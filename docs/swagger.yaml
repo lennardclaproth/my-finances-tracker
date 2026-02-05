@@ -1,0 +1,175 @@
+definitions:
+  contracts.TagTransactionRequest:
+    properties:
+      id:
+        type: string
+      tag:
+        type: string
+    type: object
+  contracts.Transaction:
+    properties:
+      amountCents:
+        example: 4250
+        type: integer
+      date:
+        example: "2025-01-15T00:00:00Z"
+        type: string
+      description:
+        example: Grocery shopping
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      note:
+        example: Bought fruits and vegetables
+        type: string
+      source:
+        example: MyBank
+        type: string
+      tag:
+        example: Food
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Returns 200 when service is healthy
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: status
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health check
+      tags:
+      - Health
+  /import/csv:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a CSV file containing transaction data to import into a
+        specific vendor
+      parameters:
+      - description: CSV file containing transaction data
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: UUID of the vendor to import transactions for
+        in: formData
+        name: vendor_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Import ID of the created import job
+          schema:
+            type: string
+        "400":
+          description: Invalid request (missing file, invalid vendor_id, etc.)
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "413":
+          description: File too large (max 20MB)
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "415":
+          description: Unsupported media type (only text/csv and application/vnd.ms-excel
+            allowed)
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Import transactions from CSV file
+      tags:
+      - imports
+  /transactions/tag:
+    post:
+      consumes:
+      - application/json
+      description: Apply a tag to a transaction by id
+      parameters:
+      - description: Tag request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/contracts.TagTransactionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Tag a transaction
+      tags:
+      - Transactions
+  /transactions/untagged:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve paginated untagged transactions
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of transactions
+          schema:
+            items:
+              $ref: '#/definitions/contracts.Transaction'
+            type: array
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get untagged transactions
+      tags:
+      - Transactions
+swagger: "2.0"

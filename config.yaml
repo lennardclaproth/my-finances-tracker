@@ -1,0 +1,18 @@
+server:
+  environment: development  # development or production
+  port: 6060                # HTTP server port
+
+database:
+  type: postgres  # postgres or sqlite3
+  connection_string: "postgres://admin:Postgres2026%21@localhost:5432/my_finances_tracker?sslmode=disable"
+
+logging:
+  level: info  # debug, info, warn, error
+
+apm:
+  server_url: http://localhost:8200
+  service_name: my-finances-tracker
+  environment: development
+  secret_token: 
+  verify_server_cert: false
+  log_level: warning

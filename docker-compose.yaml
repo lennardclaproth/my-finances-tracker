@@ -1,0 +1,67 @@
+name: my-finances-tracker
+
+services:
+  postgres:
+    image: postgres:18.1
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Postgres2026!}
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - mft_db_data:/var/lib/postgresql
+    
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.2.0
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+    volumes:
+      - mft_es_data:/usr/share/elasticsearch/data
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.2.0
+    depends_on:
+      - elasticsearch
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+
+  apm-server:
+    image: docker.elastic.co/apm/apm-server:9.2.0
+    depends_on:
+      - elasticsearch
+      - kibana
+    ports:
+      - "8200:8200"
+      - "4317:4317"
+      - "4318:4318"
+    environment:
+      - output.elasticsearch.hosts=["http://elasticsearch:9200"]
+      - apm-server.kibana.enabled=true
+      - apm-server.kibana.host=kibana:5601
+      - apm-server.otlp.enabled=true
+      - apm-server.otlp.protocols.grpc.endpoint=0.0.0.0:4317
+      - apm-server.otlp.protocols.http.endpoint=0.0.0.0:4318
+      - apm-server.host=0.0.0.0:8200
+      - apm-server.logging.level=info
+      - apm-server.auth.anonymous.enabled=true
+
+volumes:
+  mft_db_data:
+  mft_es_data:
+
+networks:
+  default:
+    name: my-finances-tracker-network
