@@ -6,16 +6,21 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/google/uuid"
 	_ "github.com/lennardclaproth/my-finances-tracker/docs"
+	"github.com/lennardclaproth/my-finances-tracker/internal/agent"
+	"github.com/lennardclaproth/my-finances-tracker/internal/bootstrap"
 	"github.com/lennardclaproth/my-finances-tracker/internal/config"
-	"github.com/lennardclaproth/my-finances-tracker/internal/infra/bootstrap"
-	"github.com/lennardclaproth/my-finances-tracker/internal/infra/storage"
+	"github.com/lennardclaproth/my-finances-tracker/internal/http"
+	handlers "github.com/lennardclaproth/my-finances-tracker/internal/http/handlers"
+	"github.com/lennardclaproth/my-finances-tracker/internal/jobs"
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
-	"github.com/lennardclaproth/my-finances-tracker/internal/rest"
-	handlers "github.com/lennardclaproth/my-finances-tracker/internal/rest/handlers"
+	"github.com/lennardclaproth/my-finances-tracker/internal/storage"
 	"github.com/lennardclaproth/my-finances-tracker/migrations"
 	httpSwagger "github.com/swaggo/http-swagger"
+	"golang.org/x/sync/errgroup"
 )
 
 func run(ctx context.Context, args []string) error {
@@ -38,10 +43,26 @@ func run(ctx context.Context, args []string) error {
 	// Wiring: construct handlers and routes at the composition root
 	router := setupRouter(logger, db)
 
-	// Create and run server
-	srv := rest.NewServer(fmt.Sprintf(":%d", cfg.Server.Port), router, logger)
-	if err := srv.Run(ctx); err != nil {
-		return fmt.Errorf("server exited with error: %w", err)
+	// Create server and job manager
+	srv := http.NewServer(fmt.Sprintf(":%d", cfg.Server.Port), router, logger)
+	jobMgr := setupJobs(logger, db, cfg)
+
+	// Run server and jobs concurrently with proper cleanup
+	g, ctx := errgroup.WithContext(ctx)
+
+	// Start HTTP server
+	g.Go(func() error {
+		return srv.Run(ctx)
+	})
+
+	// Start background jobs
+	g.Go(func() error {
+		return jobMgr.Start(ctx)
+	})
+
+	// Wait for both to finish
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("server or jobs exited with error: %w", err)
 	}
 
 	return nil
@@ -83,14 +104,14 @@ func setupDatabase(log logging.Logger, cfg *config.Config) *storage.DB {
 
 // setupRouter constructs all handlers and registers them with the router.
 // This is the composition root where all dependencies are wired together.
-func setupRouter(log logging.Logger, db *storage.DB) *rest.Router {
-	router := rest.NewRouter()
+func setupRouter(log logging.Logger, db *storage.DB) *http.Router {
+	router := http.NewRouter()
 
 	var transactionRepository = storage.NewSQLXTransactionStore(db)
 	var importRepository = storage.NewSQLXImportStore(db)
 	var vendorRepository = storage.NewSQLXVendorStore(db)
 
-	var diskWriter = storage.NewDiskWriter("./data/uploads")
+	var diskWriter = storage.NewDisk("./data/uploads")
 
 	// Register routes with their handlers
 	router.HandleWithMiddleware(
@@ -101,21 +122,46 @@ func setupRouter(log logging.Logger, db *storage.DB) *rest.Router {
 			diskWriter,
 			vendorRepository,
 		),
-		rest.WithRequestLogging(log),
+		http.WithRequestLogging(log),
 	)
 	router.HandleWithMiddleware(
 		"POST /transaction/tag",
 		handlers.TagTransaction(log, transactionRepository),
-	)
-	router.HandleWithMiddleware(
-		"GET /transaction/untagged",
-		handlers.GetUntaggedTransactions(log, transactionRepository),
+		http.WithRequestLogging(log),
 	)
 
 	router.Handle("GET /swagger/", httpSwagger.WrapHandler)
 	router.Handle("GET /health", handlers.HealthHandler())
 
 	return router
+}
+
+func setupJobs(log logging.Logger, db *storage.DB, cfg *config.Config) *jobs.Manager {
+	// Setup and start background jobs here
+	importJob := jobs.NewImportJob(
+		storage.NewSQLXVendorStore(db),
+		storage.NewSQLXImportStore(db),
+		storage.NewSQLXTransactionStore(db),
+		storage.NewDisk(cfg.DiskStorage.BasePath+"/import"),
+		log,
+		5*time.Second,
+	)
+
+	var agentID uuid.UUID
+	agentID, err := uuid.Parse(cfg.Agent.DefaultTagAgentID)
+	if err != nil {
+		agentID = uuid.Nil
+	}
+	taggerJob := jobs.NewTaggerJob(
+		agent.NewRunner(
+			cfg.Agent.AgentBaseURL,
+			agentID,
+		),
+		storage.NewSQLXTransactionStore(db),
+		100*time.Millisecond,
+		log,
+	)
+	return jobs.NewManager(log, importJob, taggerJob)
 }
 
 func bootstrapData(ctx context.Context, db *storage.DB, log logging.Logger) {

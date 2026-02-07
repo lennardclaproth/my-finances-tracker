@@ -11,10 +11,21 @@ import (
 const configPath = "config.yaml"
 
 type Config struct {
-	Server   Server    `yaml:"server"`
-	Database Database  `yaml:"database"`
-	Logging  Logging   `yaml:"logging"`
-	APM      APMConfig `yaml:"apm"`
+	Server      Server      `yaml:"server"`
+	Database    Database    `yaml:"database"`
+	Logging     Logging     `yaml:"logging"`
+	APM         APMConfig   `yaml:"apm"`
+	DiskStorage DiskStorage `yaml:"disk_storage"`
+	Agent       AgentConfig `yaml:"agent"`
+}
+
+type AgentConfig struct {
+	AgentBaseURL      string `yaml:"agent_base_url"`
+	DefaultTagAgentID string `yaml:"default_tag_agent_id"`
+}
+
+type DiskStorage struct {
+	BasePath string `yaml:"base_path"`
 }
 
 type Logging struct {

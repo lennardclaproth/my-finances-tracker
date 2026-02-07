@@ -1,12 +1,12 @@
 definitions:
-  contracts.TagTransactionRequest:
+  api.TagTransactionRequest:
     properties:
       id:
         type: string
       tag:
         type: string
     type: object
-  contracts.Transaction:
+  api.Transaction:
     properties:
       amountCents:
         example: 4250
@@ -113,7 +113,7 @@ paths:
         name: payload
         required: true
         schema:
-          $ref: '#/definitions/contracts.TagTransactionRequest'
+          $ref: '#/definitions/api.TagTransactionRequest'
       produces:
       - application/json
       responses:
@@ -161,7 +161,7 @@ paths:
           description: List of transactions
           schema:
             items:
-              $ref: '#/definitions/contracts.Transaction'
+              $ref: '#/definitions/api.Transaction'
             type: array
         "500":
           description: Internal server error

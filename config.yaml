@@ -16,3 +16,10 @@ apm:
   secret_token: 
   verify_server_cert: false
   log_level: warning
+
+disk_storage:
+  base_path: C:\mft
+
+agent:
+  agent_base_url: http://localhost:8001/api
+  default_tag_agent_id: "4cf3c137-4228-44fe-8f56-cd8ed83a8103"

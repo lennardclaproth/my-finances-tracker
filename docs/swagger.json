@@ -125,7 +125,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/contracts.TagTransactionRequest"
+                            "$ref": "#/definitions/api.TagTransactionRequest"
                         }
                     }
                 ],
@@ -195,7 +195,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/contracts.Transaction"
+                                "$ref": "#/definitions/api.Transaction"
                             }
                         }
                     },
@@ -213,7 +213,7 @@
         }
     },
     "definitions": {
-        "contracts.TagTransactionRequest": {
+        "api.TagTransactionRequest": {
             "type": "object",
             "properties": {
                 "id": {
@@ -224,7 +224,7 @@
                 }
             }
         },
-        "contracts.Transaction": {
+        "api.Transaction": {
             "type": "object",
             "properties": {
                 "amountCents": {

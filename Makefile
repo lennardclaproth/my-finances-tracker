@@ -1,15 +1,41 @@
 .PHONY: help build run test test-coverage clean fmt vet lint swagger dev install-tools env migrate-up migrate-down migrate-status migrate-create
 
-# Variables
-BINARY_NAME=server
-BINARY_PATH=./bin/$(BINARY_NAME)
-MAIN_PATH=./cmd/server/main.go
-COVERAGE_FILE=coverage.out
-MIGRATION_DIR=./migrations/postgres
+# --- OS detection ---
+ifeq ($(OS),Windows_NT)
+  IS_WINDOWS := 1
+else
+  IS_WINDOWS := 0
+endif
 
-# Colors for output
-GREEN=\033[0;32m
-NC=\033[0m # No Color
+# --- Variables ---
+BINARY_NAME := server
+ifeq ($(IS_WINDOWS),1)
+  EXE := .exe
+else
+  EXE :=
+endif
+
+BINARY_PATH := ./bin/$(BINARY_NAME)$(EXE)
+MAIN_PATH := ./cmd/server/main.go
+COVERAGE_FILE := coverage.out
+MIGRATION_DIR := ./migrations/postgres
+
+# --- Helpers (cross-platform commands) ---
+ifeq ($(IS_WINDOWS),1)
+  # PowerShell helpers
+  MKDIR_BIN = powershell -NoProfile -ExecutionPolicy Bypass -Command "New-Item -ItemType Directory -Force 'bin' | Out-Null"
+  RM_BIN    = powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path 'bin') { Remove-Item -Recurse -Force 'bin' }"
+  RM_COV    = powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '$(COVERAGE_FILE)') { Remove-Item -Force '$(COVERAGE_FILE)' }"
+  ENV_COPY  = powershell -NoProfile -ExecutionPolicy Bypass -Command "if (!(Test-Path '.env')) { Write-Host 'Creating .env from config.example.env...'; Copy-Item 'config.example.env' '.env'; Write-Host '.env created. Please update with your local settings.' }"
+  REQUIRE_NAME = powershell -NoProfile -ExecutionPolicy Bypass -Command "if ([string]::IsNullOrWhiteSpace('$(name)')) { Write-Error 'Error: migration name is required. Usage: make migrate-create name=migration_name'; exit 1 }"
+else
+  # POSIX helpers
+  MKDIR_BIN = mkdir -p bin
+  RM_BIN    = rm -rf bin/
+  RM_COV    = rm -f $(COVERAGE_FILE)
+  ENV_COPY  = sh -c 'if [ ! -f .env ]; then echo "Creating .env from config.example.env..."; cp config.example.env .env; echo ".env created. Please update with your local settings."; fi'
+  REQUIRE_NAME = sh -c 'if [ -z "$(name)" ]; then echo "Error: migration name is required. Usage: make migrate-create name=migration_name"; exit 1; fi'
+endif
 
 ## help: Display this help message
 help:
@@ -34,7 +60,7 @@ help:
 ## build: Build the application
 build:
 	@echo "Building $(BINARY_NAME)..."
-	@mkdir -p bin
+	@$(MKDIR_BIN)
 	@go build -o $(BINARY_PATH) $(MAIN_PATH)
 	@echo "Build complete: $(BINARY_PATH)"
 
@@ -86,17 +112,13 @@ swagger:
 ## clean: Remove binary and coverage files
 clean:
 	@echo "Cleaning..."
-	@rm -rf bin/
-	@rm -f $(COVERAGE_FILE)
+	@$(RM_BIN)
+	@$(RM_COV)
 	@echo "Clean complete"
 
 ## env: Create .env from example if it doesn't exist
 env:
-	@if [ ! -f .env ]; then \
-		echo "Creating .env from config.example.env..."; \
-		cp config.example.env .env; \
-		echo ".env created. Please update with your local settings."; \
-	fi
+	@$(ENV_COPY)
 
 ## install-tools: Install required development tools
 install-tools:
@@ -128,10 +150,7 @@ migrate-status:
 
 ## migrate-create: Create new migration (usage: make migrate-create name=migration_name)
 migrate-create:
-	@if [ -z "$(name)" ]; then \
-		echo "Error: migration name is required. Usage: make migrate-create name=migration_name"; \
-		exit 1; \
-	fi
+	@$(REQUIRE_NAME)
 	@echo "Creating migration: $(name)"
 	@goose -dir $(MIGRATION_DIR) create $(name) sql
 	@echo "Migration created in $(MIGRATION_DIR)"

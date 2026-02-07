@@ -136,7 +136,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/contracts.TagTransactionRequest"
+                            "$ref": "#/definitions/api.TagTransactionRequest"
                         }
                     }
                 ],
@@ -206,7 +206,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/contracts.Transaction"
+                                "$ref": "#/definitions/api.Transaction"
                             }
                         }
                     },
@@ -224,7 +224,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "contracts.TagTransactionRequest": {
+        "api.TagTransactionRequest": {
             "type": "object",
             "properties": {
                 "id": {
@@ -235,7 +235,7 @@ const docTemplate = `{
                 }
             }
         },
-        "contracts.Transaction": {
+        "api.Transaction": {
             "type": "object",
             "properties": {
                 "amountCents": {
