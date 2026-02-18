@@ -1,0 +1,81 @@
+{
+    "bestMatches": [
+        {
+            "1. symbol": "DAX",
+            "2. name": "GLOBAL X DAX GERMANY ETF ",
+            "3. type": "ETF",
+            "4. region": "United States",
+            "5. marketOpen": "09:30",
+            "6. marketClose": "16:00",
+            "7. timezone": "UTC-04",
+            "8. currency": "USD",
+            "9. matchScore": "1.0000"
+        },
+        {
+            "1. symbol": "DAXXF",
+            "2. name": "iSharesCore DAX UCITS ETF (DE) EUR (Acc)",
+            "3. type": "ETF",
+            "4. region": "United States",
+            "5. marketOpen": "09:30",
+            "6. marketClose": "16:00",
+            "7. timezone": "UTC-04",
+            "8. currency": "USD",
+            "9. matchScore": "0.7500"
+        },
+        {
+            "1. symbol": "DAX.PAR",
+            "2. name": "Multi Units Luxembourg - Lyxor DAX (DR) UCITS ETF",
+            "3. type": "ETF",
+            "4. region": "Paris",
+            "5. marketOpen": "09:00",
+            "6. marketClose": "17:30",
+            "7. timezone": "UTC+02",
+            "8. currency": "EUR",
+            "9. matchScore": "0.6667"
+        },
+        {
+            "1. symbol": "DAX3.LON",
+            "2. name": "Leverage Shares 3x Long Germany 40 ETP Securities",
+            "3. type": "ETF",
+            "4. region": "United Kingdom",
+            "5. marketOpen": "08:00",
+            "6. marketClose": "16:30",
+            "7. timezone": "UTC+01",
+            "8. currency": "USD",
+            "9. matchScore": "0.6667"
+        },
+        {
+            "1. symbol": "DAXX.LON",
+            "2. name": "MULTI-UNITS LUXEMBOURG - Lyxor DAX (DR) UCITS ETF - Acc",
+            "3. type": "ETF",
+            "4. region": "United Kingdom",
+            "5. marketOpen": "08:00",
+            "6. marketClose": "16:30",
+            "7. timezone": "UTC+01",
+            "8. currency": "GBX",
+            "9. matchScore": "0.6667"
+        },
+        {
+            "1. symbol": "DXR",
+            "2. name": "Daxor Corp",
+            "3. type": "Equity",
+            "4. region": "United States",
+            "5. marketOpen": "09:30",
+            "6. marketClose": "16:00",
+            "7. timezone": "UTC-04",
+            "8. currency": "USD",
+            "9. matchScore": "0.6667"
+        },
+        {
+            "1. symbol": "DX5.FRK",
+            "2. name": "DAXOR CORP. DL -01",
+            "3. type": "Equity",
+            "4. region": "Frankfurt",
+            "5. marketOpen": "08:00",
+            "6. marketClose": "20:00",
+            "7. timezone": "UTC+02",
+            "8. currency": "EUR",
+            "9. matchScore": "0.5000"
+        }
+    ]
+}

@@ -15,10 +15,10 @@ else
   EXE :=
 endif
 
-BINARY_PATH := ./bin/$(BINARY_NAME)$(EXE)
-MAIN_PATH := ./cmd/server/main.go
+BINARY_PATH := ./apps/api/bin/$(BINARY_NAME)$(EXE)
+MAIN_PATH := ./apps/api/cmd/server/main.go
 COVERAGE_FILE := coverage.out
-MIGRATION_DIR := ./migrations/postgres
+MIGRATION_DIR := ./apps/api/migrations/postgres
 
 # --- Helpers (cross-platform commands) ---
 ifeq ($(IS_WINDOWS),1)
@@ -106,8 +106,8 @@ lint: fmt vet
 ## swagger: Generate Swagger documentation
 swagger:
 	@echo "Generating Swagger documentation..."
-	@swag init -g $(MAIN_PATH) -o ./docs
-	@echo "Swagger docs generated in ./docs"
+	@swag init -g $(MAIN_PATH) -o ./apps/api/docs
+	@echo "Swagger docs generated in ./apps/api/docs"
 
 ## clean: Remove binary and coverage files
 clean:
