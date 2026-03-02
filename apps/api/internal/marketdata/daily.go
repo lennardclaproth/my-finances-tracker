@@ -10,7 +10,8 @@ import (
 
 type Daily struct {
 	ID        uuid.UUID   `db:"id"`
-	Symbol    string      `db:"symbol"` // This is used to link back to the listing, e.g. "AAPL"
+	ListingID uuid.UUID   `db:"listing_id"`
+	Symbol    string      `db:"symbol"` // Kept for response readability
 	Date      time.Time   `db:"date"`
 	Open      money.Price `db:"open"`
 	Close     money.Price `db:"close"`
@@ -22,7 +23,8 @@ type Daily struct {
 }
 
 var (
-	ErrDailySymbolEmpty = fmt.Errorf("daily symbol cannot be empty")
+	ErrDailySymbolEmpty    = fmt.Errorf("daily symbol cannot be empty")
+	ErrDailyListingIDEmpty = fmt.Errorf("daily listing id cannot be empty")
 )
 
 func NewDaily(symbol string, date time.Time, open, close, high, low float64, volume int64) (Daily, error) {

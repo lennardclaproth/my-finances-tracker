@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -21,6 +22,7 @@ import (
 // @Produce json
 // @Param file formData file true "CSV file containing transaction data"
 // @Param vendor_id formData string true "UUID of the vendor to import transactions for"
+// @Param account_id formData string false "UUID of the account (required for brokerage vendors)"
 // @Success 200 {object} uuid.UUID "Import ID of the created import job"
 // @Failure 400 {object} map[string]string "Invalid request (missing file, invalid vendor_id, etc.)"
 // @Failure 413 {object} map[string]string "File too large (max 20MB)"
@@ -32,14 +34,21 @@ func ImportCsv(
 	ic importer.ImportCreator,
 	dw *storage.Disk,
 	vf importer.VendorFetcher,
+	af importer.AccountFetcher,
 	iq importer.ImportEnqueuer,
 ) http.Handler {
 	// Setup the endpoint closure function.
 	endpoint := func(ctx context.Context, req api.ImportCsv) (status int, res uuid.UUID, err error) {
 		defer req.File.Close()
-		handler := importer.NewFromCsvHandler(ic, dw, dw, vf)
-		res, err = handler.Handle(ctx, req.File, req.VendorID)
+		handler := importer.NewFromCsvHandler(ic, dw, dw, vf, af)
+		res, err = handler.Handle(ctx, req.File, req.VendorID, req.AccountID)
 		if err != nil {
+			if errors.Is(err, importer.ErrAccountIDRequired) {
+				return http.StatusBadRequest, uuid.Nil, nil
+			}
+			if errors.Is(err, importer.ErrImportAccountNotFound) {
+				return http.StatusBadRequest, uuid.Nil, nil
+			}
 			return http.StatusInternalServerError, uuid.Nil, err
 		}
 		if iq != nil {

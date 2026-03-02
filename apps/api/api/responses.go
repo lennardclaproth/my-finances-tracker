@@ -80,3 +80,65 @@ type VendorResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+type AccountResponse struct {
+	ID         uuid.UUID  `json:"id"`
+	ExternalID *uuid.UUID `json:"external_id,omitempty"`
+	Name       string     `json:"name"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
+}
+
+type ListingResponse struct {
+	ID          uuid.UUID `json:"id"`
+	Symbol      string    `json:"symbol"`
+	Name        string    `json:"name"`
+	Source      string    `json:"source"`
+	Description *string   `json:"description,omitempty"`
+	Exchange    *string   `json:"exchange,omitempty"`
+	Region      *string   `json:"region,omitempty"`
+	Currency    *string   `json:"currency,omitempty"`
+	ISIN        *string   `json:"isin,omitempty"`
+	Ticker      *string   `json:"ticker,omitempty"`
+	Type        *string   `json:"type,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type AsyncEventAcceptedResponse struct {
+	MessageID uuid.UUID `json:"message_id"`
+	Topic     string    `json:"topic"`
+	AccountID uuid.UUID `json:"account_id"`
+}
+
+type PortfolioSnapshotPointResponse struct {
+	OccurredAt            time.Time `json:"occurred_at"`
+	MarketValue           int64     `json:"market_value"`
+	TotalPnL              int64     `json:"total_pnl"`
+	TotalPnLPct           float64   `json:"total_pnl_pct"`
+	TotalCostBasis        int64     `json:"total_cost_basis"`
+	ReturnVsCostBasisPct  float64   `json:"return_vs_cost_basis_pct"`
+	DailyReturnPct        float64   `json:"daily_return_pct"`
+	TimeWeightedReturnPct float64   `json:"time_weighted_return_pct"`
+	ValueIndex            float64   `json:"value_index"`
+}
+
+type PortfolioPositionResponse struct {
+	ID               uuid.UUID  `json:"id"`
+	Symbol           *string    `json:"symbol,omitempty"`
+	Name             *string    `json:"name,omitempty"`
+	Quantity         float64    `json:"quantity"`
+	CostBasis        int64      `json:"cost_basis"`
+	RealizedPnL      int64      `json:"realized_pnl"`
+	MarketValue      *int64     `json:"market_value,omitempty"`
+	UnrealizedPnLPct *float64   `json:"unrealized_pnl_pct,omitempty"`
+	LastSnapshotAt   *time.Time `json:"last_snapshot_at,omitempty"`
+	OpenDate         time.Time  `json:"open_date"`
+	CloseDate        *time.Time `json:"close_date,omitempty"`
+	IsClosed         bool       `json:"is_closed"`
+}
+
+type PortfolioPositionsResponse struct {
+	IncludeClosed bool                        `json:"include_closed"`
+	Data          []PortfolioPositionResponse `json:"data"`
+}

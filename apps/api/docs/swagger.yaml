@@ -1,4 +1,13 @@
 definitions:
+  api.AsyncEventAcceptedResponse:
+    properties:
+      account_id:
+        type: string
+      message_id:
+        type: string
+      topic:
+        type: string
+    type: object
   api.CashflowMonthlyAnalyticsPoint:
     properties:
       incomingCents:
@@ -77,6 +86,30 @@ definitions:
       pagination:
         $ref: '#/definitions/api.Pagination'
     type: object
+  api.CreateListingRequest:
+    properties:
+      currency:
+        type: string
+      description:
+        description: Optional fields
+        type: string
+      exchange:
+        type: string
+      isin:
+        type: string
+      name:
+        type: string
+      region:
+        type: string
+      source:
+        type: string
+      symbol:
+        type: string
+      ticker:
+        type: string
+      type:
+        type: string
+    type: object
   api.IgnoreTransactionsByFilterRequest:
     properties:
       filters:
@@ -93,6 +126,35 @@ definitions:
       ignored:
         type: boolean
     type: object
+  api.ListingResponse:
+    properties:
+      created_at:
+        type: string
+      currency:
+        type: string
+      description:
+        type: string
+      exchange:
+        type: string
+      id:
+        type: string
+      isin:
+        type: string
+      name:
+        type: string
+      region:
+        type: string
+      source:
+        type: string
+      symbol:
+        type: string
+      ticker:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+    type: object
   api.Pagination:
     properties:
       count:
@@ -103,6 +165,11 @@ definitions:
         type: integer
       total:
         type: integer
+    type: object
+  api.RebuildPortfolioRequest:
+    properties:
+      account_id:
+        type: string
     type: object
   api.TagTransactionRequest:
     properties:
@@ -162,6 +229,26 @@ definitions:
         type: string
       tag:
         example: Food
+        type: string
+    type: object
+  api.UpdateListingFieldsRequest:
+    properties:
+      currency:
+        type: string
+      description:
+        description: Optional fields
+        type: string
+      exchange:
+        type: string
+      id:
+        type: string
+      isin:
+        type: string
+      region:
+        type: string
+      ticker:
+        type: string
+      type:
         type: string
     type: object
   marketdata.Daily:
@@ -638,6 +725,10 @@ paths:
         name: vendor_id
         required: true
         type: string
+      - description: UUID of the account (required for brokerage vendors)
+        in: formData
+        name: account_id
+        type: string
       produces:
       - application/json
       responses:
@@ -672,4 +763,147 @@ paths:
       summary: Import transactions from CSV file
       tags:
       - imports
+  /marketdata/listing:
+    patch:
+      consumes:
+      - application/json
+      description: Patch selected listing fields; omitted fields remain unchanged.
+      parameters:
+      - description: Listing patch payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpdateListingFieldsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ListingResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Update listing fields
+      tags:
+      - listings
+    post:
+      consumes:
+      - application/json
+      description: Create a listing and trigger async daily data accumulation.
+      parameters:
+      - description: Listing payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.CreateListingRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ListingResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create listing
+      tags:
+      - listings
+  /marketdata/listings:
+    get:
+      consumes:
+      - application/json
+      description: Return all market-data listings ordered by symbol.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.ListingResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List listings
+      tags:
+      - listings
+  /portfolio/rebuild:
+    post:
+      consumes:
+      - application/json
+      description: Triggers a portfolio rebuild by publishing an event to the internal
+        bus.
+      parameters:
+      - description: Rebuild request payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.RebuildPortfolioRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/api.AsyncEventAcceptedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Rebuild portfolio
+      tags:
+      - portfolio
 swagger: "2.0"

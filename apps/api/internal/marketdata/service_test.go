@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lennardclaproth/my-finances-tracker/internal/date"
+	"github.com/lennardclaproth/my-finances-tracker/internal/money"
 )
 
 type fakeListingStore struct {
@@ -17,6 +19,7 @@ type fakeListingStore struct {
 
 	createFn                 func(ctx context.Context, listing *Listing) error
 	updateFieldsFn           func(ctx context.Context, listing *Listing) error
+	listFn                   func(ctx context.Context) ([]*Listing, error)
 	fetchBySymbolFn          func(ctx context.Context, symbol string) (*Listing, error)
 	fetchByIDFn              func(ctx context.Context, id uuid.UUID) (*Listing, error)
 	tryAcquireSyncLockFn     func(ctx context.Context, id uuid.UUID) (bool, error)
@@ -41,6 +44,13 @@ func (f *fakeListingStore) Create(ctx context.Context, listing *Listing) error {
 		return f.createFn(ctx, listing)
 	}
 	return nil
+}
+
+func (f *fakeListingStore) List(ctx context.Context) ([]*Listing, error) {
+	if f.listFn != nil {
+		return f.listFn(ctx)
+	}
+	return []*Listing{}, nil
 }
 
 func (f *fakeListingStore) UpdateFields(ctx context.Context, listing *Listing) error {
@@ -112,7 +122,7 @@ type fakeDailyStore struct {
 	mu sync.Mutex
 
 	createFn func(ctx context.Context, daily *Daily) error
-	fetchFn  func(ctx context.Context, listingID string, from, to *time.Time, limit, offset int) (*[]Daily, error)
+	fetchFn  func(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]Daily, error)
 
 	createCalls int
 	fetchCalls  int
@@ -128,7 +138,7 @@ func (f *fakeDailyStore) Create(ctx context.Context, daily *Daily) error {
 	return nil
 }
 
-func (f *fakeDailyStore) FetchByListingID(ctx context.Context, listingID string, from, to *time.Time, limit, offset int) (*[]Daily, error) {
+func (f *fakeDailyStore) FetchByListingID(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]Daily, error) {
 	f.mu.Lock()
 	f.fetchCalls++
 	f.mu.Unlock()
@@ -185,21 +195,21 @@ func TestLatestBusinessDate(t *testing.T) {
 	loc := time.UTC
 
 	mon := time.Date(2026, 2, 9, 15, 0, 0, 0, loc) // Monday
-	got := latestBusinessDate(mon, loc)
+	got := date.LatestBusinessDate(mon, loc)
 	want := time.Date(2026, 2, 6, 0, 0, 0, 0, loc) // Friday
 	if !got.Equal(want) {
 		t.Fatalf("expected %s, got %s", want, got)
 	}
 
 	wed := time.Date(2026, 2, 11, 15, 0, 0, 0, loc) // Wednesday
-	got = latestBusinessDate(wed, loc)
+	got = date.LatestBusinessDate(wed, loc)
 	want = time.Date(2026, 2, 10, 0, 0, 0, 0, loc) // Tuesday
 	if !got.Equal(want) {
 		t.Fatalf("expected %s, got %s", want, got)
 	}
 
 	sun := time.Date(2026, 2, 8, 15, 0, 0, 0, loc) // Sunday
-	got = latestBusinessDate(sun, loc)
+	got = date.LatestBusinessDate(sun, loc)
 	want = time.Date(2026, 2, 6, 0, 0, 0, 0, loc) // Friday
 	if !got.Equal(want) {
 		t.Fatalf("expected %s, got %s", want, got)
@@ -209,7 +219,7 @@ func TestLatestBusinessDate(t *testing.T) {
 func TestDateOnly(t *testing.T) {
 	loc := time.FixedZone("UTC+2", 2*3600)
 	input := time.Date(2026, 2, 9, 18, 45, 30, 0, time.UTC)
-	got := dateOnly(input, loc)
+	got := date.DateOnly(input, loc)
 	want := time.Date(2026, 2, 9, 0, 0, 0, 0, loc)
 	if !got.Equal(want) {
 		t.Fatalf("expected %s, got %s", want, got)
@@ -482,7 +492,7 @@ func TestGetDailies_WhenSyncingReturnsStaleMessage(t *testing.T) {
 		},
 	}
 	ds := &fakeDailyStore{
-		fetchFn: func(ctx context.Context, listingID string, from, to *time.Time, limit, offset int) (*[]Daily, error) {
+		fetchFn: func(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]Daily, error) {
 			return &dailies, nil
 		},
 	}
@@ -511,7 +521,7 @@ func TestGetDailies_WhenSyncingDailyFetchError(t *testing.T) {
 		},
 	}
 	ds := &fakeDailyStore{
-		fetchFn: func(ctx context.Context, listingID string, from, to *time.Time, limit, offset int) (*[]Daily, error) {
+		fetchFn: func(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]Daily, error) {
 			return nil, errors.New("fetch failed")
 		},
 	}
@@ -536,7 +546,7 @@ func TestGetDailies_StaleListingUpdateFlagErrorStillReturnsData(t *testing.T) {
 		},
 	}
 	ds := &fakeDailyStore{
-		fetchFn: func(ctx context.Context, listingID string, from, to *time.Time, limit, offset int) (*[]Daily, error) {
+		fetchFn: func(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]Daily, error) {
 			return &dailies, nil
 		},
 	}
@@ -575,7 +585,7 @@ func TestGetDailies_StaleListingStartsAsyncSync(t *testing.T) {
 		},
 	}
 	ds := &fakeDailyStore{
-		fetchFn: func(ctx context.Context, listingID string, from, to *time.Time, limit, offset int) (*[]Daily, error) {
+		fetchFn: func(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]Daily, error) {
 			return &dailies, nil
 		},
 	}
@@ -674,5 +684,159 @@ func TestCreateListing_SuccessStartsAsyncSync(t *testing.T) {
 	case <-started:
 	case <-time.After(500 * time.Millisecond):
 		t.Fatalf("expected async sync to start")
+	}
+}
+
+func TestUpdateListingFields_UpdatesOnlyProvidedFields(t *testing.T) {
+	id := uuid.New()
+	desc := "updated description"
+	typ := "ETF"
+	existingCurrency := "EUR"
+	existing := &Listing{
+		ID:          id,
+		Symbol:      "AAA",
+		Name:        "Original",
+		Type:        &typ,
+		Description: &typ,
+		Currency:    (*money.Currency)(&existingCurrency),
+		Source:      SourceAlphaVantage,
+		Active:      true,
+	}
+
+	var updated *Listing
+	ls := &fakeListingStore{
+		fetchByIDFn: func(ctx context.Context, gotID uuid.UUID) (*Listing, error) {
+			if gotID != id {
+				t.Fatalf("expected id %s, got %s", id, gotID)
+			}
+			copy := *existing
+			return &copy, nil
+		},
+		updateFieldsFn: func(ctx context.Context, listing *Listing) error {
+			updated = listing
+			return nil
+		},
+	}
+	svc := NewService(ls, &fakeDailyStore{}, &fakeEODClient{}, &fakeLogger{})
+
+	out, err := svc.UpdateListingFields(context.Background(), id, &desc, nil, nil, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if out.Description == nil || *out.Description != desc {
+		t.Fatalf("expected updated description, got %+v", out.Description)
+	}
+	if out.Type == nil || *out.Type != typ {
+		t.Fatalf("expected type unchanged, got %+v", out.Type)
+	}
+	if out.Currency == nil || *out.Currency != money.Currency(existingCurrency) {
+		t.Fatalf("expected currency unchanged, got %+v", out.Currency)
+	}
+	if updated == nil {
+		t.Fatalf("expected updateFields call")
+	}
+}
+
+func TestUpdateListingFields_RejectsEmptyPatch(t *testing.T) {
+	ls := &fakeListingStore{}
+	svc := NewService(ls, &fakeDailyStore{}, &fakeEODClient{}, &fakeLogger{})
+
+	_, err := svc.UpdateListingFields(context.Background(), uuid.New(), nil, nil, nil, nil, nil, nil, nil)
+	if !errors.Is(err, ErrNoListingFieldsToUpdate) {
+		t.Fatalf("expected ErrNoListingFieldsToUpdate, got %v", err)
+	}
+}
+
+func TestUpdateListingFields_RejectsInvalidCurrency(t *testing.T) {
+	id := uuid.New()
+	invalid := "XYZ"
+	ls := &fakeListingStore{
+		fetchByIDFn: func(ctx context.Context, id uuid.UUID) (*Listing, error) {
+			return &Listing{ID: id, Symbol: "AAA", Name: "A", Active: true, Source: SourceAlphaVantage}, nil
+		},
+	}
+	svc := NewService(ls, &fakeDailyStore{}, &fakeEODClient{}, &fakeLogger{})
+
+	_, err := svc.UpdateListingFields(context.Background(), id, nil, nil, nil, &invalid, nil, nil, nil)
+	if !errors.Is(err, ErrInvalidListingCurrency) {
+		t.Fatalf("expected ErrInvalidListingCurrency, got %v", err)
+	}
+}
+
+func TestUpdateListingFields_ReturnsNotFound(t *testing.T) {
+	id := uuid.New()
+	desc := "d"
+	ls := &fakeListingStore{
+		fetchByIDFn: func(ctx context.Context, gotID uuid.UUID) (*Listing, error) {
+			return nil, nil
+		},
+	}
+	svc := NewService(ls, &fakeDailyStore{}, &fakeEODClient{}, &fakeLogger{})
+
+	_, err := svc.UpdateListingFields(context.Background(), id, &desc, nil, nil, nil, nil, nil, nil)
+	if !errors.Is(err, ErrListingNotFound) {
+		t.Fatalf("expected ErrListingNotFound, got %v", err)
+	}
+}
+
+func TestUpdateListingFields_PersistError(t *testing.T) {
+	id := uuid.New()
+	desc := "d"
+	ls := &fakeListingStore{
+		fetchByIDFn: func(ctx context.Context, gotID uuid.UUID) (*Listing, error) {
+			return &Listing{ID: gotID, Symbol: "AAA", Name: "A", Active: true, Source: SourceAlphaVantage}, nil
+		},
+		updateFieldsFn: func(ctx context.Context, listing *Listing) error {
+			return errors.New("persist failed")
+		},
+	}
+	svc := NewService(ls, &fakeDailyStore{}, &fakeEODClient{}, &fakeLogger{})
+
+	_, err := svc.UpdateListingFields(context.Background(), id, &desc, nil, nil, nil, nil, nil, nil)
+	if err == nil || !strings.Contains(err.Error(), "failed to persist listing") {
+		t.Fatalf("expected persist error, got %v", err)
+	}
+}
+
+func TestListListings_ReturnsListings(t *testing.T) {
+	id := uuid.New()
+	ls := &fakeListingStore{
+		listFn: func(ctx context.Context) ([]*Listing, error) {
+			return []*Listing{
+				{
+					ID:     id,
+					Symbol: "AAA",
+					Name:   "Test",
+					Source: SourceAlphaVantage,
+					Active: true,
+				},
+			}, nil
+		},
+	}
+	svc := NewService(ls, &fakeDailyStore{}, &fakeEODClient{}, &fakeLogger{})
+
+	listings, err := svc.ListListings(context.Background())
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(listings) != 1 {
+		t.Fatalf("expected one listing, got %d", len(listings))
+	}
+	if listings[0].ID != id {
+		t.Fatalf("expected listing id %s, got %s", id, listings[0].ID)
+	}
+}
+
+func TestListListings_StoreError(t *testing.T) {
+	ls := &fakeListingStore{
+		listFn: func(ctx context.Context) ([]*Listing, error) {
+			return nil, errors.New("store unavailable")
+		},
+	}
+	svc := NewService(ls, &fakeDailyStore{}, &fakeEODClient{}, &fakeLogger{})
+
+	_, err := svc.ListListings(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "ListListings failed to fetch listings") {
+		t.Fatalf("expected list error, got %v", err)
 	}
 }

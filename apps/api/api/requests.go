@@ -10,17 +10,21 @@ import (
 )
 
 type ImportCsv struct {
-	File     multipart.File       `multipart:"file"`
-	Filename string               `multipart:"filename"`
-	Size     int64                `multipart:"size"`
-	Header   textproto.MIMEHeader `multipart:"header"`
-	VendorID uuid.UUID            `form:"vendor_id"`
+	File      multipart.File       `multipart:"file"`
+	Filename  string               `multipart:"filename"`
+	Size      int64                `multipart:"size"`
+	Header    textproto.MIMEHeader `multipart:"header"`
+	VendorID  uuid.UUID            `form:"vendor_id"`
+	AccountID uuid.UUID            `form:"account_id"`
 }
 
 func (r ImportCsv) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if r.VendorID == uuid.Nil {
 		problems["vendor_id"] = "vendor_id is required"
+	}
+	if r.AccountID == uuid.Nil {
+		problems["account_id"] = "account_id is required"
 	}
 	return problems
 }
@@ -203,6 +207,58 @@ func (r UpdateListingFieldsRequest) Valid(ctx context.Context) map[string]string
 	problems := make(map[string]string)
 	if r.Id == uuid.Nil {
 		problems["id"] = "id is required"
+	}
+	return problems
+}
+
+type CreateAccountRequest struct {
+	Name       string     `json:"name"`
+	ExternalID *uuid.UUID `json:"external_id,omitempty"`
+}
+
+func (r CreateAccountRequest) Valid(ctx context.Context) map[string]string {
+	problems := make(map[string]string)
+	if strings.TrimSpace(r.Name) == "" {
+		problems["name"] = "name is required"
+	}
+	return problems
+}
+
+type RebuildPortfolioRequest struct {
+	AccountID uuid.UUID `json:"account_id"`
+}
+
+func (r RebuildPortfolioRequest) Valid(ctx context.Context) map[string]string {
+	problems := make(map[string]string)
+	if r.AccountID == uuid.Nil {
+		problems["account_id"] = "account_id is required"
+	}
+	return problems
+}
+
+type GetPortfolioSnapshotsRequest struct {
+	AccountID uuid.UUID `json:"account_id" query:"account_id"`
+	From      string    `json:"from,omitempty" query:"from"`
+	To        string    `json:"to,omitempty" query:"to"`
+}
+
+func (r GetPortfolioSnapshotsRequest) Valid(ctx context.Context) map[string]string {
+	problems := make(map[string]string)
+	if r.AccountID == uuid.Nil {
+		problems["account_id"] = "account_id is required"
+	}
+	return problems
+}
+
+type GetPortfolioPositionsRequest struct {
+	AccountID    uuid.UUID `json:"account_id" query:"account_id"`
+	IncludeClosed bool     `json:"include_closed,omitempty" query:"include_closed"`
+}
+
+func (r GetPortfolioPositionsRequest) Valid(ctx context.Context) map[string]string {
+	problems := make(map[string]string)
+	if r.AccountID == uuid.Nil {
+		problems["account_id"] = "account_id is required"
 	}
 	return problems
 }

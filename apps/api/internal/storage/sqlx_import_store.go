@@ -24,8 +24,8 @@ func NewSQLXImportStore(db *DB) *SQLXImportStore {
 }
 
 func (s *SQLXImportStore) Create(ctx context.Context, imp *importer.Import) error {
-	query := fmt.Sprintf(`INSERT INTO %s (id, vendor_id, path, status, status_msg, duplicates, total_rows, imported, failed, created_at, updated_at)
-		VALUES (:id, :vendor_id, :path, :status, :status_msg, :duplicates, :total_rows, :imported, :failed, :created_at, :updated_at)
+	query := fmt.Sprintf(`INSERT INTO %s (id, vendor_id, account_id, path, status, status_msg, duplicates, total_rows, imported, failed, created_at, updated_at)
+		VALUES (:id, :vendor_id, :account_id, :path, :status, :status_msg, :duplicates, :total_rows, :imported, :failed, :created_at, :updated_at)
 	`, s.tableName)
 	_, err := s.db.NamedExecContext(ctx, query, imp)
 	return err

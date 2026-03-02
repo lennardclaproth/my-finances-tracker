@@ -4,11 +4,13 @@ import {
   ChartBarSquareIcon,
   ChevronDownIcon,
   CloudArrowUpIcon,
+  QueueListIcon,
   TagIcon,
 } from "@heroicons/vue/24/outline";
 import type { Component } from "vue";
-import { onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useAppSession } from "../../composables/useAppSession";
 import BasePopover from "../atoms/BasePopover.vue";
 
 interface Props {
@@ -44,24 +46,25 @@ const emit = defineEmits<{
 
 const route = useRoute();
 const router = useRouter();
+const session = useAppSession();
 const isOpen = ref(false);
 let closeTimer: ReturnType<typeof setTimeout> | null = null;
 
-const actions: ActionItem[] = [
+const userActions: ActionItem[] = [
   {
-    id: "tagging",
+    id: "cashflow",
     kind: "route",
-    label: "Tagging",
+    label: "Cashflow",
     description: "Review and tag transactions.",
-    to: "/tagging",
+    to: "/cashflow",
     icon: TagIcon,
   },
   {
-    id: "analyze",
+    id: "portfolio",
     kind: "route",
-    label: "Analyze",
-    description: "View your full finance overview.",
-    to: "/analyze",
+    label: "Portfolio",
+    description: "View positions and portfolio growth.",
+    to: "/portfolio",
     icon: ChartBarSquareIcon,
   },
   {
@@ -72,6 +75,19 @@ const actions: ActionItem[] = [
     icon: CloudArrowUpIcon,
   },
 ];
+
+const adminActions: ActionItem[] = [
+  {
+    id: "admin-listings",
+    kind: "route",
+    label: "Listings",
+    description: "Create and review listing metadata.",
+    to: "/admin/listings",
+    icon: QueueListIcon,
+  },
+];
+
+const actions = computed<ActionItem[]>(() => (session.adminMode.value ? adminActions : userActions));
 
 function openOnHover(): void {
   if (closeTimer) {
@@ -157,7 +173,9 @@ onBeforeUnmount(() => {
           @mouseleave="scheduleCloseOnLeave"
         >
           <header class="border-b border-slate-100 px-4 py-3">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Quick actions</p>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+              {{ session.adminMode.value ? "Admin actions" : "Quick actions" }}
+            </p>
           </header>
 
           <div class="p-2">

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -17,6 +18,7 @@ type Config struct {
 	APM         APMConfig   `yaml:"apm"`
 	DiskStorage DiskStorage `yaml:"disk_storage"`
 	Agent       AgentConfig `yaml:"agent"`
+	Providers   Providers   `yaml:"providers"`
 }
 
 type AgentConfig struct {
@@ -50,6 +52,16 @@ type APMConfig struct {
 	VerifyServerCert      bool    `yaml:"verify_server_cert"`
 	LogLevel              string  `yaml:"log_level"`
 	TransactionSampleRate float64 `yaml:"transaction_sample_rate"`
+}
+
+type Providers struct {
+	MarketStack  ProviderConfig `yaml:"marketstack"`
+	AlphaVantage ProviderConfig `yaml:"alphavantage"`
+}
+
+type ProviderConfig struct {
+	BaseURI string   `yaml:"base_uri"`
+	APIKeys []string `yaml:"-"`
 }
 
 func (c *Config) Validate() error {
@@ -104,6 +116,8 @@ func ReadConfig() (*Config, error) {
 		panic(fmt.Errorf("config: error decoding config: %w", err))
 	}
 
+	cfg.hydrateProviderEnv()
+
 	os.Setenv("ELASTIC_APM_SERVER_URL", cfg.APM.ServerURL)
 	os.Setenv("ELASTIC_APM_SERVICE_NAME", cfg.APM.ServiceName)
 	os.Setenv("ELASTIC_APM_ENVIRONMENT", cfg.APM.Environment)
@@ -116,6 +130,48 @@ func ReadConfig() (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+func (c *Config) hydrateProviderEnv() {
+	marketStackBaseURI := strings.TrimSpace(c.Providers.MarketStack.BaseURI)
+	if marketStackBaseURI == "" {
+		marketStackBaseURI = strings.TrimSpace(os.Getenv("MARKETSTACK_BASE_URI"))
+	}
+	if marketStackBaseURI == "" {
+		marketStackBaseURI = "https://api.marketstack.com/v2"
+	}
+	c.Providers.MarketStack.BaseURI = marketStackBaseURI
+	c.Providers.MarketStack.APIKeys = splitAndDedupeCommaValues(os.Getenv("MARKETSTACK_API_KEY"))
+
+	alphaVantageBaseURI := strings.TrimSpace(c.Providers.AlphaVantage.BaseURI)
+	if alphaVantageBaseURI == "" {
+		alphaVantageBaseURI = strings.TrimSpace(os.Getenv("ALPHA_VANTAGE_BASE_URI"))
+	}
+	if alphaVantageBaseURI == "" {
+		alphaVantageBaseURI = "https://www.alphavantage.co"
+	}
+	c.Providers.AlphaVantage.BaseURI = alphaVantageBaseURI
+	c.Providers.AlphaVantage.APIKeys = splitAndDedupeCommaValues(os.Getenv("ALPHA_VANTAGE_API_KEY"))
+}
+
+func splitAndDedupeCommaValues(raw string) []string {
+	parts := strings.Split(raw, ",")
+	seen := make(map[string]struct{}, len(parts))
+	out := make([]string, 0, len(parts))
+
+	for _, part := range parts {
+		v := strings.TrimSpace(part)
+		if v == "" {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+
+	return out
 }
 
 func (l *Logging) GetLogLevel() slog.Leveler {

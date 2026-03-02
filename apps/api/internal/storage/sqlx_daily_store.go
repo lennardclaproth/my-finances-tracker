@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lennardclaproth/my-finances-tracker/internal/marketdata"
 )
 
@@ -22,9 +23,13 @@ func NewSQLXDailyStore(db *DB) *SQLXDailyStore {
 }
 
 func (s *SQLXDailyStore) Create(ctx context.Context, daily *marketdata.Daily) error {
+	if daily.ListingID == uuid.Nil {
+		return marketdata.ErrDailyListingIDEmpty
+	}
 	query := fmt.Sprintf(`
 		INSERT INTO %s (
 			id,
+			listing_id,
 			symbol,
 			date,
 			open_cents,
@@ -36,6 +41,7 @@ func (s *SQLXDailyStore) Create(ctx context.Context, daily *marketdata.Daily) er
 			updated_at
 		) VALUES (
 			:id,
+			:listing_id,
 			:symbol,
 			:date,
 			:open,
@@ -46,16 +52,17 @@ func (s *SQLXDailyStore) Create(ctx context.Context, daily *marketdata.Daily) er
 			:created_at,
 			:updated_at
 		)
-		ON CONFLICT(symbol, date) DO NOTHING
+		ON CONFLICT(listing_id, date) DO NOTHING
 	`, s.tableName)
 	_, err := s.db.NamedExecContext(ctx, query, daily)
 	return err
 }
 
-func (s *SQLXDailyStore) FetchByListingID(ctx context.Context, listingID string, from, to *time.Time, limit, offset int) (*[]marketdata.Daily, error) {
+func (s *SQLXDailyStore) FetchByListingID(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]marketdata.Daily, error) {
 	query := fmt.Sprintf(`
 		SELECT
 			id,
+			listing_id,
 			symbol,
 			date,
 			open_cents AS open,
@@ -66,19 +73,19 @@ func (s *SQLXDailyStore) FetchByListingID(ctx context.Context, listingID string,
 			created_at,
 			updated_at
 		FROM %s
-		WHERE symbol = ?
+		WHERE listing_id = ?
 	`, s.tableName)
 
 	args := []any{listingID}
 	if from != nil {
 		query += " AND date >= ?"
-		args = append(args, from)
+		args = append(args, *from)
 	}
 	if to != nil {
 		query += " AND date <= ?"
-		args = append(args, to)
+		args = append(args, *to)
 	}
-	query += " ORDER BY date DESC"
+	query += " ORDER BY date ASC"
 
 	if limit > 0 {
 		query += " LIMIT ?"

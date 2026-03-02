@@ -158,6 +158,7 @@ func TestImportJob_Enqueue_Deduplicates(t *testing.T) {
 		logging.NewSlogLogger(slog.LevelError),
 		time.Second,
 		2,
+		nil,
 	)
 
 	id := uuid.New()
@@ -211,6 +212,7 @@ func TestImportJob_Start_ReconcilesAndProcessesPending(t *testing.T) {
 		logging.NewSlogLogger(slog.LevelError),
 		20*time.Millisecond,
 		1,
+		nil,
 	)
 	job.cashflowParser = func(_ vendor.VendorID) (cashflow.CsvParser, error) {
 		return &stubCashflowParser{}, nil
@@ -291,6 +293,7 @@ func TestImportJob_SyncQueueFromDB_CatchesUpAfterQueueFull(t *testing.T) {
 		logging.NewSlogLogger(slog.LevelError),
 		time.Second,
 		1,
+		nil,
 	)
 
 	if err := job.syncQueueFromDB(context.Background()); err != nil {

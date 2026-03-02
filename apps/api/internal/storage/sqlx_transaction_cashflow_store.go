@@ -63,11 +63,11 @@ func parseRows(rows *sqlx.Rows) ([]*cashflow.Transaction, error) {
 func (s *SQLXBankTransactionStore) Create(ctx context.Context, tx *cashflow.Transaction) error {
 	query := fmt.Sprintf(`
         INSERT INTO %s (
-            id, description, note, source, amount_cents,
+            id, account_id, description, note, source, amount_cents,
             direction, date, checksum, created_at, updated_at, tag,
 			row_number, ignored, import_id, account_type
         ) VALUES (
-            :id, :description, :note, :source, :amount_cents,
+            :id, :account_id, :description, :note, :source, :amount_cents,
             :direction, :date, :checksum, :created_at, :updated_at, :tag,
 			:row_number, :ignored, :import_id, :account_type
         )
@@ -76,10 +76,6 @@ func (s *SQLXBankTransactionStore) Create(ctx context.Context, tx *cashflow.Tran
 	namedQuery, args, err := sqlx.Named(query, tx)
 	if err != nil {
 		return fmt.Errorf("sqlx_transaction_store: failed to bind named params: %w", err)
-	}
-	namedQuery, args, err = sqlx.In(namedQuery, args...)
-	if err != nil {
-		return fmt.Errorf("sqlx_transaction_store: failed to expand query: %w", err)
 	}
 	namedQuery = sqlx.Rebind(sqlx.BindType(s.db.DriverName()), namedQuery)
 	_, err = executor.ExecContext(ctx, namedQuery, args...)

@@ -27,22 +27,30 @@ type FromCsvHandler struct {
 	ifw ImportFileWriter
 	fr  FileRemover
 	vf  VendorFetcher
+	af  AccountFetcher
 }
 
-func NewFromCsvHandler(ic ImportCreator, ifw ImportFileWriter, fr FileRemover, vf VendorFetcher) *FromCsvHandler {
+func NewFromCsvHandler(ic ImportCreator, ifw ImportFileWriter, fr FileRemover, vf VendorFetcher, af AccountFetcher) *FromCsvHandler {
 	return &FromCsvHandler{
 		ic:  ic,
 		ifw: ifw,
 		fr:  fr,
 		vf:  vf,
+		af:  af,
 	}
 }
 
 // Handle processes the CSV import for a given vendor ID.
-func (h *FromCsvHandler) Handle(ctx context.Context, r io.Reader, vendorID uuid.UUID) (uuid.UUID, error) {
+func (h *FromCsvHandler) Handle(ctx context.Context, r io.Reader, vendorID, accountID uuid.UUID) (uuid.UUID, error) {
 	// Get vendor via VendorFetcher
 	v, err := h.vf.FetchById(ctx, vendorID)
 	if err != nil {
+		return uuid.Nil, err
+	}
+	if h.af == nil {
+		return uuid.Nil, ErrImportAccountValidationNotReady
+	}
+	if _, err := h.af.FetchByID(ctx, accountID); err != nil {
 		return uuid.Nil, err
 	}
 	// Write file via ImportFileWriter
@@ -51,7 +59,7 @@ func (h *FromCsvHandler) Handle(ctx context.Context, r io.Reader, vendorID uuid.
 		return uuid.Nil, err
 	}
 	// Create import via ImportCreator
-	imp := NewImport(*v, path)
+	imp := NewImport(*v, path, accountID)
 	if err := h.ic.Create(ctx, imp); err != nil {
 		_ = h.fr.Remove(path) // best effort cleanup
 		return uuid.Nil, err  // return original error

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lennardclaproth/my-finances-tracker/api"
+	"github.com/lennardclaproth/my-finances-tracker/internal/bus"
 	"github.com/lennardclaproth/my-finances-tracker/internal/cashflow"
 	cashflowParsers "github.com/lennardclaproth/my-finances-tracker/internal/cashflow/parsers"
 	"github.com/lennardclaproth/my-finances-tracker/internal/importer"
@@ -72,6 +74,7 @@ type ImportJob struct {
 	mu              sync.Mutex
 	cashflowParser  cashflowParserFactory
 	portfolioParser portfolioParserFactory
+	b               bus.Bus
 }
 
 func NewImportJob(
@@ -83,6 +86,7 @@ func NewImportJob(
 	log logging.Logger,
 	reconcileEvery time.Duration,
 	queueSize int,
+	b bus.Bus,
 ) *ImportJob {
 	if queueSize <= 0 {
 		queueSize = defaultImportQueueSize
@@ -104,6 +108,7 @@ func NewImportJob(
 		inFlight:        make(map[uuid.UUID]struct{}),
 		cashflowParser:  cashflowParsers.CreateCsvParser,
 		portfolioParser: portfolioParsers.CreateCsvParser,
+		b:               b,
 	}
 }
 
@@ -290,6 +295,7 @@ func (j *ImportJob) processCashflow(ctx context.Context, imp *importer.Import, v
 			rowNumber,
 			imp.ID,
 			txd.AccountType,
+			imp.AccountID,
 		)
 		if err != nil {
 			failedCount++
@@ -327,7 +333,7 @@ func (j *ImportJob) processPortfolio(ctx context.Context, imp *importer.Import, 
 	}
 
 	for rowNumber, txd := range seq {
-		ptx, err := portfolio.NewTransaction(txd, rowNumber, imp.ID, nil, nil)
+		ptx, err := portfolio.NewTransaction(txd, rowNumber, imp.ID, imp.AccountID, nil)
 		if err != nil {
 			failedCount++
 			j.log.Error(ctx, "failed creating portfolio transaction", err, "import_id", imp.ID, "row_number", rowNumber)
@@ -342,6 +348,23 @@ func (j *ImportJob) processPortfolio(ctx context.Context, imp *importer.Import, 
 			j.log.Error(ctx, "failed persisting portfolio transaction", err, "import_id", imp.ID, "row_number", rowNumber)
 			continue
 		}
+	}
+	// publish TransactionsCreated event
+	if imp.AccountID == nil {
+		j.log.Info(ctx, "skip transactions created event: import has no account id", "import_id", imp.ID)
+		return duplicates, failedCount, nil
+	}
+	if j.b == nil {
+		j.log.Info(ctx, "skip transactions created event: bus not configured", "import_id", imp.ID, "account_id", imp.AccountID.String())
+		return duplicates, failedCount, nil
+	}
+	msg, err := bus.NewJSONEnvelope(api.TransactionsCreated{AccID: *imp.AccountID})
+	if err != nil {
+		j.log.Error(ctx, "failed to encode transactions created event", err, "import_id", imp.ID, "account_id", imp.AccountID.String())
+		return duplicates, failedCount, nil
+	}
+	if err := j.b.Publish(ctx, msg); err != nil {
+		j.log.Error(ctx, "failed to publish transactions created event", err, "import_id", imp.ID, "account_id", imp.AccountID.String())
 	}
 	return duplicates, failedCount, nil
 }

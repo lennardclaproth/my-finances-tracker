@@ -2,6 +2,20 @@
 import { Chart } from "chart.js/auto";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { CashflowMonthlyAnalyticsPoint } from "../../../types/cashflow";
+import {
+  chartTheme,
+  gradientFillWithAlpha,
+  horizontalGridConfig,
+  horizontalGuidePlugin,
+  HOVER_MARKER_BORDER_COLOR,
+  HOVER_MARKER_BORDER_WIDTH,
+  HOVER_MARKER_FILL_COLOR,
+  HOVER_MARKER_SIZE,
+  hoverGuidePlugin,
+  selectionIndicatorStyles,
+  selectionLineStyle,
+  toCanvasX,
+} from "./chartHelpers";
 
 interface Props {
   loading?: boolean;
@@ -25,10 +39,12 @@ const emit = defineEmits<{
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const hasData = computed(() => props.data.length > 0);
 
-const isDragging = ref(false);
-const dragStartX = ref(0);
-const dragCurrentX = ref(0);
-let suppressClickUntil = 0;
+const isSelecting = ref(false);
+const pointerDownX = ref(0);
+const pointerCurrentX = ref(0);
+const pointerDownIndex = ref<number | null>(null);
+const anchorIndex = ref<number | null>(null);
+const hoverIndex = ref<number | null>(null);
 
 let chart: Chart<"line"> | null = null;
 
@@ -43,11 +59,6 @@ const trendColors = {
   outgoing: "#e11d48", // rose-600
   net: "#4f46e5", // indigo-600
 };
-const chartTheme = {
-  text: "#3f3f46",
-  muted: "#71717a",
-  tooltipBg: "#0f172a",
-};
 const trendTagEntries = [
   { key: "incoming", label: "Incoming", color: trendColors.incoming },
   { key: "outgoing", label: "Outgoing", color: trendColors.outgoing },
@@ -56,35 +67,6 @@ const trendTagEntries = [
 
 function toCurrency(amountCents: number): string {
   return currencyFormatter.format(amountCents / MONEY_SCALE);
-}
-
-function hexToRgba(hex: string, alpha: number): string {
-  const normalized = hex.replace("#", "");
-  const bigint = Number.parseInt(normalized, 16);
-  const r = (bigint >> 16) & 255;
-  const g = (bigint >> 8) & 255;
-  const b = bigint & 255;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function gradientFill(chartInstance: Chart, color: string): CanvasGradient | string {
-  return gradientFillWithAlpha(chartInstance, color, 0.24, 0.02);
-}
-
-function gradientFillWithAlpha(
-  chartInstance: Chart,
-  color: string,
-  alphaTop: number,
-  alphaBottom: number,
-): CanvasGradient | string {
-  const chartArea = chartInstance.chartArea;
-  if (!chartArea) {
-    return hexToRgba(color, alphaTop);
-  }
-  const gradient = chartInstance.ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-  gradient.addColorStop(0, hexToRgba(color, alphaTop));
-  gradient.addColorStop(1, hexToRgba(color, alphaBottom));
-  return gradient;
 }
 
 function toIsoDateUtc(date: Date): string {
@@ -125,21 +107,34 @@ function clampIndex(index: number): number {
   return Math.max(0, Math.min(props.data.length - 1, index));
 }
 
-function pixelToIndex(clientX: number): number | null {
-  if (!chart || !canvasRef.value || props.data.length === 0) {
+function pixelToIndex(canvasX: number): number | null {
+  if (!chart || props.data.length === 0) {
     return null;
   }
-  const rect = canvasRef.value.getBoundingClientRect();
-  const xFromCanvas = clientX - rect.left;
   const xScale = chart.scales.x;
-  const area = chart.chartArea;
-
-  const clampedX = Math.max(area.left, Math.min(area.right, xFromCanvas));
-  const maybeIndex = xScale.getValueForPixel(clampedX);
+  const maybeIndex = xScale.getValueForPixel(canvasX);
   if (typeof maybeIndex !== "number" || Number.isNaN(maybeIndex)) {
     return null;
   }
   return clampIndex(Math.round(maybeIndex));
+}
+
+function dragStartPointY(index: number): number | null {
+  if (!chart) {
+    return null;
+  }
+  const point = props.data[clampIndex(index)];
+  if (!point) {
+    return null;
+  }
+  return chart.scales.y.getPixelForValue(point.netCents);
+}
+
+function pointX(index: number): number | null {
+  if (!chart) {
+    return null;
+  }
+  return chart.scales.x.getPixelForValue(index);
 }
 
 function emitSingleMonthSelection(index: number): void {
@@ -178,28 +173,67 @@ function emitRangeSelection(startIndex: number, endIndex: number): void {
 }
 
 function dragOverlayStyle(): Record<string, string> {
-  if (!isDragging.value || !canvasRef.value) {
+  if (!isSelecting.value || anchorIndex.value === null || hoverIndex.value === null || !chart) {
     return { display: "none" };
   }
-  const rect = canvasRef.value.getBoundingClientRect();
-  const left = Math.min(dragStartX.value, dragCurrentX.value) - rect.left;
-  const right = Math.max(dragStartX.value, dragCurrentX.value) - rect.left;
-  return {
-    left: `${Math.max(0, left)}px`,
-    width: `${Math.max(0, right - left)}px`,
-  };
+  const anchorX = pointX(anchorIndex.value);
+  const targetX = pointX(hoverIndex.value);
+  const anchorY = dragStartPointY(anchorIndex.value);
+  if (anchorX === null || targetX === null || anchorY === null) {
+    return { display: "none" };
+  }
+  return selectionIndicatorStyles(anchorX, targetX, anchorY, chart.chartArea.top, chart.chartArea.bottom - chart.chartArea.top).band;
+}
+
+function dragStartMarkerStyle(): Record<string, string> {
+  if (!isSelecting.value || anchorIndex.value === null || !chart) {
+    return { display: "none" };
+  }
+  const anchorX = pointX(anchorIndex.value);
+  const anchorY = dragStartPointY(anchorIndex.value);
+  if (anchorX === null || anchorY === null) {
+    return { display: "none" };
+  }
+  return selectionIndicatorStyles(anchorX, anchorX, anchorY, 0, 0).marker;
+}
+
+function dragHoverMarkerStyle(): Record<string, string> {
+  if (!isSelecting.value || hoverIndex.value === null || !chart) {
+    return { display: "none" };
+  }
+  const hoverX = pointX(hoverIndex.value);
+  const hoverY = dragStartPointY(hoverIndex.value);
+  if (hoverX === null || hoverY === null) {
+    return { display: "none" };
+  }
+  return selectionIndicatorStyles(hoverX, hoverX, hoverY, 0, 0).marker;
+}
+
+function dragStartLineStyle(): Record<string, string> {
+  if (!isSelecting.value || anchorIndex.value === null || !chart) {
+    return { display: "none" };
+  }
+  const x = pointX(anchorIndex.value);
+  if (x === null) {
+    return { display: "none" };
+  }
+  return selectionLineStyle(x, chart.chartArea.top, chart.chartArea.bottom - chart.chartArea.top);
+}
+
+function dragHoverLineStyle(): Record<string, string> {
+  if (!isSelecting.value || hoverIndex.value === null || !chart) {
+    return { display: "none" };
+  }
+  const x = pointX(hoverIndex.value);
+  if (x === null) {
+    return { display: "none" };
+  }
+  return selectionLineStyle(x, chart.chartArea.top, chart.chartArea.bottom - chart.chartArea.top);
 }
 
 function destroyChart(): void {
   chart?.destroy();
   chart = null;
-}
-
-function onChartClick(index: number): void {
-  if (Date.now() < suppressClickUntil || isDragging.value) {
-    return;
-  }
-  emitSingleMonthSelection(index);
 }
 
 function renderChart(): void {
@@ -211,6 +245,7 @@ function renderChart(): void {
   destroyChart();
 
   chart = new Chart(canvasRef.value, {
+    plugins: [horizontalGuidePlugin, hoverGuidePlugin],
     type: "line",
     data: {
       labels: props.data.map((point) => monthLabel(point.month)),
@@ -224,10 +259,10 @@ function renderChart(): void {
           fill: "origin",
           borderWidth: 2,
           pointRadius: 0,
-          pointBackgroundColor: "#ffffff",
-          pointBorderColor: trendColors.incoming,
-          pointBorderWidth: 0,
-          pointHoverRadius: 0,
+          pointHoverRadius: HOVER_MARKER_SIZE / 2,
+          pointHoverBackgroundColor: HOVER_MARKER_FILL_COLOR,
+          pointHoverBorderColor: HOVER_MARKER_BORDER_COLOR,
+          pointHoverBorderWidth: HOVER_MARKER_BORDER_WIDTH,
           pointHitRadius: 14,
           order: 1,
         },
@@ -240,10 +275,10 @@ function renderChart(): void {
           fill: "origin",
           borderWidth: 2,
           pointRadius: 0,
-          pointBackgroundColor: "#ffffff",
-          pointBorderColor: trendColors.outgoing,
-          pointBorderWidth: 0,
-          pointHoverRadius: 0,
+          pointHoverRadius: HOVER_MARKER_SIZE / 2,
+          pointHoverBackgroundColor: HOVER_MARKER_FILL_COLOR,
+          pointHoverBorderColor: HOVER_MARKER_BORDER_COLOR,
+          pointHoverBorderWidth: HOVER_MARKER_BORDER_WIDTH,
           pointHitRadius: 14,
           order: 2,
         },
@@ -256,10 +291,10 @@ function renderChart(): void {
           fill: "origin",
           borderWidth: 2,
           pointRadius: 0,
-          pointBackgroundColor: "#ffffff",
-          pointBorderColor: trendColors.net,
-          pointBorderWidth: 0,
-          pointHoverRadius: 0,
+          pointHoverRadius: HOVER_MARKER_SIZE / 2,
+          pointHoverBackgroundColor: HOVER_MARKER_FILL_COLOR,
+          pointHoverBorderColor: HOVER_MARKER_BORDER_COLOR,
+          pointHoverBorderWidth: HOVER_MARKER_BORDER_WIDTH,
           pointHitRadius: 14,
           order: 3,
         },
@@ -271,12 +306,6 @@ function renderChart(): void {
       interaction: {
         mode: "index",
         intersect: false,
-      },
-      onClick: (_event, elements) => {
-        if (!elements || elements.length === 0) {
-          return;
-        }
-        onChartClick(elements[0].index);
       },
       scales: {
         x: {
@@ -300,7 +329,7 @@ function renderChart(): void {
             maxTicksLimit: 4,
           },
           grid: {
-            display: false,
+            ...horizontalGridConfig(),
           },
           border: {
             display: false,
@@ -328,46 +357,79 @@ function renderChart(): void {
 }
 
 function onPointerDown(event: PointerEvent): void {
-  if (!hasData.value || props.loading) {
+  if (!hasData.value || props.loading || !chart || !canvasRef.value) {
     return;
   }
   if (event.button !== 0) {
     return;
   }
-  isDragging.value = true;
-  dragStartX.value = event.clientX;
-  dragCurrentX.value = event.clientX;
+  const startX = toCanvasX(chart, canvasRef.value, event.clientX);
+  const startIndex = pixelToIndex(startX);
+  if (startIndex === null) {
+    return;
+  }
+  const startY = dragStartPointY(startIndex);
+  if (startY === null) {
+    return;
+  }
+  pointerDownIndex.value = startIndex;
+  anchorIndex.value = startIndex;
+  hoverIndex.value = startIndex;
+  isSelecting.value = true;
+  (chart as Chart & { __suspendHoverGuide?: boolean }).__suspendHoverGuide = true;
+  pointerDownX.value = startX;
+  pointerCurrentX.value = startX;
   (event.currentTarget as HTMLElement | null)?.setPointerCapture?.(event.pointerId);
 }
 
 function onPointerMove(event: PointerEvent): void {
-  if (!isDragging.value) {
+  if (!isSelecting.value || !chart || !canvasRef.value) {
     return;
   }
-  dragCurrentX.value = event.clientX;
+  pointerCurrentX.value = toCanvasX(chart, canvasRef.value, event.clientX);
+  const nextIndex = pixelToIndex(pointerCurrentX.value);
+  if (nextIndex !== null) {
+    hoverIndex.value = nextIndex;
+  }
 }
 
 function onPointerUp(event: PointerEvent): void {
-  if (!isDragging.value) {
+  if (!isSelecting.value || !chart || !canvasRef.value) {
     return;
   }
 
-  dragCurrentX.value = event.clientX;
-  const distance = Math.abs(dragCurrentX.value - dragStartX.value);
-  isDragging.value = false;
+  pointerCurrentX.value = toCanvasX(chart, canvasRef.value, event.clientX);
+  const distance = Math.abs(pointerCurrentX.value - pointerDownX.value);
+  const startIndex = anchorIndex.value ?? pointerDownIndex.value;
+  const endIndex = hoverIndex.value ?? pointerDownIndex.value ?? startIndex;
+  isSelecting.value = false;
+  (chart as Chart & { __suspendHoverGuide?: boolean }).__suspendHoverGuide = false;
+
+  if (startIndex === null || endIndex === null) {
+    pointerDownIndex.value = null;
+    return;
+  }
 
   if (distance < 6) {
+    const nextAnchor = pointerDownIndex.value ?? startIndex;
+    emitSingleMonthSelection(nextAnchor);
+    anchorIndex.value = null;
+    hoverIndex.value = null;
+    pointerDownIndex.value = null;
     return;
   }
 
-  const startIndex = pixelToIndex(dragStartX.value);
-  const endIndex = pixelToIndex(dragCurrentX.value);
-  if (startIndex === null || endIndex === null) {
+  if (endIndex === startIndex) {
+    anchorIndex.value = null;
+    hoverIndex.value = null;
+    pointerDownIndex.value = null;
     return;
   }
 
-  suppressClickUntil = Date.now() + 220;
   emitRangeSelection(startIndex, endIndex);
+  anchorIndex.value = null;
+  hoverIndex.value = null;
+  pointerDownIndex.value = null;
 }
 
 onMounted(async () => {
@@ -395,7 +457,7 @@ onBeforeUnmount(() => {
       <canvas
         ref="canvasRef"
         class="h-full w-full"
-        aria-label="Cashflow trend chart"
+        aria-label="Cashflow chart"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
@@ -404,9 +466,29 @@ onBeforeUnmount(() => {
       />
 
       <div
-        v-if="isDragging"
-        class="pointer-events-none absolute bottom-0 top-0 z-10 border border-indigo-400 bg-indigo-300/20"
+        v-if="isSelecting"
+        class="pointer-events-none absolute z-10 bg-blue-300/25"
         :style="dragOverlayStyle()"
+      />
+      <div
+        v-if="isSelecting"
+        class="pointer-events-none absolute z-10 border-l border-dashed border-slate-400/80"
+        :style="dragStartLineStyle()"
+      />
+      <div
+        v-if="isSelecting"
+        class="pointer-events-none absolute z-10 border-l border-dashed border-slate-400/80"
+        :style="dragHoverLineStyle()"
+      />
+      <div
+        v-if="isSelecting"
+        class="pointer-events-none absolute z-10 rounded-full border-2 border-blue-500 bg-white shadow-sm"
+        :style="dragStartMarkerStyle()"
+      />
+      <div
+        v-if="isSelecting"
+        class="pointer-events-none absolute z-10 rounded-full border-2 border-blue-500 bg-white shadow-sm"
+        :style="dragHoverMarkerStyle()"
       />
 
       <div
@@ -437,7 +519,7 @@ onBeforeUnmount(() => {
         v-else-if="!hasData"
         class="absolute inset-0 flex items-center justify-center bg-white/75 text-sm text-slate-500"
       >
-        No trend data yet
+        No cashflow data yet
       </div>
     </div>
 

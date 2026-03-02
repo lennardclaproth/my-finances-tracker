@@ -2,11 +2,16 @@ package storage
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/lennardclaproth/my-finances-tracker/internal/marketdata"
+	"github.com/lennardclaproth/my-finances-tracker/internal/portfolio"
+	"github.com/lib/pq"
 )
 
 type SQLXListingStore struct {
@@ -20,6 +25,8 @@ func NewSQLXListingStore(db *DB) *SQLXListingStore {
 		tableName: qualifyTable(db, SchemaMarketData, TableListings),
 	}
 }
+
+var _ portfolio.ListingStore = (*SQLXListingStore)(nil)
 
 func (s *SQLXListingStore) Create(ctx context.Context, listing *marketdata.Listing) error {
 	query := fmt.Sprintf(`INSERT INTO %s (
@@ -52,20 +59,47 @@ func (s *SQLXListingStore) Create(ctx context.Context, listing *marketdata.Listi
 		)
 	`, s.tableName)
 	_, err := s.db.NamedExecContext(ctx, query, listing)
-	return err
+	if err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			return marketdata.ErrListingAlreadyExists
+		}
+		msg := strings.ToLower(err.Error())
+		if strings.Contains(msg, "unique") && strings.Contains(msg, "symbol") && strings.Contains(msg, "source") {
+			return marketdata.ErrListingAlreadyExists
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *SQLXListingStore) FetchBySymbol(ctx context.Context, symbol string) (*marketdata.Listing, error) {
 	var listing marketdata.Listing
 	query := fmt.Sprintf(`SELECT * FROM %s WHERE symbol = $1`, s.tableName)
 	err := s.db.GetContext(ctx, &listing, query, symbol)
-	return &listing, err
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &listing, nil
+}
+
+func (s *SQLXListingStore) List(ctx context.Context) ([]*marketdata.Listing, error) {
+	listings := make([]*marketdata.Listing, 0)
+	query := fmt.Sprintf(`SELECT * FROM %s ORDER BY symbol ASC, id ASC`, s.tableName)
+	if err := s.db.SelectContext(ctx, &listings, query); err != nil {
+		return nil, err
+	}
+	return listings, nil
 }
 
 func (s *SQLXListingStore) UpdateFields(ctx context.Context, listing *marketdata.Listing) error {
 	listing.UpdatedAt = time.Now().UTC()
 	query := fmt.Sprintf(`UPDATE %s
 		SET name = :name, 
+			isin = :isin,
 			updated_at = :updated_at, 
 			currency = :currency, 
 			region = :region, 
@@ -83,7 +117,25 @@ func (s *SQLXListingStore) FetchByID(ctx context.Context, id uuid.UUID) (*market
 	var listing marketdata.Listing
 	query := fmt.Sprintf(`SELECT * FROM %s WHERE id = $1`, s.tableName)
 	err := s.db.GetContext(ctx, &listing, query, id)
-	return &listing, err
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &listing, nil
+}
+
+func (s *SQLXListingStore) FetchBySymbolOrISIN(ctx context.Context, val string) (*marketdata.Listing, error) {
+	var listing marketdata.Listing
+	query := fmt.Sprintf(`SELECT * FROM %s WHERE symbol = $1 OR isin = $1 LIMIT 1`, s.tableName)
+	if err := s.db.GetContext(ctx, &listing, query, val); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &listing, nil
 }
 
 func (s *SQLXListingStore) TryAcquireSyncLock(ctx context.Context, id uuid.UUID) (bool, error) {

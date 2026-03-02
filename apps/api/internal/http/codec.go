@@ -71,6 +71,24 @@ func DecodeQuery[T any](r *http.Request) (T, error) {
 			}
 			f.SetBool(bv)
 		default:
+			// Handle UUID type.
+			if f.Type() == reflect.TypeOf(uuid.UUID{}) {
+				parsedUUID, err := uuid.Parse(val)
+				if err != nil {
+					return target, fmt.Errorf("invalid UUID for %s: %w", tag, err)
+				}
+				f.Set(reflect.ValueOf(parsedUUID))
+				continue
+			}
+			// Handle *UUID type.
+			if f.Type() == reflect.TypeOf((*uuid.UUID)(nil)) {
+				parsedUUID, err := uuid.Parse(val)
+				if err != nil {
+					return target, fmt.Errorf("invalid UUID for %s: %w", tag, err)
+				}
+				f.Set(reflect.ValueOf(&parsedUUID))
+				continue
+			}
 			// silently ignore unsupported types
 		}
 	}
@@ -217,6 +235,15 @@ func DecodeMultipartFile[T any](r *http.Request, opt MultipartFileDecoderOptions
 					return out, fmt.Errorf("invalid UUID for %s: %w", formTag, err)
 				}
 				fieldValue.Set(reflect.ValueOf(parsedUUID))
+				continue
+			}
+			// Handle *UUID type
+			if fieldValue.Type() == reflect.TypeOf((*uuid.UUID)(nil)) {
+				parsedUUID, err := uuid.Parse(formVal)
+				if err != nil {
+					return out, fmt.Errorf("invalid UUID for %s: %w", formTag, err)
+				}
+				fieldValue.Set(reflect.ValueOf(&parsedUUID))
 			}
 		}
 	}

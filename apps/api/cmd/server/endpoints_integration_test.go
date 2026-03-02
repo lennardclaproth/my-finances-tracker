@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lennardclaproth/my-finances-tracker/internal/account"
 	"github.com/lennardclaproth/my-finances-tracker/internal/cashflow"
 	"github.com/lennardclaproth/my-finances-tracker/internal/config"
 	"github.com/lennardclaproth/my-finances-tracker/internal/importer"
@@ -72,6 +73,7 @@ func TestIntegration_ImportCsvEndpoint_HappyPath(t *testing.T) {
 	ctx := context.Background()
 
 	v := seedVendorING(t, app.db)
+	acc := seedImportAccount(t, app.db)
 
 	var reqBody bytes.Buffer
 	writer := multipart.NewWriter(&reqBody)
@@ -85,6 +87,9 @@ func TestIntegration_ImportCsvEndpoint_HappyPath(t *testing.T) {
 	_, _ = part.Write([]byte("Date;Name / Description;Notifications;Amount (EUR);Debit/credit\n20250101;Coffee;Note;1,23;Debit\n"))
 	if err := writer.WriteField("vendor_id", v.ID.String()); err != nil {
 		t.Fatalf("failed writing vendor_id field: %v", err)
+	}
+	if err := writer.WriteField("account_id", acc.AccountID.String()); err != nil {
+		t.Fatalf("failed writing account_id field: %v", err)
 	}
 	if err := writer.Close(); err != nil {
 		t.Fatalf("failed closing multipart writer: %v", err)
@@ -124,6 +129,9 @@ func TestIntegration_ImportCsvEndpoint_HappyPath(t *testing.T) {
 
 	if imp.VendorID != v.ID {
 		t.Fatalf("expected vendor id %s, got %s", v.ID, imp.VendorID)
+	}
+	if imp.AccountID == nil || *imp.AccountID != acc.AccountID {
+		t.Fatalf("expected import account id %s, got %+v", acc.AccountID, imp.AccountID)
 	}
 	if _, err := os.Stat(imp.Path); err != nil {
 		t.Fatalf("expected uploaded csv file at %s: %v", imp.Path, err)
@@ -267,10 +275,27 @@ func TestIntegration_CreateListingEndpoint_HappyPath(t *testing.T) {
 
 func TestIntegration_UpdateListingEndpoint_HappyPath(t *testing.T) {
 	app := newIntegrationApp(t)
+	ctx := context.Background()
+
+	store := storage.NewSQLXListingStore(app.db)
+	listing, err := marketdata.NewListing(
+		"TUPD.AS",
+		"Update Listing",
+		marketdata.SourceAlphaVantage,
+		marketdata.ListingWithDescription("old description"),
+		marketdata.ListingWithISIN("NLUPDATE0001"),
+	)
+	if err != nil {
+		t.Fatalf("failed creating listing seed: %v", err)
+	}
+	if err := store.Create(ctx, listing); err != nil {
+		t.Fatalf("failed storing listing seed: %v", err)
+	}
 
 	payload := map[string]any{
-		"id":          uuid.New(),
+		"id":          listing.ID,
 		"description": "updated description",
+		"exchange":    "XAMS",
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -292,6 +317,89 @@ func TestIntegration_UpdateListingEndpoint_HappyPath(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
 		t.Fatalf("expected status 200, got %d body=%s", res.StatusCode, string(body))
+	}
+
+	listingsTable := qualifiedTable(app.backend, storage.SchemaMarketData, storage.TableListings)
+	var persisted marketdata.Listing
+	query := app.db.Rebind(fmt.Sprintf("SELECT * FROM %s WHERE id = ?", listingsTable))
+	if err := app.db.GetContext(ctx, &persisted, query, listing.ID); err != nil {
+		t.Fatalf("failed fetching updated listing: %v", err)
+	}
+	if persisted.Description == nil || *persisted.Description != "updated description" {
+		t.Fatalf("expected updated description, got %+v", persisted.Description)
+	}
+	if persisted.Exchange == nil || *persisted.Exchange != "XAMS" {
+		t.Fatalf("expected updated exchange, got %+v", persisted.Exchange)
+	}
+	if persisted.Name != "Update Listing" {
+		t.Fatalf("expected name to remain unchanged, got %s", persisted.Name)
+	}
+	if persisted.ISIN == nil || *persisted.ISIN != "NLUPDATE0001" {
+		t.Fatalf("expected isin to remain unchanged, got %+v", persisted.ISIN)
+	}
+}
+
+func TestIntegration_GetListingsEndpoint_ReturnsSortedRows(t *testing.T) {
+	app := newIntegrationApp(t)
+	ctx := context.Background()
+
+	store := storage.NewSQLXListingStore(app.db)
+	listingA, err := marketdata.NewListing("ZZZ.AS", "Zulu", marketdata.SourceAlphaVantage)
+	if err != nil {
+		t.Fatalf("failed creating listing seed A: %v", err)
+	}
+	listingB, err := marketdata.NewListing("AAA.AS", "Alpha", marketdata.SourceAlphaVantage)
+	if err != nil {
+		t.Fatalf("failed creating listing seed B: %v", err)
+	}
+	if err := store.Create(ctx, listingA); err != nil {
+		t.Fatalf("failed storing listing A: %v", err)
+	}
+	if err := store.Create(ctx, listingB); err != nil {
+		t.Fatalf("failed storing listing B: %v", err)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, app.server.URL+"/marketdata/listings", nil)
+	if err != nil {
+		t.Fatalf("failed creating request: %v", err)
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /marketdata/listings failed: %v", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(res.Body)
+		t.Fatalf("expected status 200, got %d body=%s", res.StatusCode, string(body))
+	}
+
+	var payload []struct {
+		ID     uuid.UUID `json:"id"`
+		Symbol string    `json:"symbol"`
+		Name   string    `json:"name"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
+		t.Fatalf("failed decoding payload: %v", err)
+	}
+	if len(payload) < 2 {
+		t.Fatalf("expected at least two listings in response, got %d", len(payload))
+	}
+
+	var idxA, idxZ int = -1, -1
+	for i, row := range payload {
+		if row.Symbol == "AAA.AS" {
+			idxA = i
+		}
+		if row.Symbol == "ZZZ.AS" {
+			idxZ = i
+		}
+	}
+	if idxA == -1 || idxZ == -1 {
+		t.Fatalf("expected seeded listings in response, got %+v", payload)
+	}
+	if idxA >= idxZ {
+		t.Fatalf("expected symbol ordering ascending (AAA before ZZZ), got idxA=%d idxZ=%d", idxA, idxZ)
 	}
 }
 
@@ -1548,11 +1656,19 @@ func setupIntegrationDB(t *testing.T, logger logging.Logger) (*storage.DB, stora
 		}
 		if _, err := db.ExecContext(ctx, `
 			TRUNCATE TABLE
+				portfolio.portfolio_snapshots,
+				portfolio.position_snapshots,
+				portfolio.positions,
+				portfolio.accounts,
+				portfolio.transactions,
+				cashflow.accounts,
 				marketdata.dailies,
 				marketdata.listings,
 				marketdata.providers,
 				cashflow.transactions,
 				import.imports,
+				import.accounts,
+				account.accounts,
 				vendor.vendors
 			RESTART IDENTITY CASCADE
 		`); err != nil {
@@ -1604,6 +1720,24 @@ func seedVendorING(t *testing.T, db *storage.DB) *vendor.Vendor {
 		t.Fatalf("failed storing vendor seed: %v", err)
 	}
 	return v
+}
+
+func seedImportAccount(t *testing.T, db *storage.DB) *importer.Account {
+	t.Helper()
+	ctx := context.Background()
+
+	acc, err := account.NewAccount("Integration Test Account", nil)
+	if err != nil {
+		t.Fatalf("failed creating account seed: %v", err)
+	}
+	if err := storage.NewSQLXAccountStore(db).Create(ctx, acc); err != nil {
+		t.Fatalf("failed storing account seed: %v", err)
+	}
+	importAcc := importer.NewAccount(acc.ID)
+	if err := storage.NewSQLXImportAccountStore(db).Create(ctx, importAcc); err != nil {
+		t.Fatalf("failed storing import account seed: %v", err)
+	}
+	return importAcc
 }
 
 func seedMarketStackProvider(t *testing.T, db *storage.DB, baseURI, apiKey string) {

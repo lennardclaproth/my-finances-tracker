@@ -149,23 +149,5 @@ In finance this is closely related to time-weighted return.
 
 If no cash flows occur between snapshots, weighted performance will closely match daily percentage change.
 
-## What These Metrics Tell You
-
-These snapshot fields allow the system to distinguish between:
-
-	- Market performance (account worth changes)
-	- Investor profitability (delta vs net invested)
-	- Time evolution (daily movement)
-	- True return independent of deposits (weighted performance)
-
-In short:
-
-	AccountWorth tells you where you are.
-	Delta tells you whether you are winning or still climbing out of fees.
-	DailyDelta tells you what the market did today.
-	WeightedPerformance tells you what your strategy did, free of cash flow distortion.
-
-The universe is noisy, markets are chaotic, and these fields are how we keep score
-without fooling ourselves.
 */
 package portfolio

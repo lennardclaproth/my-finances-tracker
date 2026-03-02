@@ -2,17 +2,21 @@ package marketdata
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lennardclaproth/my-finances-tracker/internal/date"
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
+	"github.com/lennardclaproth/my-finances-tracker/internal/money"
 )
 
 type listingStore interface {
 	Create(ctx context.Context, listing *Listing) error
 	UpdateFields(ctx context.Context, listing *Listing) error
+	List(ctx context.Context) ([]*Listing, error)
 	FetchBySymbol(ctx context.Context, symbol string) (*Listing, error)
 	FetchByID(ctx context.Context, id uuid.UUID) (*Listing, error)
 	TryAcquireSyncLock(ctx context.Context, id uuid.UUID) (bool, error)
@@ -23,7 +27,7 @@ type listingStore interface {
 
 type dailyStore interface {
 	Create(ctx context.Context, daily *Daily) error
-	FetchByListingID(ctx context.Context, listingID string, from, to *time.Time, limit, offset int) (*[]Daily, error)
+	FetchByListingID(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]Daily, error)
 }
 
 type Service struct {
@@ -57,28 +61,6 @@ func NewService(listingStore listingStore, dailyStore dailyStore, client eodClie
 	}
 }
 
-func latestBusinessDate(now time.Time, loc *time.Location) time.Time {
-	n := now.In(loc)
-	// Target is yesterday (one-day lag).
-	target := n.AddDate(0, 0, -1)
-	// If target falls on weekend, roll back to Friday.
-	switch target.Weekday() {
-	case time.Saturday:
-		target = target.AddDate(0, 0, -1)
-	case time.Sunday:
-		target = target.AddDate(0, 0, -2)
-	}
-	// Normalize to midnight local time (date-only semantics).
-	y, m, d := target.Date()
-	return time.Date(y, m, d, 0, 0, 0, 0, loc)
-}
-
-func dateOnly(t time.Time, loc *time.Location) time.Time {
-	tt := t.In(loc)
-	y, m, d := tt.Date()
-	return time.Date(y, m, d, 0, 0, 0, 0, loc)
-}
-
 // GetDailies fetches daily data for a given symbol and date range.
 // returns the data along with metadata about the request.
 func (s *Service) GetDailies(ctx context.Context, symbol string, from, to *time.Time, limit, offset int) (*DailyResponse, error) {
@@ -96,7 +78,7 @@ func (s *Service) GetDailies(ctx context.Context, symbol string, from, to *time.
 	// If the listing is currently syncing it means that there is already a sync in progress.
 	// In this case we can just fetch the existing data from the database, we don't need to trigger another sync.
 	if listing.Syncing == true {
-		data, err := s.dailyStore.FetchByListingID(ctx, symbol, from, to, limit, offset)
+		data, err := s.dailyStore.FetchByListingID(ctx, listing.ID, from, to, limit, offset)
 		if err != nil {
 			return nil, fmt.Errorf("GetDaily failed to fetch daily data: %w", err)
 		}
@@ -111,11 +93,11 @@ func (s *Service) GetDailies(ctx context.Context, symbol string, from, to *time.
 	}
 	// If the accumulated end date is nil or before the day before the current data, it means the data is not
 	// up to date, so we should trigger a sync to fetch the latest data.
-	targetEnd := latestBusinessDate(time.Now(), time.Local)
-	if listing.AccumulatedEnd == nil || dateOnly(*listing.AccumulatedEnd, time.Local).Before(targetEnd) {
+	targetEnd := date.LatestBusinessDate(time.Now(), time.Local)
+	if listing.AccumulatedEnd == nil || date.DateOnly(*listing.AccumulatedEnd, time.Local).Before(targetEnd) {
 		err := s.listingStore.UpdateShouldAccumulate(ctx, listing.ID, true)
 		if err != nil {
-			s.log.Error(ctx, "GetDaily failed to update listing should_accumulate flag: %w", err)
+			s.log.Error(ctx, "GetDaily failed to update listing should_accumulate flag", err, "listing_id", listing.ID, "symbol", listing.Symbol)
 		}
 		if err == nil {
 			// Trigger sync in a separate goroutine to avoid blocking the request, errors are logged but not returned
@@ -124,13 +106,13 @@ func (s *Service) GetDailies(ctx context.Context, symbol string, from, to *time.
 				defer cancel()
 				err := s.syncDailyData(fnCtx, listing.ID, nil, nil)
 				if err != nil {
-					s.log.Error(fnCtx, "GetDaily failed to sync daily data for listing %s: %w", err, listing.Symbol)
+					s.log.Error(fnCtx, "GetDaily failed to sync daily data for listing", err, "listing_id", listing.ID, "symbol", listing.Symbol)
 				}
 			}()
 		}
 	}
 	// Fetch daily data from the database, this will return the existing data if a sync is in progress, or the up to date data if not.
-	data, err := s.dailyStore.FetchByListingID(ctx, symbol, from, to, limit, offset)
+	data, err := s.dailyStore.FetchByListingID(ctx, listing.ID, from, to, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("GetDaily failed to fetch daily data: %w", err)
 	}
@@ -162,7 +144,7 @@ func (s *Service) syncDailyData(ctx context.Context, listingID uuid.UUID, from, 
 		defer cancel()
 
 		if err := s.listingStore.ReleaseSyncLock(cleanupCtx, listingID); err != nil {
-			s.log.Error(cleanupCtx, "syncDailyData failed to release sync lock: %w", err)
+			s.log.Error(cleanupCtx, "syncDailyData failed to release sync lock", err, "listing_id", listingID)
 		}
 	}()
 	// Get most up to date listing data
@@ -185,11 +167,12 @@ func (s *Service) syncDailyData(ctx context.Context, listingID uuid.UUID, from, 
 	}
 	for d, err := range s.client.GetEOD(ctx, []string{listing.Symbol}, from, to) {
 		if err != nil {
-			s.log.Error(ctx, "syncDailyData failed to fetch daily data for symbol %s: %w", err, listing.Symbol)
+			s.log.Error(ctx, "syncDailyData failed to fetch daily data", err, "listing_id", listing.ID, "symbol", listing.Symbol)
 			continue
 		}
+		d.ListingID = listing.ID
 		if err := s.dailyStore.Create(ctx, &d); err != nil {
-			s.log.Error(ctx, "syncDailyData failed to persist daily data for symbol %s: %w", err, listing.Symbol)
+			s.log.Error(ctx, "syncDailyData failed to persist daily data", err, "listing_id", listing.ID, "symbol", listing.Symbol, "date", d.Date)
 			continue
 		}
 	}
@@ -205,8 +188,11 @@ func (s *Service) CreateListing(
 ) (*Listing, error) {
 	// Check if listing with source and symbol already exists
 	existing, err := s.listingStore.FetchBySymbol(ctx, symbol)
-	if err == nil && existing != nil && existing.Source == source {
-		return nil, fmt.Errorf("CreateListing failed, listing with symbol %s already exists", symbol)
+	if err != nil {
+		return nil, fmt.Errorf("CreateListing failed to fetch listing: %w", err)
+	}
+	if existing != nil && existing.Source == source {
+		return nil, ErrListingAlreadyExists
 	}
 	// Create new listing and persist
 	listing, err := NewListing(symbol, name, source, options...)
@@ -214,6 +200,9 @@ func (s *Service) CreateListing(
 		return nil, fmt.Errorf("CreateListing failed to create listing: %w", err)
 	}
 	if err := s.listingStore.Create(ctx, listing); err != nil {
+		if errors.Is(err, ErrListingAlreadyExists) {
+			return nil, ErrListingAlreadyExists
+		}
 		return nil, fmt.Errorf("CreateListing failed to persist listing: %w", err)
 	}
 	// Fetch daily data for the listing and persist it, this is done in a
@@ -223,8 +212,66 @@ func (s *Service) CreateListing(
 		defer cancel()
 		err := s.syncDailyData(fnCtx, listing.ID, nil, nil)
 		if err != nil {
-			s.log.Error(fnCtx, "CreateListing failed to sync daily data for listing %s: %w", err, listing.Symbol)
+			s.log.Error(fnCtx, "CreateListing failed to sync daily data for listing", err, "listing_id", listing.ID, "symbol", listing.Symbol)
 		}
 	}()
 	return listing, nil
+}
+
+// UpdateListingFields updates only the provided listing fields.
+func (s *Service) UpdateListingFields(
+	ctx context.Context,
+	id uuid.UUID,
+	description, exchange, region, currency, isin, ticker, typ *string,
+) (*Listing, error) {
+	if description == nil && exchange == nil && region == nil && currency == nil && isin == nil && ticker == nil && typ == nil {
+		return nil, ErrNoListingFieldsToUpdate
+	}
+	listing, err := s.listingStore.FetchByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("UpdateListingFields failed to fetch listing: %w", err)
+	}
+	if listing == nil {
+		return nil, ErrListingNotFound
+	}
+
+	if description != nil {
+		listing.Description = description
+	}
+	if exchange != nil {
+		listing.Exchange = exchange
+	}
+	if region != nil {
+		listing.Region = region
+	}
+	if isin != nil {
+		listing.ISIN = isin
+	}
+	if ticker != nil {
+		listing.Ticker = ticker
+	}
+	if typ != nil {
+		listing.Type = typ
+	}
+	if currency != nil {
+		cur := money.Currency(*currency)
+		if !cur.IsValid() {
+			return nil, ErrInvalidListingCurrency
+		}
+		listing.Currency = &cur
+	}
+
+	if err := s.listingStore.UpdateFields(ctx, listing); err != nil {
+		return nil, fmt.Errorf("UpdateListingFields failed to persist listing: %w", err)
+	}
+	return listing, nil
+}
+
+// ListListings returns all listings in deterministic order for UI presentation.
+func (s *Service) ListListings(ctx context.Context) ([]*Listing, error) {
+	listings, err := s.listingStore.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("ListListings failed to fetch listings: %w", err)
+	}
+	return listings, nil
 }

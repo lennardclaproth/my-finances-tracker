@@ -102,7 +102,7 @@ const isBusy = computed(() => loading.value || mutating.value);
 const hasFilters = computed(() => hasActiveFilters(queryState.value));
 const expandedChartTitle = computed(() => {
   if (expandedChart.value === "trend") {
-    return "Trend";
+    return "Cashflow";
   }
   if (expandedChart.value === "incoming") {
     return "Incoming Tags";
@@ -128,8 +128,8 @@ const tagTargetLabel = computed(() => {
 onMounted(() => {
   const normalizedQuery = toCashflowTransactionsRouteQuery(queryState.value);
   if (!areRouteQueriesEqual(route.query, normalizedQuery)) {
-    void router.replace({
-      path: "/tagging",
+      void router.replace({
+      path: "/cashflow",
       query: normalizedQuery,
     });
   }
@@ -294,14 +294,14 @@ async function updateRouteQuery(
 
   if (mode === "replace") {
     await router.replace({
-      path: "/tagging",
+      path: "/cashflow",
       query: nextQuery,
     });
     return;
   }
 
   await router.push({
-    path: "/tagging",
+    path: "/cashflow",
     query: nextQuery,
   });
 }
@@ -617,11 +617,11 @@ async function applyIgnore(ignored: boolean): Promise<void> {
       <div class="grid shrink-0 grid-cols-1 gap-3 lg:grid-cols-4">
         <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
           <div class="mb-3 flex items-center justify-between gap-2">
-            <h2 class="text-sm font-semibold text-slate-700">Trend</h2>
+            <h2 class="text-sm font-semibold text-slate-700">Cashflow</h2>
             <button
               type="button"
               class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-              title="Expand trend graph"
+              title="Expand cashflow graph"
               @click="openExpandedChart('trend')"
             >
               <ArrowsPointingOutIcon class="h-4 w-4" />
@@ -681,7 +681,7 @@ async function applyIgnore(ignored: boolean): Promise<void> {
         </section>
       </div>
 
-      <div class="min-h-0 flex-1 px-1 pb-1">
+      <div class="min-h-0 flex-1">
         <TransactionsTable
           class="h-full"
           :rows="rows"

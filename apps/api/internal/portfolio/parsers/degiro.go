@@ -79,7 +79,9 @@ func (p *DegiroParser) parseHeader(headers []string) error {
 	return nil
 }
 
+// ParseRow parses a single CSV record into TransactionData. It uses the headerToColumn mapping to find the correct fields and applies specific parsing logic for Degiro's format.
 func (p *DegiroParser) ParseRow(record []string) (portfolio.TransactionData, error) {
+	// Parse occurred date
 	dateRaw := p.value(record, "Date")
 	if dateRaw == "" {
 		return portfolio.TransactionData{}, fmt.Errorf("missing Date")
@@ -88,7 +90,7 @@ func (p *DegiroParser) ParseRow(record []string) (portfolio.TransactionData, err
 	if err != nil {
 		return portfolio.TransactionData{}, fmt.Errorf("invalid Date: %w", err)
 	}
-
+	// Parse value date (optional)
 	var valueDate *time.Time
 	valueDateRaw := p.value(record, "Value date")
 	if valueDateRaw != "" {
@@ -99,7 +101,8 @@ func (p *DegiroParser) ParseRow(record []string) (portfolio.TransactionData, err
 		valueDate = &parsed
 	}
 
-	amount, err := parseDegiroAmount(p.value(record, "Change"))
+	// Parse amount, with fallback to adjacent column if parsing fails (some Degiro exports have an extra column for the absolute amount)
+	amount, err := parseAmount(p.value(record, "Change"))
 	if err != nil {
 		if fallback, fbErr := p.amountFromAdjacentColumn(record); fbErr == nil {
 			amount = fallback
@@ -107,26 +110,27 @@ func (p *DegiroParser) ParseRow(record []string) (portfolio.TransactionData, err
 			return portfolio.TransactionData{}, fmt.Errorf("invalid amount: %w", err)
 		}
 	}
-
+	// Parse description to classify type and extract quantity/price for trades
 	description := p.value(record, "Description")
 	txType := classifyType(description)
 	quantity, price := parseTrade(description)
 	product := p.value(record, "Product")
 	isin := p.value(record, "ISIN")
 	return portfolio.TransactionData{
-		Source:     "DEGIRO",
-		OccurredAt: occurredAt,
-		ValueDate:  valueDate,
-		ISIN:       &isin,
-		Symbol:     &product,
-		Type:       txType,
-		Quantity:   quantity,
-		Price:      price,
-		Amount:     amount,
-		RawRef:     p.value(record, "Order Id"),
+		Source:      "DEGIRO",
+		OccurredAt:  occurredAt,
+		ValueDate:   valueDate,
+		ISIN:        &isin,
+		Symbol:      nil,
+		Description: product,
+		Type:        txType,
+		Quantity:    quantity,
+		Price:       price,
+		Amount:      amount,
 	}, nil
 }
 
+// classifyType classifies the transaction type based on keywords in the description. It looks for specific terms to determine if it's a buy, sell, dividend, tax, fee, or cash transaction.
 func classifyType(description string) portfolio.TransactionType {
 	d := strings.ToLower(strings.TrimSpace(description))
 	switch {
@@ -134,12 +138,12 @@ func classifyType(description string) portfolio.TransactionType {
 		return portfolio.TxTax
 	case strings.Contains(d, "dividend"):
 		return portfolio.TxDividend
-	case strings.Contains(d, "transactiekosten"), strings.Contains(d, "kosten"), strings.Contains(d, "fee"):
+	case strings.Contains(d, "transactiekosten"), strings.Contains(d, "fee"):
 		return portfolio.TxFee
-	case strings.Contains(d, "koop"), strings.Contains(d, "buy"):
-		return portfolio.TxBuy
 	case strings.Contains(d, "verkoop"), strings.Contains(d, "sell"):
 		return portfolio.TxSell
+	case strings.Contains(d, "koop"), strings.Contains(d, "buy"):
+		return portfolio.TxBuy
 	default:
 		return portfolio.TxCash
 	}
@@ -150,11 +154,11 @@ func parseTrade(description string) (quantity float64, price float64) {
 	if len(matches) != 4 {
 		return 0, 0
 	}
-	q, err := parseEUFloat(matches[2])
+	q, err := parseAmount(matches[2])
 	if err != nil {
 		return 0, 0
 	}
-	p, err := parseEUFloat(matches[3])
+	p, err := parseAmount(matches[3])
 	if err != nil {
 		return 0, 0
 	}
@@ -169,11 +173,7 @@ func (p *DegiroParser) value(record []string, key string) string {
 	return strings.TrimSpace(record[idx])
 }
 
-func parseDegiroAmount(raw string) (float64, error) {
-	return parseEUFloat(raw)
-}
-
-func parseEUFloat(raw string) (float64, error) {
+func parseAmount(raw string) (float64, error) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
 		return 0, fmt.Errorf("empty amount")
@@ -188,5 +188,5 @@ func (p *DegiroParser) amountFromAdjacentColumn(record []string) (float64, error
 	if idx+1 >= len(record) {
 		return 0, fmt.Errorf("no adjacent amount column")
 	}
-	return parseDegiroAmount(record[idx+1])
+	return parseAmount(record[idx+1])
 }

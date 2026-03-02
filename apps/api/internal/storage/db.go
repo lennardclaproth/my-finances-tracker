@@ -24,17 +24,22 @@ const (
 	SchemaVendors    = "vendor"
 	SchemaCashflow   = "cashflow"
 	SchemaPortfolio  = "portfolio"
+	SchemaAccount    = "account"
 	SchemaImports    = "import"
 	SchemaMarketData = "marketdata"
 )
 
 const (
-	TableVendors      = "vendors"
-	TableTransactions = "transactions"
-	TableImports      = "imports"
-	TableListings     = "listings"
-	TableHistories    = "dailies"
-	TableProviders    = "providers"
+	TableVendors       = "vendors"
+	TableTransactions  = "transactions"
+	TableImports       = "imports"
+	TableListings      = "listings"
+	TableHistories     = "dailies"
+	TableProviders     = "providers"
+	TableAccounts      = "accounts"
+	TablePositions     = "positions"
+	TablePosSnapshots  = "position_snapshots"
+	TablePortSnapshots = "portfolio_snapshots"
 )
 
 type DB struct {

@@ -10,7 +10,10 @@ import (
 )
 
 var (
-	ErrNoImportsPending = fmt.Errorf("no imports pending")
+	ErrNoImportsPending                = fmt.Errorf("no imports pending")
+	ErrAccountIDRequired               = fmt.Errorf("account_id is required for imports")
+	ErrImportAccountNotFound           = fmt.Errorf("import account not found")
+	ErrImportAccountValidationNotReady = fmt.Errorf("account validation is not configured")
 )
 
 type ImportStatus string
@@ -27,6 +30,7 @@ type Import struct {
 	CreatedAt  time.Time    `db:"created_at"`
 	UpdatedAt  time.Time    `db:"updated_at"`
 	VendorID   uuid.UUID    `db:"vendor_id"`
+	AccountID  *uuid.UUID   `db:"account_id"`
 	Path       string       `db:"path"`
 	Status     ImportStatus `db:"status"`
 	StatusMsg  string       `db:"status_msg"`
@@ -44,12 +48,19 @@ type ImportEnqueuer interface {
 	Enqueue(ctx context.Context, importID uuid.UUID) error
 }
 
-func NewImport(v vendor.Vendor, path string) *Import {
+func NewImport(v vendor.Vendor, path string, accountID ...uuid.UUID) *Import {
+	var accID *uuid.UUID
+	if len(accountID) > 0 && accountID[0] != uuid.Nil {
+		id := accountID[0]
+		accID = &id
+	}
+
 	return &Import{
 		ID:        uuid.New(),
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
 		VendorID:  v.ID,
+		AccountID: accID,
 		Path:      path,
 		Status:    ImportStatusPending,
 		StatusMsg: "",

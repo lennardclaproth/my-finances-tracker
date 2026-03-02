@@ -21,6 +21,13 @@ interface CalendarDay {
   inCurrentMonth: boolean;
 }
 
+type PresetKey = "YTD" | "1W" | "1M" | "3M" | "1Y" | "3Y";
+
+interface PresetOption {
+  key: PresetKey;
+  label: string;
+}
+
 const props = withDefaults(defineProps<Props>(), {
   disabled: false,
 });
@@ -31,6 +38,14 @@ const emit = defineEmits<{
 }>();
 
 const weekLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const presetOptions: PresetOption[] = [
+  { key: "YTD", label: "YTD" },
+  { key: "1W", label: "1W" },
+  { key: "1M", label: "1M" },
+  { key: "3M", label: "3M" },
+  { key: "1Y", label: "1Y" },
+  { key: "3Y", label: "3Y" },
+];
 const monthLabelFormatter = new Intl.DateTimeFormat(undefined, {
   month: "long",
   year: "numeric",
@@ -45,6 +60,7 @@ const isOpen = ref(false);
 const visibleMonth = ref(startOfMonth(new Date()));
 const draftFrom = ref<Date | null>(null);
 const draftTo = ref<Date | null>(null);
+const selectedPreset = ref<PresetKey | null>(null);
 
 const leftMonth = computed(() => visibleMonth.value);
 const rightMonth = computed(() => addMonths(visibleMonth.value, 1));
@@ -52,8 +68,17 @@ const leftDays = computed(() => buildCalendarGrid(leftMonth.value));
 const rightDays = computed(() => buildCalendarGrid(rightMonth.value));
 const activeFrom = computed(() => (isOpen.value ? draftFrom.value : parseISODate(props.from)));
 const activeTo = computed(() => (isOpen.value ? draftTo.value : parseISODate(props.to)));
+const activePreset = computed<PresetKey | null>(() => {
+  if (isOpen.value) {
+    return selectedPreset.value ?? detectPreset(activeFrom.value, activeTo.value);
+  }
+  return detectPreset(activeFrom.value, activeTo.value);
+});
 
 const displayLabel = computed(() => {
+  if (activePreset.value) {
+    return activePreset.value;
+  }
   if (activeFrom.value && activeTo.value) {
     return `${dateLabelFormatter.format(activeFrom.value)} -> ${dateLabelFormatter.format(activeTo.value)}`;
   }
@@ -81,6 +106,16 @@ function parseISODate(value: string): Date | null {
   }
   parsed.setHours(0, 0, 0, 0);
   return parsed;
+}
+
+function todayAtStartOfDay(): Date {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+}
+
+function dateOnly(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 function startOfMonth(date: Date): Date {
@@ -119,6 +154,56 @@ function compareDate(a: Date, b: Date): number {
   return aValue - bValue;
 }
 
+function rangeForPreset(preset: PresetKey, today: Date): { from: Date; to: Date } {
+  const to = dateOnly(today);
+  switch (preset) {
+    case "YTD":
+      return {
+        from: new Date(to.getFullYear(), 0, 1),
+        to,
+      };
+    case "1W":
+      return {
+        from: new Date(to.getFullYear(), to.getMonth(), to.getDate() - 6),
+        to,
+      };
+    case "1M":
+      return {
+        from: new Date(to.getFullYear(), to.getMonth() - 1, to.getDate()),
+        to,
+      };
+    case "3M":
+      return {
+        from: new Date(to.getFullYear(), to.getMonth() - 3, to.getDate()),
+        to,
+      };
+    case "1Y":
+      return {
+        from: new Date(to.getFullYear() - 1, to.getMonth(), to.getDate()),
+        to,
+      };
+    case "3Y":
+      return {
+        from: new Date(to.getFullYear() - 3, to.getMonth(), to.getDate()),
+        to,
+      };
+  }
+}
+
+function detectPreset(from: Date | null, to: Date | null): PresetKey | null {
+  if (!from || !to) {
+    return null;
+  }
+  const today = todayAtStartOfDay();
+  for (const preset of presetOptions) {
+    const range = rangeForPreset(preset.key, today);
+    if (compareDate(from, range.from) === 0 && compareDate(to, range.to) === 0) {
+      return preset.key;
+    }
+  }
+  return null;
+}
+
 function isSameDate(a: Date | null, b: Date): boolean {
   if (!a) {
     return false;
@@ -151,6 +236,7 @@ function dayCellClass(day: CalendarDay): string {
 
 function selectDay(day: Date): void {
   const normalized = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+  selectedPreset.value = null;
 
   if (!draftFrom.value || (draftFrom.value && draftTo.value)) {
     draftFrom.value = normalized;
@@ -170,7 +256,16 @@ function selectDay(day: Date): void {
 function initializeDraftRange(): void {
   draftFrom.value = parseISODate(props.from);
   draftTo.value = parseISODate(props.to);
+  selectedPreset.value = detectPreset(draftFrom.value, draftTo.value);
   visibleMonth.value = startOfMonth(draftFrom.value ?? new Date());
+}
+
+function selectPreset(preset: PresetKey): void {
+  const range = rangeForPreset(preset, todayAtStartOfDay());
+  draftFrom.value = range.from;
+  draftTo.value = range.to;
+  selectedPreset.value = preset;
+  visibleMonth.value = startOfMonth(range.from);
 }
 
 function onTriggerClick(open: () => void, close: () => void): void {
@@ -183,6 +278,7 @@ function onTriggerClick(open: () => void, close: () => void): void {
 }
 
 function apply(close: () => void): void {
+  selectedPreset.value = detectPreset(draftFrom.value, draftTo.value);
   emit("apply", draftFrom.value ? toISODate(draftFrom.value) : "", draftTo.value ? toISODate(draftTo.value) : "");
   close();
 }
@@ -190,6 +286,7 @@ function apply(close: () => void): void {
 function clearDates(close: () => void): void {
   draftFrom.value = null;
   draftTo.value = null;
+  selectedPreset.value = null;
   emit("clear");
   close();
 }
@@ -246,6 +343,21 @@ function nextMonth(): void {
         </div>
 
         <div class="text-sm text-slate-600">Click start and end dates to select a range</div>
+      </div>
+
+      <div class="mb-4 flex flex-wrap items-center gap-2">
+        <BaseButton
+          unstyled
+          v-for="preset in presetOptions"
+          :key="preset.key"
+          class="rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide transition"
+          :class="activePreset === preset.key
+            ? 'border-blue-500 bg-blue-50 text-blue-700'
+            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'"
+          @click="selectPreset(preset.key)"
+        >
+          {{ preset.label }}
+        </BaseButton>
       </div>
 
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">

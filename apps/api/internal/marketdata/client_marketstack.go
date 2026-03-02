@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,6 +31,24 @@ func (m *marketstackTime) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	m.Time = t
+	return nil
+}
+
+type marketstackInt64 int64
+
+func (m *marketstackInt64) UnmarshalJSON(b []byte) error {
+	s := strings.TrimSpace(string(b))
+	if s == "" || s == "null" {
+		*m = 0
+		return nil
+	}
+	// Accept plain numbers (e.g. 11580, 11580.0) and quoted numbers.
+	s = strings.Trim(s, `"`)
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return err
+	}
+	*m = marketstackInt64(int64(math.Round(f)))
 	return nil
 }
 
@@ -63,13 +83,13 @@ type marketstackEODResponse struct {
 		Count  int `json:"count"`
 	} `json:"pagination"`
 	Data []struct {
-		Symbol string          `json:"symbol"`
-		Date   marketstackTime `json:"date"`
-		Open   float64         `json:"open"`
-		Close  float64         `json:"close"`
-		High   float64         `json:"high"`
-		Low    float64         `json:"low"`
-		Volume int64           `json:"volume"`
+		Symbol string           `json:"symbol"`
+		Date   marketstackTime  `json:"date"`
+		Open   float64          `json:"open"`
+		Close  float64          `json:"close"`
+		High   float64          `json:"high"`
+		Low    float64          `json:"low"`
+		Volume marketstackInt64 `json:"volume"`
 	} `json:"data"`
 }
 
@@ -210,7 +230,7 @@ func (c *MarketStackClient) yieldDailies(
 	page marketstackEODResponse,
 ) bool {
 	for _, d := range page.Data {
-		h, err := NewDaily(d.Symbol, d.Date.Time, d.Open, d.Close, d.High, d.Low, d.Volume)
+		h, err := NewDaily(d.Symbol, d.Date.Time, d.Open, d.Close, d.High, d.Low, int64(d.Volume))
 		if err != nil {
 			continue // skip malformed rows
 		}

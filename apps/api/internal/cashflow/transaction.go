@@ -34,6 +34,7 @@ const (
 
 type Transaction struct {
 	ID          uuid.UUID         `db:"id"`
+	AccountID   *uuid.UUID        `db:"account_id"`
 	Description string            `db:"description"`
 	Note        string            `db:"note"`
 	Source      string            `db:"source"`
@@ -67,14 +68,19 @@ var (
 )
 
 // NewTransaction creates a new Transaction instance and generates its checksum.
-func NewTransaction(desc, note, source string, direction CashFlowDirection, amount float64, date time.Time, rowNumber int, importID uuid.UUID, accountType *AccountType) (*Transaction, error) {
+func NewTransaction(desc, note, source string, direction CashFlowDirection, amount float64, date time.Time, rowNumber int, importID uuid.UUID, accountType *AccountType, accountID ...*uuid.UUID) (*Transaction, error) {
 	// Guard on domain level against invalid amount values
 	amountCents, err := money.NewPrice(amount)
 	if err != nil {
 		return nil, fmt.Errorf("NewTransaction failed: %w", err)
 	}
+	var accID *uuid.UUID
+	if len(accountID) > 0 {
+		accID = accountID[0]
+	}
 	t := &Transaction{
 		ID:          uuid.New(),
+		AccountID:   accID,
 		Description: desc,
 		Note:        note,
 		Source:      source,
@@ -104,9 +110,13 @@ func (t *Transaction) generateChecksum() string {
 	amountCents := fmt.Sprintf("%d", t.AmountCents)
 	rowNumber := fmt.Sprintf("%d", t.RowNumber)
 	date := t.Date.Format("20060102") // Standard date format
+	accountID := ""
+	if t.AccountID != nil {
+		accountID = t.AccountID.String()
+	}
 	// concatenate all fields to form the payload string to generate a checksum
 	const sep = "\x1F" // Unit Separator character see -> https://www.ascii-code.com/character/%E2%90%9F
-	payload := strings.Join([]string{desc, note, source, direction, amountCents, date, rowNumber}, sep)
+	payload := strings.Join([]string{desc, note, source, direction, amountCents, date, rowNumber, accountID}, sep)
 	// digest the payload in byte format and encode it to hexadecimal string
 	sum := sha256.Sum256([]byte(payload))
 	return hex.EncodeToString(sum[:])

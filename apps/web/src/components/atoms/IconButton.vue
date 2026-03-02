@@ -2,9 +2,11 @@
 import { computed } from "vue";
 
 type Tone = "neutral" | "primary" | "warning" | "info";
+type Size = "sm" | "md" | "fab";
 
 interface Props {
   tone?: Tone;
+  size?: Size;
   disabled?: boolean;
   title: string;
   type?: "button" | "submit" | "reset";
@@ -13,6 +15,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   tone: "neutral",
+  size: "md",
   disabled: false,
   type: "button",
   unstyled: false,
@@ -24,7 +27,9 @@ const classes = computed(() => {
   }
 
   const base =
-    "inline-flex h-9 w-9 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+    "inline-flex items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+  const sizeClass =
+    props.size === "fab" ? "h-14 w-14 shadow-lg" : props.size === "sm" ? "h-8 w-8" : "h-9 w-9";
 
   const toneMap: Record<Tone, string> = {
     neutral: "border-slate-200 bg-white text-slate-600 hover:bg-slate-100 focus-visible:ring-slate-400",
@@ -33,7 +38,7 @@ const classes = computed(() => {
     info: "border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 focus-visible:ring-cyan-500",
   };
 
-  return `${base} ${toneMap[props.tone]}`;
+  return `${base} ${sizeClass} ${toneMap[props.tone]}`;
 });
 </script>
 

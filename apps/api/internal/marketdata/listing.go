@@ -46,14 +46,19 @@ const (
 )
 
 var (
-	ErrListingSymbolEmpty = fmt.Errorf("listing symbol cannot be empty")
-	ErrListingNameEmpty   = fmt.Errorf("listing name cannot be empty")
-	ErrListingSourceEmpty = fmt.Errorf("listing source cannot be empty")
-	ErrSyncInProgress     = fmt.Errorf("sync is already in progress for this listing")
+	ErrListingSymbolEmpty      = fmt.Errorf("listing symbol cannot be empty")
+	ErrListingNameEmpty        = fmt.Errorf("listing name cannot be empty")
+	ErrListingSourceEmpty      = fmt.Errorf("listing source cannot be empty")
+	ErrListingAlreadyExists    = fmt.Errorf("listing already exists")
+	ErrListingNotFound         = fmt.Errorf("listing not found")
+	ErrNoListingFieldsToUpdate = fmt.Errorf("no listing fields to update")
+	ErrInvalidListingCurrency  = fmt.Errorf("invalid listing currency")
+	ErrSyncInProgress          = fmt.Errorf("sync is already in progress for this listing")
 )
 
 const (
 	SourceAlphaVantage Source = "alpha_vantage"
+	SourceMarketStack  Source = "market_stack"
 )
 
 func NewListing(symbol, name string, source Source, options ...ListingOption) (*Listing, error) {

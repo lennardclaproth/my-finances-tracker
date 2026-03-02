@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 	"github.com/lennardclaproth/my-finances-tracker/internal/vendor"
 	"github.com/lib/pq"
 )
@@ -44,8 +45,9 @@ func (s *SQLXVendorStore) Create(ctx context.Context, v *vendor.Vendor) error {
 
 func (s *SQLXVendorStore) FetchByName(ctx context.Context, name vendor.VendorID) (*vendor.Vendor, error) {
 	var v vendor.Vendor
-	query := fmt.Sprintf(`SELECT id, name, type, active, created_at, updated_at FROM %s WHERE name = $1`, s.tableName)
-	err := s.db.GetContext(ctx, &v, query, name)
+	query := s.db.Rebind(fmt.Sprintf(`SELECT id, name, type, active, created_at, updated_at FROM %s WHERE name = ?`, s.tableName))
+	executor := s.db.GetExecutor(ctx)
+	err := sqlx.GetContext(ctx, executor, &v, query, name)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, vendor.ErrVendorNotFound
@@ -57,8 +59,9 @@ func (s *SQLXVendorStore) FetchByName(ctx context.Context, name vendor.VendorID)
 
 func (s *SQLXVendorStore) FetchById(ctx context.Context, id uuid.UUID) (*vendor.Vendor, error) {
 	var v vendor.Vendor
-	query := fmt.Sprintf(`SELECT id, name, type, active, created_at, updated_at FROM %s WHERE id = $1`, s.tableName)
-	err := s.db.GetContext(ctx, &v, query, id)
+	query := s.db.Rebind(fmt.Sprintf(`SELECT id, name, type, active, created_at, updated_at FROM %s WHERE id = ?`, s.tableName))
+	executor := s.db.GetExecutor(ctx)
+	err := sqlx.GetContext(ctx, executor, &v, query, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, vendor.ErrVendorNotFound
