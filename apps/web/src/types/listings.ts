@@ -42,3 +42,15 @@ export interface CreateListingPayload {
   ticker?: string;
   type?: string;
 }
+
+export interface ListingsSearchPagination {
+  limit: number;
+  offset: number;
+  count: number;
+  total: number;
+}
+
+export interface ListingsSearchResponse {
+  pagination: ListingsSearchPagination;
+  data: ListingDto[];
+}

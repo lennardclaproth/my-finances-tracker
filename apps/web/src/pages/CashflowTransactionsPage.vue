@@ -615,9 +615,9 @@ async function applyIgnore(ignored: boolean): Promise<void> {
 
     <div class="flex h-full min-h-0 flex-col gap-3 px-4 pb-4">
       <div class="grid shrink-0 grid-cols-1 gap-3 lg:grid-cols-4">
-        <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
+        <section class="rounded-3xl border border-slate-300 bg-white p-4 shadow-sm lg:col-span-2">
           <div class="mb-3 flex items-center justify-between gap-2">
-            <h2 class="text-sm font-semibold text-slate-700">Cashflow</h2>
+            <h2 class="font-secondary text-lg font-semibold text-slate-700 md:text-xl">Cashflow</h2>
             <button
               type="button"
               class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
@@ -636,9 +636,9 @@ async function applyIgnore(ignored: boolean): Promise<void> {
           </div>
         </section>
 
-        <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-1">
+        <section class="rounded-3xl border border-slate-300 bg-white p-4 shadow-sm lg:col-span-1">
           <div class="mb-3 flex items-center justify-between gap-2">
-            <h2 class="text-sm font-semibold text-slate-700">Incoming Tags</h2>
+            <h2 class="font-secondary text-lg font-semibold text-slate-700 md:text-xl">Incoming Tags</h2>
             <button
               type="button"
               class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
@@ -658,9 +658,9 @@ async function applyIgnore(ignored: boolean): Promise<void> {
           </div>
         </section>
 
-        <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-1">
+        <section class="rounded-3xl border border-slate-300 bg-white p-4 shadow-sm lg:col-span-1">
           <div class="mb-3 flex items-center justify-between gap-2">
-            <h2 class="text-sm font-semibold text-slate-700">Outgoing Tags</h2>
+            <h2 class="font-secondary text-lg font-semibold text-slate-700 md:text-xl">Outgoing Tags</h2>
             <button
               type="button"
               class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
@@ -730,9 +730,9 @@ async function applyIgnore(ignored: boolean): Promise<void> {
       class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 p-4"
       @click.self="closeExpandedChart"
     >
-      <section class="w-full max-w-6xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
+      <section class="w-full max-w-6xl rounded-3xl border border-slate-300 bg-white shadow-2xl">
         <header class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h3 class="text-base font-semibold text-slate-900">{{ expandedChartTitle }}</h3>
+          <h3 class="font-secondary text-lg font-semibold text-slate-900 md:text-xl">{{ expandedChartTitle }}</h3>
           <button
             type="button"
             class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"

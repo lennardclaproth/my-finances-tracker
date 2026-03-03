@@ -33,7 +33,7 @@ const classes = computed(() => {
 
   const toneMap: Record<Tone, string> = {
     neutral: "border-slate-200 bg-white text-slate-600 hover:bg-slate-100 focus-visible:ring-slate-400",
-    primary: "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 focus-visible:ring-blue-500",
+    primary: "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 focus-visible:ring-indigo-500",
     warning: "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 focus-visible:ring-amber-500",
     info: "border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 focus-visible:ring-cyan-500",
   };

@@ -62,3 +62,54 @@ export interface PortfolioGrowthPoint {
   timeWeightedReturnPct: number;
   returnVsCostBasisPct: number;
 }
+
+export interface PortfolioTransactionDto {
+  id: string;
+  account_id: string;
+  origin: "IMPORT" | "MANUAL";
+  source: string;
+  occurred_at: string;
+  type: "BUY" | "SELL" | "DIVIDEND" | "TAX" | "FEE" | "CASH";
+  listing_id?: string;
+  isin?: string;
+  symbol?: string;
+  description: string;
+  amount: string;
+  quantity: string;
+  unit_price: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PortfolioTransactionsResponseDto {
+  data: PortfolioTransactionDto[];
+}
+
+export interface PortfolioTransaction {
+  id: string;
+  accountId: string;
+  origin: "IMPORT" | "MANUAL";
+  source: string;
+  occurredAt: string;
+  type: "BUY" | "SELL" | "DIVIDEND" | "TAX" | "FEE" | "CASH";
+  listingId?: string;
+  isin?: string;
+  symbol?: string;
+  description: string;
+  amount: string;
+  quantity: string;
+  unitPrice: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateManualPortfolioTransactionPayload {
+  account_id: string;
+  vendor_id: string;
+  occurred_at: string;
+  type: "BUY" | "SELL" | "DIVIDEND" | "TAX" | "FEE" | "CASH";
+  listing_id?: string;
+  amount: string;
+  quantity?: string;
+  description?: string;
+}

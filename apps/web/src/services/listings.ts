@@ -1,4 +1,4 @@
-import type { CreateListingPayload, Listing, ListingDto } from "../types/listings";
+import type { CreateListingPayload, Listing, ListingDto, ListingsSearchResponse } from "../types/listings";
 import { requestJson } from "./http";
 
 function toListing(dto: ListingDto): Listing {
@@ -53,4 +53,24 @@ export async function createListing(input: CreateListingPayload): Promise<Listin
     body: JSON.stringify(body),
   });
   return toListing(dto);
+}
+
+export async function searchListings(
+  q: string,
+  limit = 25,
+  offset = 0,
+): Promise<{ pagination: ListingsSearchResponse["pagination"]; data: Listing[] }> {
+  const payload = await requestJson<ListingsSearchResponse>("/marketdata/listings/search", {
+    method: "GET",
+    query: {
+      q: q.trim(),
+      limit,
+      offset,
+    },
+  });
+
+  return {
+    pagination: payload.pagination,
+    data: payload.data.map(toListing),
+  };
 }

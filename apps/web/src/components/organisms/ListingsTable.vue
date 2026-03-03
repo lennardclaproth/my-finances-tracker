@@ -30,7 +30,7 @@ function formatDate(value: string): string {
 </script>
 
 <template>
-  <section class="h-full overflow-hidden rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-sm">
+  <section class="h-full overflow-hidden rounded-3xl border border-slate-300 bg-white/95 p-4 shadow-sm">
     <div class="relative h-full">
       <div class="h-full overflow-auto bg-slate-100">
         <table class="w-full min-w-[1120px] border-separate border-spacing-0 bg-white">

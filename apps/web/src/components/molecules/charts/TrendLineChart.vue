@@ -467,7 +467,7 @@ onBeforeUnmount(() => {
 
       <div
         v-if="isSelecting"
-        class="pointer-events-none absolute z-10 bg-blue-300/25"
+        class="pointer-events-none absolute z-10 bg-indigo-300/25"
         :style="dragOverlayStyle()"
       />
       <div
@@ -482,12 +482,12 @@ onBeforeUnmount(() => {
       />
       <div
         v-if="isSelecting"
-        class="pointer-events-none absolute z-10 rounded-full border-2 border-blue-500 bg-white shadow-sm"
+        class="pointer-events-none absolute z-10 rounded-full border-2 border-indigo-500 bg-white shadow-sm"
         :style="dragStartMarkerStyle()"
       />
       <div
         v-if="isSelecting"
-        class="pointer-events-none absolute z-10 rounded-full border-2 border-blue-500 bg-white shadow-sm"
+        class="pointer-events-none absolute z-10 rounded-full border-2 border-indigo-500 bg-white shadow-sm"
         :style="dragHoverMarkerStyle()"
       />
 

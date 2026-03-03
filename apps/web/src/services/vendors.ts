@@ -6,6 +6,7 @@ interface VendorApiResponse {
   name: string;
   type: string;
   active: boolean;
+  import_disabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -20,6 +21,7 @@ export async function fetchVendors(): Promise<Vendor[]> {
     name: vendor.name,
     type: vendor.type,
     active: vendor.active,
+    importDisabled: vendor.import_disabled,
     createdAt: vendor.created_at,
     updatedAt: vendor.updated_at,
   }));

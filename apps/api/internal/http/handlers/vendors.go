@@ -27,12 +27,13 @@ func GetVendors(
 				continue
 			}
 			response = append(response, api.VendorResponse{
-				ID:        v.ID,
-				Name:      string(v.Name),
-				Type:      string(v.Type),
-				Active:    v.Active,
-				CreatedAt: v.CreatedAt,
-				UpdatedAt: v.UpdatedAt,
+				ID:             v.ID,
+				Name:           string(v.Name),
+				Type:           string(v.Type),
+				Active:         v.Active,
+				ImportDisabled: v.ImportDisabled,
+				CreatedAt:      v.CreatedAt,
+				UpdatedAt:      v.UpdatedAt,
 			})
 		}
 		return http.StatusOK, response, nil

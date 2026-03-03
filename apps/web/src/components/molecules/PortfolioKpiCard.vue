@@ -27,14 +27,14 @@ const valueToneClass = computed(() => {
 </script>
 
 <template>
-  <article class="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+  <article class="rounded-2xl border border-slate-300 bg-slate-50/70 p-3">
     <template v-if="loading">
       <div class="h-3 w-24 animate-pulse rounded bg-slate-200" />
       <div class="mt-2 h-7 w-28 animate-pulse rounded bg-slate-200" />
     </template>
     <template v-else>
       <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{{ label }}</p>
-      <p class="mt-1 text-xl font-semibold" :class="valueToneClass">{{ value }}</p>
+      <p class="font-secondary mt-1 text-2xl font-semibold leading-none" :class="valueToneClass">{{ value }}</p>
     </template>
   </article>
 </template>

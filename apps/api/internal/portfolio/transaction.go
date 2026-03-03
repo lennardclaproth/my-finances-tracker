@@ -15,6 +15,7 @@ import (
 )
 
 type TransactionType string
+type TransactionOrigin string
 
 const (
 	TxBuy      TransactionType = "BUY"
@@ -23,26 +24,35 @@ const (
 	TxTax      TransactionType = "TAX"
 	TxFee      TransactionType = "FEE"
 	TxCash     TransactionType = "CASH"
+
+	TransactionOriginImport TransactionOrigin = "IMPORT"
+	TransactionOriginManual TransactionOrigin = "MANUAL"
 )
 
 type Transaction struct {
-	ID          uuid.UUID       `db:"id"`
-	AccountID   *uuid.UUID      `db:"account_id"`
-	ImportID    uuid.UUID       `db:"import_id"`
-	Source      string          `db:"source"` // "degiro", "ibkr", ...
-	OccurredAt  time.Time       `db:"occurred_at"`
-	PositionID  *uuid.UUID      `db:"position_id"` // links to the position this transaction belongs to (can be null for cash transactions or if position mapping failed)
-	ISIN        *string         `db:"isin"`
-	Symbol      *string         `db:"symbol"`
-	Description string          `db:"description"` // optional raw description from the broker, can be used for debugging or more complex parsing if needed
-	Type        TransactionType `db:"type"`
-	Quantity    float64         `db:"quantity"`
-	UnitPrice   money.Price     `db:"unit_price"`   // per-unit for BUY/SELL
-	AmountCents money.Price     `db:"amount_cents"` // absolute amount for cash-impact rows
-	Checksum    string          `db:"checksum"`
-	RowNumber   int             `db:"row_number"`
-	CreatedAt   time.Time       `db:"created_at"`
-	UpdatedAt   time.Time       `db:"updated_at"`
+	ID          uuid.UUID         `db:"id"`
+	AccountID   *uuid.UUID        `db:"account_id"`
+	ImportID    *uuid.UUID        `db:"import_id"`
+	Origin      TransactionOrigin `db:"origin"`
+	Source      string            `db:"source"` // "degiro", "ibkr", ...
+	OccurredAt  time.Time         `db:"occurred_at"`
+	PositionID  *uuid.UUID        `db:"position_id"` // links to the position this transaction belongs to (can be null for cash transactions or if position mapping failed)
+	ISIN        *string           `db:"isin"`
+	Symbol      *string           `db:"symbol"`
+	Description string            `db:"description"` // optional raw description from the broker, can be used for debugging or more complex parsing if needed
+	Type        TransactionType   `db:"type"`
+	Quantity    float64           `db:"quantity"`
+	UnitPrice   money.Price       `db:"unit_price"`   // per-unit for BUY/SELL
+	AmountCents money.Price       `db:"amount_cents"` // absolute amount for cash-impact rows
+	Checksum    string            `db:"checksum"`
+	RowNumber   int               `db:"row_number"`
+	CreatedAt   time.Time         `db:"created_at"`
+	UpdatedAt   time.Time         `db:"updated_at"`
+}
+
+type TransactionWithListingID struct {
+	Transaction
+	ListingID *uuid.UUID `db:"listing_id"`
 }
 
 type CsvParser interface {
@@ -65,9 +75,36 @@ type TransactionData struct {
 var (
 	ErrDuplicateTransaction            = fmt.Errorf("duplicate transaction")
 	ErrTransactionISINAndSymbolMissing = fmt.Errorf("both ISIN and Symbol are missing, cannot determine position ID")
+	ErrInvalidTransactionOrigin        = fmt.Errorf("invalid transaction origin")
 )
 
 func NewTransaction(data TransactionData, rowNumber int, importID uuid.UUID, accountID, positionID *uuid.UUID) (*Transaction, error) {
+	imp := importID
+	return newTransaction(data, rowNumber, &imp, accountID, positionID, TransactionOriginImport)
+}
+
+func NewManualTransaction(data TransactionData, accountID uuid.UUID) (*Transaction, error) {
+	acc := accountID
+	return newTransaction(data, 0, nil, &acc, nil, TransactionOriginManual)
+}
+
+func newTransaction(
+	data TransactionData,
+	rowNumber int,
+	importID *uuid.UUID,
+	accountID, positionID *uuid.UUID,
+	origin TransactionOrigin,
+) (*Transaction, error) {
+	if origin != TransactionOriginImport && origin != TransactionOriginManual {
+		return nil, ErrInvalidTransactionOrigin
+	}
+	if origin == TransactionOriginImport && importID == nil {
+		return nil, ErrInvalidTransactionOrigin
+	}
+	if origin == TransactionOriginManual && importID != nil {
+		return nil, ErrInvalidTransactionOrigin
+	}
+
 	price, err := money.NewPrice(math.Abs(data.Price))
 	if err != nil {
 		return nil, fmt.Errorf("portfolio.NewTransaction price: %w", err)
@@ -87,7 +124,7 @@ func NewTransaction(data TransactionData, rowNumber int, importID uuid.UUID, acc
 			quantity = 0
 		}
 	}
-	if data.ISIN == nil && data.Symbol == nil {
+	if data.ISIN == nil && data.Symbol == nil && data.Type != TxCash {
 		return nil, ErrTransactionISINAndSymbolMissing
 	}
 	if data.ISIN != nil {
@@ -98,10 +135,12 @@ func NewTransaction(data TransactionData, rowNumber int, importID uuid.UUID, acc
 		symbol := strings.TrimSpace(*data.Symbol)
 		data.Symbol = &symbol
 	}
+	now := time.Now().UTC()
 	tx := &Transaction{
 		ID:          uuid.New(),
 		AccountID:   accountID,
 		ImportID:    importID,
+		Origin:      origin,
 		Source:      strings.TrimSpace(data.Source),
 		OccurredAt:  data.OccurredAt,
 		PositionID:  positionID,
@@ -113,8 +152,8 @@ func NewTransaction(data TransactionData, rowNumber int, importID uuid.UUID, acc
 		UnitPrice:   price,
 		AmountCents: amount,
 		RowNumber:   rowNumber,
-		CreatedAt:   time.Now().UTC(),
-		UpdatedAt:   time.Now().UTC(),
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 	tx.Checksum = tx.generateChecksum()
 	return tx, nil
@@ -169,6 +208,7 @@ func (t *Transaction) generateChecksum() string {
 		fmt.Sprintf("%d", t.RowNumber),
 		accountID,
 		positionID,
+		string(t.Origin),
 	}, sep)
 	sum := sha256.Sum256([]byte(payload))
 	return hex.EncodeToString(sum[:])

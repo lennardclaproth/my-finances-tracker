@@ -17,6 +17,7 @@ type listingStore interface {
 	Create(ctx context.Context, listing *Listing) error
 	UpdateFields(ctx context.Context, listing *Listing) error
 	List(ctx context.Context) ([]*Listing, error)
+	Search(ctx context.Context, q string, limit, offset int) ([]*Listing, int, error)
 	FetchBySymbol(ctx context.Context, symbol string) (*Listing, error)
 	FetchByID(ctx context.Context, id uuid.UUID) (*Listing, error)
 	TryAcquireSyncLock(ctx context.Context, id uuid.UUID) (bool, error)
@@ -176,6 +177,7 @@ func (s *Service) syncDailyData(ctx context.Context, listingID uuid.UUID, from, 
 			continue
 		}
 	}
+	s.listingStore.UpdateAccumulatedRange(ctx, listingID, from, to)
 	return nil
 }
 
@@ -274,4 +276,12 @@ func (s *Service) ListListings(ctx context.Context) ([]*Listing, error) {
 		return nil, fmt.Errorf("ListListings failed to fetch listings: %w", err)
 	}
 	return listings, nil
+}
+
+func (s *Service) SearchListings(ctx context.Context, q string, limit, offset int) ([]*Listing, int, error) {
+	listings, total, err := s.listingStore.Search(ctx, q, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("SearchListings failed to fetch listings: %w", err)
+	}
+	return listings, total, nil
 }

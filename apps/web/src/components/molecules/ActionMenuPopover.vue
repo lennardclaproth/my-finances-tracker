@@ -149,14 +149,14 @@ onBeforeUnmount(() => {
       <template #trigger>
         <button
           type="button"
-          class="group inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white/90 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+          class="group inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white/90 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
           :aria-expanded="isOpen"
           aria-haspopup="menu"
           title="Open actions"
           @click="toggleFromClick"
         >
           <span
-            class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-700 transition-transform duration-500 ease-out group-hover:rotate-[360deg]"
+            class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 transition-transform duration-500 ease-out group-hover:rotate-[360deg]"
             :class="isOpen ? 'rotate-[360deg]' : ''"
           >
             <Bars3Icon class="h-5 w-5" />
@@ -173,7 +173,7 @@ onBeforeUnmount(() => {
           @mouseleave="scheduleCloseOnLeave"
         >
           <header class="border-b border-slate-100 px-4 py-3">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            <p class="font-secondary text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
               {{ session.adminMode.value ? "Admin actions" : "Quick actions" }}
             </p>
           </header>
@@ -186,14 +186,14 @@ onBeforeUnmount(() => {
               class="menu-item flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition"
               :class="
                 isActiveAction(item)
-                  ? 'bg-blue-50 text-blue-800'
+                  ? 'bg-indigo-50 text-indigo-800'
                   : 'text-slate-700 hover:bg-slate-100'
               "
               @click="void runAction(item, close)"
             >
               <span
                 class="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border"
-                :class="isActiveAction(item) ? 'border-blue-200 bg-blue-100 text-blue-700' : 'border-slate-200 bg-white text-slate-500'"
+                :class="isActiveAction(item) ? 'border-indigo-200 bg-indigo-100 text-indigo-700' : 'border-slate-200 bg-white text-slate-500'"
               >
                 <component :is="item.icon" class="h-4 w-4" />
               </span>

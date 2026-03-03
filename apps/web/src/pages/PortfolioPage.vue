@@ -1,19 +1,28 @@
 <script setup lang="ts">
-import { ArrowPathIcon } from "@heroicons/vue/24/outline";
+import { ArrowPathIcon, PlusIcon } from "@heroicons/vue/24/outline";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import BaseButton from "../components/atoms/BaseButton.vue";
+import BaseToggle from "../components/atoms/BaseToggle.vue";
 import IconButton from "../components/atoms/IconButton.vue";
+import CreatePortfolioTransactionModal from "../components/molecules/CreatePortfolioTransactionModal.vue";
+import PortfolioTabs from "../components/molecules/PortfolioTabs.vue";
 import PortfolioGrowthComboChart from "../components/molecules/charts/PortfolioGrowthComboChart.vue";
 import ToastMessage from "../components/molecules/ToastMessage.vue";
 import PortfolioGrowthKpis from "../components/organisms/PortfolioGrowthKpis.vue";
 import TopNavbar from "../components/organisms/TopNavbar.vue";
 import PortfolioPositionsTable from "../components/organisms/PortfolioPositionsTable.vue";
+import PortfolioTransactionsTable from "../components/organisms/PortfolioTransactionsTable.vue";
 import AppShellTemplate from "../components/templates/AppShellTemplate.vue";
 import { useAppSession } from "../composables/useAppSession";
-import { fetchPortfolioPositions, fetchPortfolioSnapshots, requestPortfolioRebuild } from "../services/portfolio";
+import {
+  fetchPortfolioPositions,
+  fetchPortfolioSnapshots,
+  fetchPortfolioTransactions,
+  requestPortfolioRebuild,
+} from "../services/portfolio";
 import { ApiError } from "../services/http";
-import type { PortfolioGrowthPoint, PortfolioPosition, PortfolioSnapshotPoint } from "../types/portfolio";
+import type { PortfolioGrowthPoint, PortfolioPosition, PortfolioSnapshotPoint, PortfolioTransaction } from "../types/portfolio";
 
 type AlertTone = "success" | "danger" | "info";
 
@@ -23,13 +32,18 @@ const router = useRouter();
 
 const snapshots = ref<PortfolioSnapshotPoint[]>([]);
 const positions = ref<PortfolioPosition[]>([]);
+const transactions = ref<PortfolioTransaction[]>([]);
 const includeClosed = ref(false);
+const createModalOpen = ref(false);
+const activeTab = ref<"positions" | "transactions">("positions");
 
 const snapshotsLoading = ref(false);
 const positionsLoading = ref(false);
+const transactionsLoading = ref(false);
 const rebuildLoading = ref(false);
 const snapshotsError = ref("");
 const positionsError = ref("");
+const transactionsError = ref("");
 const toast = ref<{ tone: AlertTone; message: string } | null>(null);
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -42,6 +56,10 @@ function firstQueryValue(value: string | string[] | null | undefined): string {
 
 const from = computed(() => firstQueryValue(route.query.from as string | string[] | undefined).trim());
 const to = computed(() => firstQueryValue(route.query.to as string | string[] | undefined).trim());
+
+function parseTab(value: string): "positions" | "transactions" {
+  return value === "transactions" ? "transactions" : "positions";
+}
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -119,6 +137,22 @@ async function loadPositions(): Promise<void> {
   }
 }
 
+async function loadTransactions(): Promise<void> {
+  transactionsLoading.value = true;
+  transactionsError.value = "";
+  try {
+    transactions.value = await fetchPortfolioTransactions(
+      session.activeAccountId.value,
+      from.value || undefined,
+      to.value || undefined,
+    );
+  } catch (error: unknown) {
+    transactionsError.value = toErrorMessage(error);
+  } finally {
+    transactionsLoading.value = false;
+  }
+}
+
 async function onRebuildPortfolio(): Promise<void> {
   if (rebuildLoading.value) {
     return;
@@ -141,6 +175,9 @@ async function updateDateRange(nextFrom: string, nextTo: string, mode: "push" | 
   }
   if (nextTo) {
     nextQuery.to = nextTo;
+  }
+  if (activeTab.value === "transactions") {
+    nextQuery.tab = "transactions";
   }
 
   const currentFrom = from.value;
@@ -174,6 +211,32 @@ async function onChartRangeSelected(range: { from: string; to: string }): Promis
   await updateDateRange(range.from, range.to);
 }
 
+async function onTabChange(nextTab: "positions" | "transactions"): Promise<void> {
+  if (nextTab === activeTab.value) {
+    return;
+  }
+  activeTab.value = nextTab;
+  const nextQuery: Record<string, string> = {};
+  if (from.value) {
+    nextQuery.from = from.value;
+  }
+  if (to.value) {
+    nextQuery.to = to.value;
+  }
+  if (nextTab === "transactions") {
+    nextQuery.tab = "transactions";
+  }
+  await router.push({
+    path: route.path,
+    query: nextQuery,
+  });
+}
+
+async function onTransactionCreated(): Promise<void> {
+  showToast("success", "Transaction created successfully.");
+  await loadTransactions();
+}
+
 watch(includeClosed, () => {
   void loadPositions();
 });
@@ -182,6 +245,15 @@ watch(
   () => [from.value, to.value],
   () => {
     void loadSnapshots();
+    void loadTransactions();
+  },
+  { immediate: true },
+);
+
+watch(
+  () => firstQueryValue(route.query.tab as string | string[] | undefined).trim(),
+  (tab) => {
+    activeTab.value = parseTab(tab);
   },
   { immediate: true },
 );
@@ -204,7 +276,7 @@ onBeforeUnmount(() => {
       <TopNavbar
         :from="from"
         :to="to"
-        :loading="snapshotsLoading || positionsLoading || rebuildLoading"
+        :loading="snapshotsLoading || positionsLoading || transactionsLoading || rebuildLoading"
         :show-filter-controls="true"
         :show-search-control="false"
         :show-date-control="true"
@@ -214,9 +286,9 @@ onBeforeUnmount(() => {
     </template>
 
     <div class="flex h-full min-h-0 flex-col gap-3 px-4 pb-4">
-      <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      <section class="rounded-3xl border border-slate-300 bg-white p-4 shadow-sm">
         <header class="mb-3 flex items-center justify-between gap-2">
-          <h2 class="text-sm font-semibold text-slate-700">Portfolio Growth</h2>
+          <h2 class="font-secondary text-lg font-semibold text-slate-700 md:text-xl">Portfolio Growth</h2>
           <div class="flex items-center gap-2">
             <IconButton
               tone="neutral"
@@ -251,17 +323,63 @@ onBeforeUnmount(() => {
       </section>
 
       <div class="min-h-0 flex-1">
-        <PortfolioPositionsTable
-          class="h-full"
-          :rows="positions"
-          :loading="positionsLoading"
-          :include-closed="includeClosed"
-          :error-message="positionsError"
-          @retry="void loadPositions()"
-          @update:include-closed="includeClosed = $event"
-        />
+        <section class="relative flex h-full min-h-0 flex-col overflow-hidden rounded-3xl border border-slate-300 bg-white/95 p-4 shadow-sm">
+          <header class="mb-3 flex items-center justify-between gap-3">
+            <PortfolioTabs :model-value="activeTab" @update:model-value="void onTabChange($event)" />
+            <div v-if="activeTab === 'positions'" class="flex items-center gap-2">
+              <span class="text-xs font-medium uppercase tracking-wide text-slate-500">Include closed</span>
+              <BaseToggle
+                :checked="includeClosed"
+                :disabled="positionsLoading"
+                @update:checked="includeClosed = $event"
+              />
+            </div>
+          </header>
+
+          <div class="min-h-0 flex-1">
+            <PortfolioPositionsTable
+              v-if="activeTab === 'positions'"
+              class="h-full"
+              :rows="positions"
+              :loading="positionsLoading"
+              :include-closed="includeClosed"
+              :error-message="positionsError"
+              :framed="false"
+              :show-include-closed-control="false"
+              @retry="void loadPositions()"
+              @update:include-closed="includeClosed = $event"
+            />
+            <PortfolioTransactionsTable
+              v-else
+              class="h-full"
+              :rows="transactions"
+              :loading="transactionsLoading"
+              :error-message="transactionsError"
+              :framed="false"
+              @retry="void loadTransactions()"
+            />
+          </div>
+
+          <div class="absolute bottom-6 right-6 z-40">
+            <IconButton
+              tone="primary"
+              size="fab"
+              title="Add transaction"
+              @click="createModalOpen = true"
+            >
+              <PlusIcon class="h-6 w-6" />
+            </IconButton>
+          </div>
+        </section>
       </div>
     </div>
+
+    <CreatePortfolioTransactionModal
+      :open="createModalOpen"
+      :account-id="session.activeAccountId.value"
+      @close="createModalOpen = false"
+      @created="void onTransactionCreated()"
+    />
 
     <div class="pointer-events-none fixed right-4 top-4 z-50">
       <Transition

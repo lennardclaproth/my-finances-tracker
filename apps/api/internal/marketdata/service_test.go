@@ -20,6 +20,7 @@ type fakeListingStore struct {
 	createFn                 func(ctx context.Context, listing *Listing) error
 	updateFieldsFn           func(ctx context.Context, listing *Listing) error
 	listFn                   func(ctx context.Context) ([]*Listing, error)
+	searchFn                 func(ctx context.Context, q string, limit, offset int) ([]*Listing, int, error)
 	fetchBySymbolFn          func(ctx context.Context, symbol string) (*Listing, error)
 	fetchByIDFn              func(ctx context.Context, id uuid.UUID) (*Listing, error)
 	tryAcquireSyncLockFn     func(ctx context.Context, id uuid.UUID) (bool, error)
@@ -51,6 +52,13 @@ func (f *fakeListingStore) List(ctx context.Context) ([]*Listing, error) {
 		return f.listFn(ctx)
 	}
 	return []*Listing{}, nil
+}
+
+func (f *fakeListingStore) Search(ctx context.Context, q string, limit, offset int) ([]*Listing, int, error) {
+	if f.searchFn != nil {
+		return f.searchFn(ctx, q, limit, offset)
+	}
+	return []*Listing{}, 0, nil
 }
 
 func (f *fakeListingStore) UpdateFields(ctx context.Context, listing *Listing) error {

@@ -26,8 +26,8 @@ func NewSQLXVendorStore(db *DB) *SQLXVendorStore {
 
 func (s *SQLXVendorStore) Create(ctx context.Context, v *vendor.Vendor) error {
 	query := fmt.Sprintf(`
-		INSERT INTO %s (id, name, type, active, created_at, updated_at)
-		VALUES (:id, :name, :type, :active, :created_at, :updated_at)
+		INSERT INTO %s (id, name, type, active, import_disabled, created_at, updated_at)
+		VALUES (:id, :name, :type, :active, :import_disabled, :created_at, :updated_at)
 	`, s.tableName)
 	_, err := s.db.NamedExecContext(ctx, query, v)
 	var pqErr *pq.Error
@@ -45,7 +45,7 @@ func (s *SQLXVendorStore) Create(ctx context.Context, v *vendor.Vendor) error {
 
 func (s *SQLXVendorStore) FetchByName(ctx context.Context, name vendor.VendorID) (*vendor.Vendor, error) {
 	var v vendor.Vendor
-	query := s.db.Rebind(fmt.Sprintf(`SELECT id, name, type, active, created_at, updated_at FROM %s WHERE name = ?`, s.tableName))
+	query := s.db.Rebind(fmt.Sprintf(`SELECT id, name, type, active, import_disabled, created_at, updated_at FROM %s WHERE name = ?`, s.tableName))
 	executor := s.db.GetExecutor(ctx)
 	err := sqlx.GetContext(ctx, executor, &v, query, name)
 	if err != nil {
@@ -59,7 +59,7 @@ func (s *SQLXVendorStore) FetchByName(ctx context.Context, name vendor.VendorID)
 
 func (s *SQLXVendorStore) FetchById(ctx context.Context, id uuid.UUID) (*vendor.Vendor, error) {
 	var v vendor.Vendor
-	query := s.db.Rebind(fmt.Sprintf(`SELECT id, name, type, active, created_at, updated_at FROM %s WHERE id = ?`, s.tableName))
+	query := s.db.Rebind(fmt.Sprintf(`SELECT id, name, type, active, import_disabled, created_at, updated_at FROM %s WHERE id = ?`, s.tableName))
 	executor := s.db.GetExecutor(ctx)
 	err := sqlx.GetContext(ctx, executor, &v, query, id)
 	if err != nil {
@@ -74,7 +74,7 @@ func (s *SQLXVendorStore) FetchById(ctx context.Context, id uuid.UUID) (*vendor.
 func (s *SQLXVendorStore) ListActive(ctx context.Context) ([]*vendor.Vendor, error) {
 	var vendors []*vendor.Vendor
 	query := fmt.Sprintf(`
-		SELECT id, name, type, active, created_at, updated_at
+		SELECT id, name, type, active, import_disabled, created_at, updated_at
 		FROM %s
 		WHERE active = $1
 		ORDER BY name ASC

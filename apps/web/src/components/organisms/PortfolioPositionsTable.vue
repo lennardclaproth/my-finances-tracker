@@ -11,12 +11,16 @@ interface Props {
   loading?: boolean;
   errorMessage?: string;
   includeClosed?: boolean;
+  framed?: boolean;
+  showIncludeClosedControl?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
   errorMessage: "",
   includeClosed: false,
+  framed: true,
+  showIncludeClosedControl: true,
 });
 
 const emit = defineEmits<{
@@ -63,12 +67,19 @@ function averageCost(position: PortfolioPosition): number | undefined {
   }
   return position.costBasis / position.quantity;
 }
+
+const rootClasses = computed(() => {
+  if (!props.framed) {
+    return "h-full";
+  }
+  return "h-full overflow-hidden rounded-3xl border border-slate-300 bg-white/95 p-4 shadow-sm";
+});
 </script>
 
 <template>
-  <section class="h-full overflow-hidden rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-sm">
+  <section :class="rootClasses">
     <div class="flex h-full min-h-0 flex-col">
-      <header class="mb-3 flex items-center justify-end gap-3">
+      <header v-if="showIncludeClosedControl" class="mb-3 flex items-center justify-end gap-3">
         <div class="flex items-center gap-2">
           <span class="text-xs font-medium uppercase tracking-wide text-slate-500">Include closed</span>
           <BaseToggle

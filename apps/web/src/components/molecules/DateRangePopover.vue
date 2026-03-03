@@ -223,10 +223,10 @@ function dayCellClass(day: CalendarDay): string {
   const inRange = !selected && isInRange(day.date);
 
   if (selected) {
-    return "bg-blue-600 text-white";
+    return "bg-indigo-600 text-white";
   }
   if (inRange) {
-    return "bg-blue-100 text-blue-800";
+    return "bg-indigo-100 text-indigo-800";
   }
   if (!day.inCurrentMonth) {
     return "text-slate-300";
@@ -310,7 +310,7 @@ function nextMonth(): void {
     <template #trigger="{ open, close }">
       <BaseButton
         unstyled
-        class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-60"
+        class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-60"
         :disabled="disabled"
         :title="displayLabel"
         @click="onTriggerClick(open, close)"
@@ -352,7 +352,7 @@ function nextMonth(): void {
           :key="preset.key"
           class="rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide transition"
           :class="activePreset === preset.key
-            ? 'border-blue-500 bg-blue-50 text-blue-700'
+            ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
             : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'"
           @click="selectPreset(preset.key)"
         >

@@ -95,6 +95,44 @@ func (s *SQLXListingStore) List(ctx context.Context) ([]*marketdata.Listing, err
 	return listings, nil
 }
 
+func (s *SQLXListingStore) Search(ctx context.Context, q string, limit, offset int) ([]*marketdata.Listing, int, error) {
+	if limit <= 0 {
+		limit = 25
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	pattern := "%" + strings.ToLower(strings.TrimSpace(q)) + "%"
+	where := `WHERE LOWER(symbol) LIKE ? OR LOWER(name) LIKE ? OR LOWER(COALESCE(isin, '')) LIKE ?`
+
+	countQuery := fmt.Sprintf(`SELECT COUNT(1) FROM %s %s`, s.tableName, where)
+	countQuery = s.db.Rebind(countQuery)
+	var total int
+	if err := s.db.GetContext(ctx, &total, countQuery, pattern, pattern, pattern); err != nil {
+		return nil, 0, err
+	}
+
+	query := fmt.Sprintf(`
+		SELECT *
+		FROM %s
+		%s
+		ORDER BY symbol ASC, id ASC
+		LIMIT ?
+		OFFSET ?
+	`, s.tableName, where)
+	query = s.db.Rebind(query)
+
+	listings := make([]*marketdata.Listing, 0)
+	if err := s.db.SelectContext(ctx, &listings, query, pattern, pattern, pattern, limit, offset); err != nil {
+		return nil, 0, err
+	}
+	return listings, total, nil
+}
+
 func (s *SQLXListingStore) UpdateFields(ctx context.Context, listing *marketdata.Listing) error {
 	listing.UpdatedAt = time.Now().UTC()
 	query := fmt.Sprintf(`UPDATE %s
@@ -175,7 +213,7 @@ func (s *SQLXListingStore) UpdateShouldAccumulate(ctx context.Context, id uuid.U
 }
 
 func (s *SQLXListingStore) UpdateAccumulatedRange(ctx context.Context, id uuid.UUID, accumulatedStart, accumulatedEnd *time.Time) error {
-	query := fmt.Sprintf(`UPDATE %s SET accumulated_start = $1, accumulated_end = $2, updated_at = $3 WHERE id = $4`, s.tableName)
-	_, err := s.db.ExecContext(ctx, query, accumulatedStart, accumulatedEnd, time.Now().UTC(), id)
+	query := fmt.Sprintf(`UPDATE %s SET accumulated_start = $1, accumulated_end = $2, should_accumulate = $3, updated_at = $4 WHERE id = $5`, s.tableName)
+	_, err := s.db.ExecContext(ctx, query, accumulatedStart, accumulatedEnd, false, time.Now().UTC(), id)
 	return err
 }

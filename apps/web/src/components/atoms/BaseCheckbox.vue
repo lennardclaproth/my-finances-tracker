@@ -32,7 +32,7 @@ watch(
     type="checkbox"
     :checked="checked"
     :disabled="disabled"
-    class="h-4 w-4 rounded border-slate-300 text-blue-400 focus:ring-blue-100 disabled:cursor-not-allowed"
+    class="h-4 w-4 rounded border-slate-300 text-indigo-400 focus:ring-indigo-100 disabled:cursor-not-allowed"
     @change="emit('update:checked', ($event.target as HTMLInputElement).checked)"
   />
 </template>

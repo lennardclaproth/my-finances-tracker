@@ -14,14 +14,16 @@ import (
 )
 
 type SQLXPortfolioTransactionStore struct {
-	db        *DB
-	tableName string
+	db             *DB
+	tableName      string
+	positionsTable string
 }
 
 func NewSQLXPortfolioTransactionStore(db *DB) *SQLXPortfolioTransactionStore {
 	return &SQLXPortfolioTransactionStore{
-		db:        db,
-		tableName: qualifyPortfolioTransactionsTable(db),
+		db:             db,
+		tableName:      qualifyPortfolioTransactionsTable(db),
+		positionsTable: qualifyTable(db, SchemaPortfolio, TablePositions),
 	}
 }
 
@@ -37,10 +39,10 @@ func qualifyPortfolioTransactionsTable(db *DB) string {
 func (s *SQLXPortfolioTransactionStore) Create(ctx context.Context, tx *portfolio.Transaction) error {
 	query := fmt.Sprintf(`
 		INSERT INTO %s (
-			id, account_id, import_id, source, occurred_at, position_id, isin, symbol, description,
+			id, account_id, import_id, origin, source, occurred_at, position_id, isin, symbol, description,
 			type, quantity, unit_price, amount_cents, checksum, row_number, created_at, updated_at
 		) VALUES (
-			:id, :account_id, :import_id, :source, :occurred_at, :position_id, :isin, :symbol, :description,
+			:id, :account_id, :import_id, :origin, :source, :occurred_at, :position_id, :isin, :symbol, :description,
 			:type, :quantity, :unit_price, :amount_cents, :checksum, :row_number, :created_at, :updated_at
 		)
 	`, s.tableName)
@@ -117,6 +119,39 @@ func (s *SQLXPortfolioTransactionStore) GetByPositionID(ctx context.Context, pos
 	var txs []portfolio.Transaction
 	if err := sqlx.SelectContext(ctx, executor, &txs, query, args...); err != nil {
 		return nil, fmt.Errorf("sqlx_portfolio_transaction_store: get by position: %w", err)
+	}
+	return txs, nil
+}
+
+func (s *SQLXPortfolioTransactionStore) FetchForAccount(
+	ctx context.Context,
+	accID uuid.UUID,
+	from, to *time.Time,
+) ([]portfolio.TransactionWithListingID, error) {
+	query := fmt.Sprintf(`
+		SELECT
+			t.*,
+			p.listing_id AS listing_id
+		FROM %s t
+		LEFT JOIN %s p ON p.id = t.position_id
+		WHERE t.account_id = ?
+	`, s.tableName, s.positionsTable)
+	args := []any{accID}
+	if from != nil {
+		query += " AND t.occurred_at >= ?"
+		args = append(args, *from)
+	}
+	if to != nil {
+		query += " AND t.occurred_at <= ?"
+		args = append(args, *to)
+	}
+	query += " ORDER BY t.occurred_at DESC, t.created_at DESC, t.id DESC"
+	query = s.db.Rebind(query)
+
+	executor := s.db.GetExecutor(ctx)
+	var txs []portfolio.TransactionWithListingID
+	if err := sqlx.SelectContext(ctx, executor, &txs, query, args...); err != nil {
+		return nil, fmt.Errorf("sqlx_portfolio_transaction_store: fetch for account: %w", err)
 	}
 	return txs, nil
 }

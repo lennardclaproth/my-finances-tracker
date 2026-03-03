@@ -64,7 +64,7 @@ onBeforeUnmount(() => {
       rounded="pill"
       :disabled="disabled"
       placeholder="Search description, note or tag"
-      class="w-full border-slate-200 bg-white/90 py-2 pl-10 pr-9 placeholder:text-slate-400 focus:border-blue-400 focus:ring-blue-200"
+      class="w-full border-slate-200 bg-white/90 py-2 pl-10 pr-9 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-indigo-200"
     />
     <InputClearButton
       v-if="localValue"

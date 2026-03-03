@@ -141,7 +141,7 @@ async function importFile(): Promise<void> {
     <section class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl">
       <header class="flex items-start justify-between border-b border-slate-100 px-5 py-4">
         <div class="space-y-1">
-          <h2 class="text-lg font-semibold text-slate-900">Import data</h2>
+          <h2 class="font-secondary text-lg font-semibold text-slate-900">Import data</h2>
           <p class="text-sm text-slate-500">
             Upload a file to stage your next import batch.
           </p>
@@ -179,7 +179,7 @@ async function importFile(): Promise<void> {
 
         <button
           type="button"
-          class="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          class="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="submitting"
           @click="openFilePicker"
         >

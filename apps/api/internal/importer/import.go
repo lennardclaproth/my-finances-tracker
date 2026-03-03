@@ -14,6 +14,7 @@ var (
 	ErrAccountIDRequired               = fmt.Errorf("account_id is required for imports")
 	ErrImportAccountNotFound           = fmt.Errorf("import account not found")
 	ErrImportAccountValidationNotReady = fmt.Errorf("account validation is not configured")
+	ErrVendorImportDisabled            = fmt.Errorf("vendor import disabled")
 )
 
 type ImportStatus string

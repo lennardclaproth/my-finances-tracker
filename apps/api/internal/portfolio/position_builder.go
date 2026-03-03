@@ -163,7 +163,7 @@ func (s *PositionBuilder) BuildPositionSnapshots(
 		// If a buy or sell transaction occurred on this day we can calculate the market value based on the
 		// transaction price, this is an approximation but it's better than carrying forward the previous market
 		// value without any adjustments.
-		if !unitPriceSet {
+		if !unitPriceSet && prevSnapshot != nil {
 			unitPrice = prevSnapshot.UnitPrice
 		}
 		snap, err := NewPositionSnapshot(

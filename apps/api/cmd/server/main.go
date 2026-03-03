@@ -198,6 +198,12 @@ func setupRouterWithDeps(
 	bulkTagEnqueuer jobs.BulkTagEnqueuer,
 ) *http.Router {
 	router := http.NewRouter()
+	manualPortfolioTxService := portfolio.NewManualTransactionService(
+		deps.accountStore,
+		deps.vendorStore,
+		deps.listingStore,
+		deps.portfolioTransactionStore,
+	)
 
 	// Register routes with their handlers
 	router.HandleWithMiddleware(
@@ -246,6 +252,12 @@ func setupRouterWithDeps(
 		), http.WithRequestLogging(log),
 	)
 	router.HandleWithMiddleware(
+		"GET /marketdata/listings/search", handlers.SearchListings(
+			log,
+			deps.marketDataService,
+		), http.WithRequestLogging(log),
+	)
+	router.HandleWithMiddleware(
 		"POST /portfolio/rebuild",
 		handlers.RebuildPortfolio(log, b, deps.accountStore),
 		http.WithRequestLogging(log),
@@ -258,6 +270,16 @@ func setupRouterWithDeps(
 	router.HandleWithMiddleware(
 		"GET /portfolio/positions",
 		handlers.GetPortfolioPositions(log, deps.accountStore, deps.positionStore),
+		http.WithRequestLogging(log),
+	)
+	router.HandleWithMiddleware(
+		"GET /portfolio/transactions",
+		handlers.GetPortfolioTransactions(log, deps.accountStore, deps.portfolioTransactionStore),
+		http.WithRequestLogging(log),
+	)
+	router.HandleWithMiddleware(
+		"POST /portfolio/transactions/manual",
+		handlers.CreateManualPortfolioTransaction(log, manualPortfolioTxService),
 		http.WithRequestLogging(log),
 	)
 

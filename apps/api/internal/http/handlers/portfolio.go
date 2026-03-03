@@ -82,6 +82,14 @@ type portfolioPositionLister interface {
 	) ([]*portfolio.PositionWithLatestSnapshot, error)
 }
 
+type portfolioTransactionLister interface {
+	FetchForAccount(
+		ctx context.Context,
+		accountID uuid.UUID,
+		from, to *time.Time,
+	) ([]portfolio.TransactionWithListingID, error)
+}
+
 // GetPortfolioSnapshots returns snapshot series for charting the portfolio.
 //
 // @Summary Get portfolio snapshots
@@ -242,6 +250,97 @@ func GetPortfolioPositions(
 		res, err := httpx.DecodeQuery[api.GetPortfolioPositionsRequest](r)
 		if err != nil {
 			return req, fmt.Errorf("GetPortfolioPositions failed to decode query: %w", err)
+		}
+		return res, nil
+	})
+
+	return httpx.Endpoint(decodeFn, log, endpoint)
+}
+
+// GetPortfolioTransactions returns transaction history for a portfolio account.
+//
+// @Summary Get portfolio transactions
+// @Description Returns portfolio transactions for the given account and optional date range.
+// @Tags portfolio
+// @Accept json
+// @Produce json
+// @Param account_id query string true "Account ID"
+// @Param from query string false "Start date (YYYY-MM-DD)"
+// @Param to query string false "End date (YYYY-MM-DD)"
+// @Success 200 {object} api.PortfolioTransactionsResponse
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /portfolio/transactions [get]
+func GetPortfolioTransactions(
+	log logging.Logger,
+	fetcher account.Fetcher,
+	lister portfolioTransactionLister,
+) http.Handler {
+	endpoint := func(ctx context.Context, req api.GetPortfolioTransactionsRequest) (status int, res api.PortfolioTransactionsResponse, err error) {
+		if _, err := fetcher.FetchByID(ctx, req.AccountID); err != nil {
+			if errors.Is(err, account.ErrAccountNotFound) {
+				return http.StatusNotFound, api.PortfolioTransactionsResponse{}, nil
+			}
+			return http.StatusInternalServerError, api.PortfolioTransactionsResponse{}, err
+		}
+
+		from, to, err := parsePortfolioDateRange(req.From, req.To)
+		if err != nil {
+			msg := err.Error()
+			switch {
+			case msg == "from must be in YYYY-MM-DD format":
+				return http.StatusBadRequest, api.PortfolioTransactionsResponse{}, nil
+			case msg == "to must be in YYYY-MM-DD format":
+				return http.StatusBadRequest, api.PortfolioTransactionsResponse{}, nil
+			default:
+				return http.StatusBadRequest, api.PortfolioTransactionsResponse{}, nil
+			}
+		}
+
+		transactions, err := lister.FetchForAccount(ctx, req.AccountID, from, to)
+		if err != nil {
+			return http.StatusInternalServerError, api.PortfolioTransactionsResponse{}, err
+		}
+
+		out := make([]api.PortfolioTransactionResponse, 0, len(transactions))
+		for _, tx := range transactions {
+			amount := tx.AmountCents.Float64()
+			if tx.Type == portfolio.TxCash && tx.Quantity < 0 {
+				amount = -amount
+			}
+			accountID := uuid.Nil
+			if tx.AccountID != nil {
+				accountID = *tx.AccountID
+			}
+			out = append(out, api.PortfolioTransactionResponse{
+				ID:          tx.ID,
+				AccountID:   accountID,
+				Origin:      string(tx.Origin),
+				Source:      tx.Source,
+				OccurredAt:  tx.OccurredAt,
+				Type:        string(tx.Type),
+				ListingID:   tx.ListingID,
+				ISIN:        tx.ISIN,
+				Symbol:      tx.Symbol,
+				Description: tx.Description,
+				Amount:      formatDecimal(amount),
+				Quantity:    formatDecimal(tx.Quantity),
+				UnitPrice:   formatDecimal(tx.UnitPrice.Float64()),
+				CreatedAt:   tx.CreatedAt,
+				UpdatedAt:   tx.UpdatedAt,
+			})
+		}
+		return http.StatusOK, api.PortfolioTransactionsResponse{
+			Data: out,
+		}, nil
+	}
+
+	decodeFn := httpx.DecoderFunc[api.GetPortfolioTransactionsRequest](func(r *http.Request) (api.GetPortfolioTransactionsRequest, error) {
+		var req api.GetPortfolioTransactionsRequest
+		res, err := httpx.DecodeQuery[api.GetPortfolioTransactionsRequest](r)
+		if err != nil {
+			return req, fmt.Errorf("GetPortfolioTransactions failed to decode query: %w", err)
 		}
 		return res, nil
 	})

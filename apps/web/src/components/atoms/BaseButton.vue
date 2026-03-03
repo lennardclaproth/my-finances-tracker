@@ -30,7 +30,7 @@ const classes = computed(() => {
   const size = props.size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm";
 
   const variantMap: Record<Variant, string> = {
-    primary: "bg-blue-600 text-white hover:bg-blue-700 focus-visible:ring-blue-500",
+    primary: "bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500",
     secondary: "bg-slate-200 text-slate-900 hover:bg-slate-300 focus-visible:ring-slate-400",
     success: "bg-emerald-600 text-white hover:bg-emerald-700 focus-visible:ring-emerald-500",
     warning: "bg-amber-500 text-slate-950 hover:bg-amber-600 focus-visible:ring-amber-400",

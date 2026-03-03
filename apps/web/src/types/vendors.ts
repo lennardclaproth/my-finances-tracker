@@ -3,6 +3,7 @@ export interface Vendor {
   name: string;
   type: string;
   active: boolean;
+  importDisabled: boolean;
   createdAt: string;
   updatedAt: string;
 }

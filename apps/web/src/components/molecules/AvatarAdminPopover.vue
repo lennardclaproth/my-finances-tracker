@@ -85,7 +85,7 @@ onBeforeUnmount(() => {
       <template #trigger>
         <button
           type="button"
-          class="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-2 py-1.5 text-sm text-slate-700 shadow-sm transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+          class="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-2 py-1.5 text-sm text-slate-700 shadow-sm transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
           :aria-expanded="isOpen"
           aria-haspopup="menu"
           title="Open account menu"
@@ -105,8 +105,8 @@ onBeforeUnmount(() => {
           @mouseleave="scheduleCloseOnLeave"
         >
           <header class="border-b border-slate-100 px-4 py-3">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Account</p>
-            <p class="mt-1 truncate text-sm font-semibold text-slate-800">{{ BOOTSTRAP_ACCOUNT_NAME }}</p>
+            <p class="font-secondary text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Account</p>
+            <p class="font-secondary mt-1 truncate text-sm font-semibold text-slate-800">{{ BOOTSTRAP_ACCOUNT_NAME }}</p>
           </header>
 
           <div class="p-2">

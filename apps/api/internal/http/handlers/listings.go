@@ -173,6 +173,66 @@ func GetListings(
 	return httpx.Endpoint(decodeFn, log, endpoint)
 }
 
+// SearchListings searches listings by symbol, name or ISIN.
+//
+// @Summary Search listings
+// @Description Search market-data listings using a case-insensitive partial query over symbol, name and isin.
+// @Tags listings
+// @Accept json
+// @Produce json
+// @Param q query string true "Search query"
+// @Param limit query int false "Page size (max 100, default 25)"
+// @Param offset query int false "Offset"
+// @Success 200 {object} api.ListingsSearchResponse
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /marketdata/listings/search [get]
+func SearchListings(
+	log logging.Logger,
+	mds *marketdata.Service,
+) http.Handler {
+	endpoint := func(ctx context.Context, req api.SearchListingsRequest) (status int, res api.ListingsSearchResponse, err error) {
+		limit := req.Limit
+		if limit == 0 {
+			limit = 25
+		}
+
+		listings, total, err := mds.SearchListings(ctx, req.Q, limit, req.Offset)
+		if err != nil {
+			return http.StatusInternalServerError, api.ListingsSearchResponse{}, err
+		}
+
+		data := make([]api.ListingResponse, 0, len(listings))
+		for _, listing := range listings {
+			if listing == nil {
+				continue
+			}
+			data = append(data, toListingResponse(listing))
+		}
+
+		return http.StatusOK, api.ListingsSearchResponse{
+			Pagination: api.Pagination{
+				Limit:  limit,
+				Offset: req.Offset,
+				Count:  len(data),
+				Total:  total,
+			},
+			Data: data,
+		}, nil
+	}
+
+	decodeFn := httpx.DecoderFunc[api.SearchListingsRequest](func(r *http.Request) (api.SearchListingsRequest, error) {
+		var req api.SearchListingsRequest
+		res, err := httpx.DecodeQuery[api.SearchListingsRequest](r)
+		if err != nil {
+			return req, fmt.Errorf("SearchListings failed to decode query: %w", err)
+		}
+		return res, nil
+	})
+
+	return httpx.Endpoint(decodeFn, log, endpoint)
+}
+
 func toListingResponse(listing *marketdata.Listing) api.ListingResponse {
 	var currency *string
 	if listing != nil && listing.Currency != nil {

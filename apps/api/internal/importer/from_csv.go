@@ -47,6 +47,9 @@ func (h *FromCsvHandler) Handle(ctx context.Context, r io.Reader, vendorID, acco
 	if err != nil {
 		return uuid.Nil, err
 	}
+	if v.ImportDisabled {
+		return uuid.Nil, ErrVendorImportDisabled
+	}
 	if h.af == nil {
 		return uuid.Nil, ErrImportAccountValidationNotReady
 	}

@@ -211,6 +211,60 @@ func (r UpdateListingFieldsRequest) Valid(ctx context.Context) map[string]string
 	return problems
 }
 
+type SearchListingsRequest struct {
+	Q      string `json:"q" query:"q"`
+	Limit  int    `json:"limit,omitempty" query:"limit"`
+	Offset int    `json:"offset,omitempty" query:"offset"`
+}
+
+func (r SearchListingsRequest) Valid(ctx context.Context) map[string]string {
+	problems := make(map[string]string)
+	if strings.TrimSpace(r.Q) == "" {
+		problems["q"] = "q is required"
+	}
+	if r.Limit < 0 {
+		problems["limit"] = "limit must be greater than or equal to 0"
+	}
+	if r.Limit > 100 {
+		problems["limit"] = "limit must be less than or equal to 100"
+	}
+	if r.Offset < 0 {
+		problems["offset"] = "offset must be greater than or equal to 0"
+	}
+	return problems
+}
+
+type CreateManualPortfolioTransactionRequest struct {
+	AccountID   uuid.UUID  `json:"account_id"`
+	VendorID    uuid.UUID  `json:"vendor_id"`
+	OccurredAt  string     `json:"occurred_at"`
+	Type        string     `json:"type"`
+	ListingID   *uuid.UUID `json:"listing_id,omitempty"`
+	Amount      string     `json:"amount"`
+	Quantity    *string    `json:"quantity,omitempty"`
+	Description *string    `json:"description,omitempty"`
+}
+
+func (r CreateManualPortfolioTransactionRequest) Valid(ctx context.Context) map[string]string {
+	problems := make(map[string]string)
+	if r.AccountID == uuid.Nil {
+		problems["account_id"] = "account_id is required"
+	}
+	if r.VendorID == uuid.Nil {
+		problems["vendor_id"] = "vendor_id is required"
+	}
+	if strings.TrimSpace(r.OccurredAt) == "" {
+		problems["occurred_at"] = "occurred_at is required"
+	}
+	if strings.TrimSpace(r.Type) == "" {
+		problems["type"] = "type is required"
+	}
+	if strings.TrimSpace(r.Amount) == "" {
+		problems["amount"] = "amount is required"
+	}
+	return problems
+}
+
 type CreateAccountRequest struct {
 	Name       string     `json:"name"`
 	ExternalID *uuid.UUID `json:"external_id,omitempty"`
@@ -251,11 +305,25 @@ func (r GetPortfolioSnapshotsRequest) Valid(ctx context.Context) map[string]stri
 }
 
 type GetPortfolioPositionsRequest struct {
-	AccountID    uuid.UUID `json:"account_id" query:"account_id"`
-	IncludeClosed bool     `json:"include_closed,omitempty" query:"include_closed"`
+	AccountID     uuid.UUID `json:"account_id" query:"account_id"`
+	IncludeClosed bool      `json:"include_closed,omitempty" query:"include_closed"`
 }
 
 func (r GetPortfolioPositionsRequest) Valid(ctx context.Context) map[string]string {
+	problems := make(map[string]string)
+	if r.AccountID == uuid.Nil {
+		problems["account_id"] = "account_id is required"
+	}
+	return problems
+}
+
+type GetPortfolioTransactionsRequest struct {
+	AccountID uuid.UUID `json:"account_id" query:"account_id"`
+	From      string    `json:"from,omitempty" query:"from"`
+	To        string    `json:"to,omitempty" query:"to"`
+}
+
+func (r GetPortfolioTransactionsRequest) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if r.AccountID == uuid.Nil {
 		problems["account_id"] = "account_id is required"

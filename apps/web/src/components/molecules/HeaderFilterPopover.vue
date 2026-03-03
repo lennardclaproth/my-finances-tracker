@@ -116,7 +116,7 @@ function clearValue(): void {
           rounded="pill"
           :placeholder="placeholder"
           :disabled="loading || (supportsUntagged && localUntaggedOnly)"
-          class="w-full border-slate-200 bg-white/90 px-3 py-2 pr-8 placeholder:text-slate-400 focus:border-blue-400 focus:ring-blue-200"
+          class="w-full border-slate-200 bg-white/90 px-3 py-2 pr-8 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-indigo-200"
           @focus="isInputFocused = true"
           @blur="isInputFocused = false"
           @keydown.esc.prevent="close"

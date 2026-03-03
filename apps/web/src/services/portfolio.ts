@@ -1,10 +1,14 @@
 import { requestJson } from "./http";
 import type {
+  CreateManualPortfolioTransactionPayload,
   PortfolioPosition,
   PortfolioPositionDto,
   PortfolioPositionsResponseDto,
   PortfolioSnapshotPoint,
   PortfolioSnapshotPointDto,
+  PortfolioTransaction,
+  PortfolioTransactionDto,
+  PortfolioTransactionsResponseDto,
 } from "../types/portfolio";
 
 function toSnapshotPoint(dto: PortfolioSnapshotPointDto): PortfolioSnapshotPoint {
@@ -35,6 +39,26 @@ function toPosition(dto: PortfolioPositionDto): PortfolioPosition {
     openDate: dto.open_date,
     closeDate: dto.close_date,
     isClosed: dto.is_closed,
+  };
+}
+
+function toPortfolioTransaction(dto: PortfolioTransactionDto): PortfolioTransaction {
+  return {
+    id: dto.id,
+    accountId: dto.account_id,
+    origin: dto.origin,
+    source: dto.source,
+    occurredAt: dto.occurred_at,
+    type: dto.type,
+    listingId: dto.listing_id,
+    isin: dto.isin,
+    symbol: dto.symbol,
+    description: dto.description,
+    amount: dto.amount,
+    quantity: dto.quantity,
+    unitPrice: dto.unit_price,
+    createdAt: dto.created_at,
+    updatedAt: dto.updated_at,
   };
 }
 
@@ -93,4 +117,30 @@ export async function requestPortfolioRebuild(accountId: string): Promise<{
     topic: payload.topic,
     accountId: payload.account_id,
   };
+}
+
+export async function fetchPortfolioTransactions(
+  accountId: string,
+  from?: string,
+  to?: string,
+): Promise<PortfolioTransaction[]> {
+  const payload = await requestJson<PortfolioTransactionsResponseDto>("/portfolio/transactions", {
+    method: "GET",
+    query: {
+      account_id: accountId,
+      from,
+      to,
+    },
+  });
+  return payload.data.map(toPortfolioTransaction);
+}
+
+export async function createManualPortfolioTransaction(
+  input: CreateManualPortfolioTransactionPayload,
+): Promise<PortfolioTransaction> {
+  const payload = await requestJson<PortfolioTransactionDto>("/portfolio/transactions/manual", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return toPortfolioTransaction(payload);
 }

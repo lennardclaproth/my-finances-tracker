@@ -11,7 +11,7 @@ export const chartTheme = {
 
 export const HOVER_MARKER_SIZE = 8;
 export const HOVER_MARKER_BORDER_WIDTH = 2;
-export const HOVER_MARKER_BORDER_COLOR = "#3b82f6";
+export const HOVER_MARKER_BORDER_COLOR = "#6366f1";
 export const HOVER_MARKER_FILL_COLOR = "#ffffff";
 
 export function horizontalGridConfig() {

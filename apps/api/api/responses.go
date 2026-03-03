@@ -73,12 +73,13 @@ type TagTransactionsResponse struct {
 }
 
 type VendorResponse struct {
-	ID        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	Type      string    `json:"type"`
-	Active    bool      `json:"active"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID             uuid.UUID `json:"id"`
+	Name           string    `json:"name"`
+	Type           string    `json:"type"`
+	Active         bool      `json:"active"`
+	ImportDisabled bool      `json:"import_disabled"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type AccountResponse struct {
@@ -103,6 +104,51 @@ type ListingResponse struct {
 	Type        *string   `json:"type,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type ListingsSearchResponse struct {
+	Pagination Pagination        `json:"pagination"`
+	Data       []ListingResponse `json:"data"`
+}
+
+type ManualPortfolioTransactionResponse struct {
+	ID          uuid.UUID  `json:"id"`
+	AccountID   uuid.UUID  `json:"account_id"`
+	Origin      string     `json:"origin"`
+	Source      string     `json:"source"`
+	OccurredAt  time.Time  `json:"occurred_at"`
+	Type        string     `json:"type"`
+	ListingID   *uuid.UUID `json:"listing_id,omitempty"`
+	ISIN        *string    `json:"isin,omitempty"`
+	Symbol      *string    `json:"symbol,omitempty"`
+	Description string     `json:"description"`
+	Amount      string     `json:"amount"`
+	Quantity    string     `json:"quantity"`
+	UnitPrice   string     `json:"unit_price"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+type PortfolioTransactionResponse struct {
+	ID          uuid.UUID  `json:"id"`
+	AccountID   uuid.UUID  `json:"account_id"`
+	Origin      string     `json:"origin"`
+	Source      string     `json:"source"`
+	OccurredAt  time.Time  `json:"occurred_at"`
+	Type        string     `json:"type"`
+	ListingID   *uuid.UUID `json:"listing_id,omitempty"`
+	ISIN        *string    `json:"isin,omitempty"`
+	Symbol      *string    `json:"symbol,omitempty"`
+	Description string     `json:"description"`
+	Amount      string     `json:"amount"`
+	Quantity    string     `json:"quantity"`
+	UnitPrice   string     `json:"unit_price"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+type PortfolioTransactionsResponse struct {
+	Data []PortfolioTransactionResponse `json:"data"`
 }
 
 type AsyncEventAcceptedResponse struct {

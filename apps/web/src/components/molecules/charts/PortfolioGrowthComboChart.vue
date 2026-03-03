@@ -47,7 +47,7 @@ const hoverIndex = ref<number | null>(null);
 let chart: Chart<"bar" | "line"> | null = null;
 
 const trendColors = {
-  dailyPositive: "#16a34a", // green-600
+  dailyPositive: "#059669", // emerald-600
   dailyNegative: "#dc2626", // red-600
   cumulative: "#334155", // slate-700
 };
@@ -236,11 +236,11 @@ function renderChart(): void {
           data: props.data.map((p) => p.timeWeightedReturnPct),
           backgroundColor: (ctx) => {
             const value = Number(ctx.raw ?? 0);
-            return value >= 0 ? "rgba(34, 197, 94, 0.38)" : "rgba(239, 68, 68, 0.38)";
+            return value >= 0 ? "rgba(16, 185, 129, 0.38)" : "rgba(239, 68, 68, 0.38)";
           },
           borderColor: (ctx) => {
             const value = Number(ctx.raw ?? 0);
-            return value >= 0 ? "rgba(22, 163, 74, 0.95)" : "rgba(220, 38, 38, 0.95)";
+            return value >= 0 ? "rgba(5, 150, 105, 0.95)" : "rgba(220, 38, 38, 0.95)";
           },
           borderWidth: 1,
           barPercentage: 0.74,
@@ -476,7 +476,7 @@ onBeforeUnmount(() => {
 
       <div
         v-if="isSelecting"
-        class="pointer-events-none absolute z-10 bg-blue-300/25"
+        class="pointer-events-none absolute z-10 bg-indigo-300/25"
         :style="dragOverlayStyle()"
       />
       <div
@@ -491,12 +491,12 @@ onBeforeUnmount(() => {
       />
       <div
         v-if="isSelecting"
-        class="pointer-events-none absolute z-10 rounded-full border-2 border-blue-500 bg-white shadow-sm"
+        class="pointer-events-none absolute z-10 rounded-full border-2 border-indigo-500 bg-white shadow-sm"
         :style="dragStartMarkerStyle()"
       />
       <div
         v-if="isSelecting"
-        class="pointer-events-none absolute z-10 rounded-full border-2 border-blue-500 bg-white shadow-sm"
+        class="pointer-events-none absolute z-10 rounded-full border-2 border-indigo-500 bg-white shadow-sm"
         :style="dragHoverMarkerStyle()"
       />
 

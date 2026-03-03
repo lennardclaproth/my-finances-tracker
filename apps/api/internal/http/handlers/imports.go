@@ -38,26 +38,33 @@ func ImportCsv(
 	iq importer.ImportEnqueuer,
 ) http.Handler {
 	// Setup the endpoint closure function.
-	endpoint := func(ctx context.Context, req api.ImportCsv) (status int, res uuid.UUID, err error) {
+	endpoint := func(ctx context.Context, req api.ImportCsv) (status int, res any, err error) {
 		defer req.File.Close()
 		handler := importer.NewFromCsvHandler(ic, dw, dw, vf, af)
 		res, err = handler.Handle(ctx, req.File, req.VendorID, req.AccountID)
 		if err != nil {
 			if errors.Is(err, importer.ErrAccountIDRequired) {
-				return http.StatusBadRequest, uuid.Nil, nil
+				return http.StatusBadRequest, map[string]string{"account_id": importer.ErrAccountIDRequired.Error()}, nil
 			}
 			if errors.Is(err, importer.ErrImportAccountNotFound) {
-				return http.StatusBadRequest, uuid.Nil, nil
+				return http.StatusBadRequest, map[string]string{"account_id": importer.ErrImportAccountNotFound.Error()}, nil
 			}
-			return http.StatusInternalServerError, uuid.Nil, err
+			if errors.Is(err, importer.ErrVendorImportDisabled) {
+				return http.StatusBadRequest, map[string]string{"vendor_id": importer.ErrVendorImportDisabled.Error()}, nil
+			}
+			return http.StatusInternalServerError, struct{}{}, err
+		}
+		importID, ok := res.(uuid.UUID)
+		if !ok {
+			return http.StatusInternalServerError, struct{}{}, errors.New("unexpected import id type")
 		}
 		if iq != nil {
-			if err := iq.Enqueue(ctx, res); err != nil {
+			if err := iq.Enqueue(ctx, importID); err != nil {
 				// Import is already persisted; queue reconciliation will retry pending imports.
-				log.Info(ctx, "import persisted but enqueue failed", "import_id", res, "error", err.Error())
+				log.Info(ctx, "import persisted but enqueue failed", "import_id", importID, "error", err.Error())
 			}
 		}
-		return http.StatusOK, res, nil
+		return http.StatusOK, importID, nil
 	}
 	// Setup the decoder function.
 	decodeFn := httpx.DecoderFunc[api.ImportCsv](func(r *http.Request) (api.ImportCsv, error) {

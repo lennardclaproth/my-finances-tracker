@@ -88,6 +88,21 @@ func (f *fakePortfolioPositionLister) ListForAccountWithLatestSnapshot(
 	return nil, nil
 }
 
+type fakePortfolioTransactionLister struct {
+	listFn func(ctx context.Context, accountID uuid.UUID, from, to *time.Time) ([]portfolio.TransactionWithListingID, error)
+}
+
+func (f *fakePortfolioTransactionLister) FetchForAccount(
+	ctx context.Context,
+	accountID uuid.UUID,
+	from, to *time.Time,
+) ([]portfolio.TransactionWithListingID, error) {
+	if f.listFn != nil {
+		return f.listFn(ctx, accountID, from, to)
+	}
+	return nil, nil
+}
+
 func TestRebuildPortfolio_PublishesRequestedEvent(t *testing.T) {
 	accID := uuid.New()
 	b := &fakeBus{}
@@ -308,6 +323,139 @@ func TestGetPortfolioPositions_DefaultOpenOnlyAndIncludeClosed(t *testing.T) {
 	}
 	if len(all.Data) != 2 {
 		t.Fatalf("expected two positions, got %d", len(all.Data))
+	}
+}
+
+func TestGetPortfolioTransactions_UnknownAccountReturns404(t *testing.T) {
+	fetcher := &fakeAccountFetcher{
+		fetchFn: func(ctx context.Context, id uuid.UUID) (*account.Account, error) {
+			return nil, account.ErrAccountNotFound
+		},
+	}
+	lister := &fakePortfolioTransactionLister{}
+	h := GetPortfolioTransactions(&testLogger{}, fetcher, lister)
+	req := httptest.NewRequest(http.MethodGet, "/portfolio/transactions?account_id="+uuid.New().String(), nil)
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGetPortfolioTransactions_MapsResponseAndDateRange(t *testing.T) {
+	accID := uuid.New()
+	listingID := uuid.New()
+	fetcher := &fakeAccountFetcher{
+		fetchFn: func(ctx context.Context, id uuid.UUID) (*account.Account, error) {
+			return &account.Account{ID: id, Name: "ok"}, nil
+		},
+	}
+	lister := &fakePortfolioTransactionLister{
+		listFn: func(ctx context.Context, accountID uuid.UUID, from, to *time.Time) ([]portfolio.TransactionWithListingID, error) {
+			if accountID != accID {
+				t.Fatalf("unexpected account id: %s", accountID)
+			}
+			if from == nil || to == nil {
+				t.Fatalf("expected from and to to be set")
+			}
+			if from.Format("2006-01-02") != "2026-01-01" {
+				t.Fatalf("unexpected from: %s", from.Format("2006-01-02"))
+			}
+			if to.Format("2006-01-02") != "2026-01-31" {
+				t.Fatalf("unexpected to date: %s", to.Format("2006-01-02"))
+			}
+			symbol := "VWCE"
+			isin := "IE00BK5BQT80"
+			now := time.Date(2026, 1, 31, 9, 0, 0, 0, time.UTC)
+			return []portfolio.TransactionWithListingID{
+				{
+					Transaction: portfolio.Transaction{
+						ID:          uuid.New(),
+						AccountID:   &accID,
+						Origin:      portfolio.TransactionOriginImport,
+						Source:      "DEGIRO",
+						OccurredAt:  now,
+						Type:        portfolio.TxBuy,
+						Symbol:      &symbol,
+						ISIN:        &isin,
+						Description: "Buy",
+						Quantity:    2,
+						UnitPrice:   1000000,
+						AmountCents: 2000000,
+						CreatedAt:   now,
+						UpdatedAt:   now,
+					},
+					ListingID: &listingID,
+				},
+				{
+					Transaction: portfolio.Transaction{
+						ID:          uuid.New(),
+						AccountID:   &accID,
+						Origin:      portfolio.TransactionOriginManual,
+						Source:      "DEGIRO",
+						OccurredAt:  now,
+						Type:        portfolio.TxCash,
+						Description: "Cash withdrawal",
+						Quantity:    -1,
+						UnitPrice:   0,
+						AmountCents: 5050000,
+						CreatedAt:   now,
+						UpdatedAt:   now,
+					},
+					ListingID: nil,
+				},
+			}, nil
+		},
+	}
+	h := GetPortfolioTransactions(&testLogger{}, fetcher, lister)
+	req := httptest.NewRequest(http.MethodGet, "/portfolio/transactions?account_id="+accID.String()+"&from=2026-01-01&to=2026-01-31", nil)
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var response api.PortfolioTransactionsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed decoding response: %v", err)
+	}
+	if len(response.Data) != 2 {
+		t.Fatalf("expected 2 transactions, got %d", len(response.Data))
+	}
+	if response.Data[0].ListingID == nil || *response.Data[0].ListingID != listingID {
+		t.Fatalf("expected first listing id %s, got %v", listingID, response.Data[0].ListingID)
+	}
+	if response.Data[0].Amount != "2" {
+		t.Fatalf("expected BUY amount 2, got %s", response.Data[0].Amount)
+	}
+	if response.Data[1].Type != string(portfolio.TxCash) {
+		t.Fatalf("expected CASH type, got %s", response.Data[1].Type)
+	}
+	if response.Data[1].Amount != "-5.05" {
+		t.Fatalf("expected signed CASH amount -5.05, got %s", response.Data[1].Amount)
+	}
+}
+
+func TestGetPortfolioTransactions_InvalidDateRangeReturns400(t *testing.T) {
+	accID := uuid.New()
+	fetcher := &fakeAccountFetcher{
+		fetchFn: func(ctx context.Context, id uuid.UUID) (*account.Account, error) {
+			return &account.Account{ID: id, Name: "ok"}, nil
+		},
+	}
+	lister := &fakePortfolioTransactionLister{}
+	h := GetPortfolioTransactions(&testLogger{}, fetcher, lister)
+	req := httptest.NewRequest(http.MethodGet, "/portfolio/transactions?account_id="+accID.String()+"&from=2026-02-01&to=2026-01-01", nil)
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
 	}
 }
 

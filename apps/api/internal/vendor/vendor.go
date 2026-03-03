@@ -20,21 +20,24 @@ const (
 	VendorING    VendorID = "ING"
 	VendorDEGIRO VendorID = "DEGIRO"
 	VendorN26    VendorID = "N26"
+	VendorBND    VendorID = "BrandNewDay"
 )
 
 var SupportedVendors = map[VendorID]VendorType{
 	VendorING:    VendorTypeBank,
 	VendorDEGIRO: VendorTypeBrokerage,
 	VendorN26:    VendorTypeBank,
+	VendorBND:    VendorTypeBrokerage,
 }
 
 type Vendor struct {
-	ID        uuid.UUID  `db:"id"`
-	Name      VendorID   `db:"name"`
-	Active    bool       `db:"active"`
-	CreatedAt time.Time  `db:"created_at"`
-	UpdatedAt time.Time  `db:"updated_at"`
-	Type      VendorType `db:"type"`
+	ID             uuid.UUID  `db:"id"`
+	Name           VendorID   `db:"name"`
+	Active         bool       `db:"active"`
+	ImportDisabled bool       `db:"import_disabled"`
+	CreatedAt      time.Time  `db:"created_at"`
+	UpdatedAt      time.Time  `db:"updated_at"`
+	Type           VendorType `db:"type"`
 }
 
 var (
@@ -68,12 +71,13 @@ func NewVendor(name VendorID, vendorType VendorType) (*Vendor, error) {
 		return nil, ErrUnsupportedVendorType
 	}
 	v := &Vendor{
-		ID:        uuid.New(),
-		Name:      name,
-		Active:    true,
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
-		Type:      vendorType,
+		ID:             uuid.New(),
+		Name:           name,
+		Active:         true,
+		ImportDisabled: false,
+		CreatedAt:      time.Now().UTC(),
+		UpdatedAt:      time.Now().UTC(),
+		Type:           vendorType,
 	}
 	return v, nil
 }
