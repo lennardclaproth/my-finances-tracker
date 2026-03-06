@@ -11,6 +11,8 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/date"
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
 	"github.com/lennardclaproth/my-finances-tracker/internal/money"
+	"github.com/lennardclaproth/my-finances-tracker/internal/observability"
+	"go.elastic.co/apm/v2"
 )
 
 type listingStore interface {
@@ -29,13 +31,26 @@ type listingStore interface {
 type dailyStore interface {
 	Create(ctx context.Context, daily *Daily) error
 	FetchByListingID(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]Daily, error)
+	FetchByListingIDWithSort(
+		ctx context.Context,
+		listingID uuid.UUID,
+		from, to *time.Time,
+		limit, offset int,
+		sortOrder DailyDateSortOrder,
+	) (*[]Daily, error)
+	CountByListingID(ctx context.Context, listingID uuid.UUID, from, to *time.Time) (int, error)
+}
+
+type providerStore interface {
+	GetByName(ctx context.Context, name ProviderName) (*Provider, error)
 }
 
 type Service struct {
-	listingStore listingStore
-	dailyStore   dailyStore
-	client       eodClient
-	log          logging.Logger
+	listingStore  listingStore
+	dailyStore    dailyStore
+	providerStore providerStore
+	client        eodClient
+	log           logging.Logger
 }
 
 type eodClient interface {
@@ -53,42 +68,156 @@ type DailyResponse struct {
 	Metadata Metadata
 }
 
-func NewService(listingStore listingStore, dailyStore dailyStore, client eodClient, log logging.Logger) *Service {
-	return &Service{
-		listingStore: listingStore,
-		dailyStore:   dailyStore,
-		client:       client,
-		log:          log,
+func NewService(listingStore listingStore, dailyStore dailyStore, client eodClient, log logging.Logger, providers ...providerStore) *Service {
+	var providerStore providerStore
+	if len(providers) > 0 {
+		providerStore = providers[0]
 	}
+	return &Service{
+		listingStore:  listingStore,
+		dailyStore:    dailyStore,
+		providerStore: providerStore,
+		client:        client,
+		log:           log,
+	}
+}
+
+func (s *Service) sourceIsManual(ctx context.Context, source Source) (bool, error) {
+	if s.providerStore == nil {
+		return false, nil
+	}
+	providerName, err := ProviderNameFromSource(source)
+	if err != nil {
+		return false, nil
+	}
+	provider, err := s.providerStore.GetByName(ctx, providerName)
+	if err != nil {
+		if errors.Is(err, ErrProviderNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	if provider == nil {
+		return false, nil
+	}
+	return provider.IsManualIngestion(), nil
 }
 
 // GetDailies fetches daily data for a given symbol and date range.
 // returns the data along with metadata about the request.
 func (s *Service) GetDailies(ctx context.Context, symbol string, from, to *time.Time, limit, offset int) (*DailyResponse, error) {
+	return s.GetDailiesWithSort(ctx, symbol, from, to, limit, offset, DailyDateSortAsc)
+}
+
+func (s *Service) GetDailiesWithSort(
+	ctx context.Context,
+	symbol string,
+	from, to *time.Time,
+	limit, offset int,
+	sortOrder DailyDateSortOrder,
+) (*DailyResponse, error) {
 	// Fetch listing to ensure it exists and is accumulated
 	listing, err := s.listingStore.FetchBySymbol(ctx, symbol)
 	if err != nil {
 		return nil, fmt.Errorf("GetDaily failed to fetch listing: %w", err)
 	}
+	return s.getDailiesForListing(ctx, listing, from, to, limit, offset, sortOrder)
+}
+
+// GetDailiesByListingID fetches daily data for a listing id and date range.
+func (s *Service) GetDailiesByListingID(
+	ctx context.Context,
+	listingID uuid.UUID,
+	from, to *time.Time,
+	limit, offset int,
+) (*DailyResponse, error) {
+	return s.GetDailiesByListingIDWithSort(ctx, listingID, from, to, limit, offset, DailyDateSortAsc)
+}
+
+func (s *Service) GetDailiesByListingIDWithSort(
+	ctx context.Context,
+	listingID uuid.UUID,
+	from, to *time.Time,
+	limit, offset int,
+	sortOrder DailyDateSortOrder,
+) (*DailyResponse, error) {
+	listing, err := s.listingStore.FetchByID(ctx, listingID)
+	if err != nil {
+		return nil, fmt.Errorf("GetDaily failed to fetch listing by id: %w", err)
+	}
+	return s.getDailiesForListing(ctx, listing, from, to, limit, offset, sortOrder)
+}
+
+func (s *Service) getDailiesForListing(
+	ctx context.Context,
+	listing *Listing,
+	from, to *time.Time,
+	limit, offset int,
+	sortOrder DailyDateSortOrder,
+) (*DailyResponse, error) {
 	if listing == nil {
-		return nil, fmt.Errorf("GetDaily failed, listing with symbol %s not found", symbol)
+		return nil, fmt.Errorf("GetDaily failed, listing not found")
 	}
 	if listing.Active == false {
-		return nil, fmt.Errorf("GetDaily failed, listing with symbol %s is not active", symbol)
+		return nil, fmt.Errorf("GetDaily failed, listing with symbol %s is not active", listing.Symbol)
 	}
+
+	isManualProvider, err := s.sourceIsManual(ctx, listing.Source)
+	if err != nil {
+		s.log.Error(ctx, "GetDaily failed to resolve provider ingestion mode", err, "symbol", listing.Symbol, "source", listing.Source)
+	}
+	if isManualProvider {
+		data, err := s.dailyStore.FetchByListingIDWithSort(
+			ctx,
+			listing.ID,
+			from,
+			to,
+			limit,
+			offset,
+			NormalizeDailyDateSortOrder(string(sortOrder)),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("GetDaily failed to fetch daily data: %w", err)
+		}
+		totalCount, err := s.dailyStore.CountByListingID(ctx, listing.ID, from, to)
+		if err != nil {
+			return nil, fmt.Errorf("GetDaily failed to fetch total daily count: %w", err)
+		}
+		return &DailyResponse{
+			Data: *data,
+			Metadata: Metadata{
+				Message:     "Manual provider configured; automatic sync disabled",
+				ResultCount: len(*data),
+				TotalCount:  totalCount,
+			},
+		}, nil
+	}
+
 	// If the listing is currently syncing it means that there is already a sync in progress.
 	// In this case we can just fetch the existing data from the database, we don't need to trigger another sync.
 	if listing.Syncing == true {
-		data, err := s.dailyStore.FetchByListingID(ctx, listing.ID, from, to, limit, offset)
+		data, err := s.dailyStore.FetchByListingIDWithSort(
+			ctx,
+			listing.ID,
+			from,
+			to,
+			limit,
+			offset,
+			NormalizeDailyDateSortOrder(string(sortOrder)),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("GetDaily failed to fetch daily data: %w", err)
+		}
+		totalCount, err := s.dailyStore.CountByListingID(ctx, listing.ID, from, to)
+		if err != nil {
+			return nil, fmt.Errorf("GetDaily failed to fetch total daily count: %w", err)
 		}
 		return &DailyResponse{
 			Data: *data,
 			Metadata: Metadata{
 				Message:     "Data may be stale, listing is currently syncing",
 				ResultCount: len(*data),
-				TotalCount:  len(*data), // TODO: To implement
+				TotalCount:  totalCount,
 			},
 		}, nil
 	}
@@ -101,28 +230,32 @@ func (s *Service) GetDailies(ctx context.Context, symbol string, from, to *time.
 			s.log.Error(ctx, "GetDaily failed to update listing should_accumulate flag", err, "listing_id", listing.ID, "symbol", listing.Symbol)
 		}
 		if err == nil {
-			// Trigger sync in a separate goroutine to avoid blocking the request, errors are logged but not returned
-			go func() {
-				fnCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-				defer cancel()
-				err := s.syncDailyData(fnCtx, listing.ID, nil, nil)
-				if err != nil {
-					s.log.Error(fnCtx, "GetDaily failed to sync daily data for listing", err, "listing_id", listing.ID, "symbol", listing.Symbol)
-				}
-			}()
+			s.startAsyncDailySync(ctx, listing, "GetDaily failed to sync daily data for listing")
 		}
 	}
 	// Fetch daily data from the database, this will return the existing data if a sync is in progress, or the up to date data if not.
-	data, err := s.dailyStore.FetchByListingID(ctx, listing.ID, from, to, limit, offset)
+	data, err := s.dailyStore.FetchByListingIDWithSort(
+		ctx,
+		listing.ID,
+		from,
+		to,
+		limit,
+		offset,
+		NormalizeDailyDateSortOrder(string(sortOrder)),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("GetDaily failed to fetch daily data: %w", err)
+	}
+	totalCount, err := s.dailyStore.CountByListingID(ctx, listing.ID, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("GetDaily failed to fetch total daily count: %w", err)
 	}
 	return &DailyResponse{
 		Data: *data,
 		Metadata: Metadata{
 			Message:     "Sync triggered; data may be stale until sync is complete",
 			ResultCount: len(*data),
-			TotalCount:  len(*data), // TODO: To implement
+			TotalCount:  totalCount,
 		},
 	}, nil
 }
@@ -161,10 +294,10 @@ func (s *Service) syncDailyData(ctx context.Context, listingID uuid.UUID, from, 
 		// This is desired.
 		from = listing.AccumulatedEnd
 	}
-	// If to is nil, we want to accumulate up to the current date, so we can safely set it to now.
+	// If to is nil, accumulate only through the latest completed business date (exclude today).
 	if to == nil {
-		now := time.Now().UTC()
-		to = &now
+		latestCompletedBusinessDate := date.LatestBusinessDate(time.Now(), time.Local)
+		to = &latestCompletedBusinessDate
 	}
 	for d, err := range s.client.GetEOD(ctx, []string{listing.Symbol}, from, to) {
 		if err != nil {
@@ -207,17 +340,92 @@ func (s *Service) CreateListing(
 		}
 		return nil, fmt.Errorf("CreateListing failed to persist listing: %w", err)
 	}
-	// Fetch daily data for the listing and persist it, this is done in a
-	// separate goroutine to avoid blocking the request, errors are logged but not returned
+
+	isManualProvider, err := s.sourceIsManual(ctx, source)
+	if err != nil {
+		s.log.Error(ctx, "CreateListing failed to resolve provider ingestion mode", err, "symbol", symbol, "source", source)
+	}
+	if isManualProvider {
+		return listing, nil
+	}
+
+	s.startAsyncDailySync(ctx, listing, "CreateListing failed to sync daily data for listing")
+	return listing, nil
+}
+
+func (s *Service) startAsyncDailySync(ctx context.Context, listing *Listing, errorMessage string) {
+	if listing == nil {
+		return
+	}
+	headers := observability.PropagationHeadersFromContext(ctx)
+	listingID := listing.ID
+	symbol := listing.Symbol
+	source := listing.Source
+
 	go func() {
-		fnCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		fnCtx := observability.ContextWithPropagationHeaders(context.Background(), headers)
+		fnCtx, _, _ = observability.EnsureRequestAndCorrelationIDs(
+			fnCtx,
+			observability.RequestIDFromContext(fnCtx),
+			observability.CorrelationIDFromContext(fnCtx),
+		)
+		fnCtx, cancel := context.WithTimeout(fnCtx, 10*time.Minute)
 		defer cancel()
-		err := s.syncDailyData(fnCtx, listing.ID, nil, nil)
-		if err != nil {
-			s.log.Error(fnCtx, "CreateListing failed to sync daily data for listing", err, "listing_id", listing.ID, "symbol", listing.Symbol)
+
+		operation := observability.JobOperation("marketdata_sync_daily")
+		tx, txCtx, traceErr := observability.StartTransactionFromHeaders(
+			fnCtx,
+			operation,
+			"job",
+			headers,
+		)
+		if traceErr != nil {
+			s.log.Error(txCtx, "failed to parse trace context for async marketdata sync", traceErr,
+				"listing_id", listingID,
+				"symbol", symbol,
+				"source", source,
+				"operation", operation,
+				"component", "service",
+				"outcome", "failure",
+				"error_class", "internal",
+			)
+		}
+
+		tx.Result = "success"
+		tx.Outcome = "success"
+		observability.SetSafeTransactionLabels(tx, map[string]any{
+			"operation":  operation,
+			"component":  "service",
+			"listing_id": listingID.String(),
+			"symbol":     symbol,
+			"source":     source,
+			"stage":      "sync_daily_data",
+		})
+
+		var syncErr error
+		defer func() {
+			if syncErr != nil {
+				tx.Result = "error"
+				tx.Outcome = "failure"
+				apm.CaptureError(txCtx, syncErr).Send()
+			}
+			tx.End()
+		}()
+
+		span, spanCtx := apm.StartSpan(txCtx, "sync_daily_data", "service")
+		syncErr = s.syncDailyData(spanCtx, listingID, nil, nil)
+		span.End()
+		if syncErr != nil {
+			s.log.Error(spanCtx, errorMessage, syncErr,
+				"listing_id", listingID,
+				"symbol", symbol,
+				"source", source,
+				"operation", operation,
+				"component", "service",
+				"outcome", "failure",
+			)
 		}
 	}()
-	return listing, nil
 }
 
 // UpdateListingFields updates only the provided listing fields.

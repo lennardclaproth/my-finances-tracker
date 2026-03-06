@@ -91,6 +91,8 @@ function clearValue(): void {
   <BasePopover
     v-model:open="isOpen"
     :disabled="loading"
+    :portal="true"
+    z-index-class="z-[60]"
     panel-class="w-56 rounded-lg border border-slate-200 bg-white p-2 shadow-lg"
   >
     <template #trigger="{ toggle }">

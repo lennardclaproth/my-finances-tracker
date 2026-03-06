@@ -36,6 +36,7 @@ import (
 type appDependencies struct {
 	vendorStore               *storage.SQLXVendorStore
 	importStore               *storage.SQLXImportStore
+	dailyUploadStore          *storage.SQLXDailyUploadStore
 	accountStore              *storage.SQLXAccountStore
 	importAccountStore        *storage.SQLXImportAccountStore
 	cashflowAccountStore      *storage.SQLXCashflowAccountStore
@@ -48,6 +49,8 @@ type appDependencies struct {
 	positionStore             *storage.SQLXPositionStore
 	portfolioSnapshotStore    *storage.SQLXPortfolioSnapshotStore
 	disk                      *storage.Disk
+	dailyUploadDisk           *storage.Disk
+	dailyUploadEnqueuer       jobs.DailyUploadEnqueuer
 	marketDataService         *marketdata.Service
 }
 
@@ -79,7 +82,8 @@ func run(ctx context.Context, args []string) error {
 	bootstrapData(ctx, deps, b, logger, cfg)
 
 	// Create background jobs first so the import endpoint can enqueue directly.
-	jobMgr, importEnqueuer, bulkTagEnqueuer := setupJobs(logger, deps, cfg, b)
+	jobMgr, importEnqueuer, bulkTagEnqueuer, dailyUploadEnqueuer := setupJobs(logger, deps, cfg, b)
+	deps.dailyUploadEnqueuer = dailyUploadEnqueuer
 
 	// Wiring: construct handlers and routes at the composition root
 	router := setupRouterWithDeps(logger, deps, b, importEnqueuer, bulkTagEnqueuer)
@@ -148,6 +152,7 @@ func setupDatabase(log logging.Logger, cfg *config.Config) *storage.DB {
 func newAppDependencies(log logging.Logger, db *storage.DB, cfg *config.Config) *appDependencies {
 	vendorStore := storage.NewSQLXVendorStore(db)
 	importStore := storage.NewSQLXImportStore(db)
+	dailyUploadStore := storage.NewSQLXDailyUploadStore(db)
 	accountStore := storage.NewSQLXAccountStore(db)
 	importAccountStore := storage.NewSQLXImportAccountStore(db)
 	cashflowAccountStore := storage.NewSQLXCashflowAccountStore(db)
@@ -156,11 +161,13 @@ func newAppDependencies(log logging.Logger, db *storage.DB, cfg *config.Config) 
 	listingStore := storage.NewSQLXListingStore(db)
 	dailyStore := storage.NewSQLXDailyStore(db)
 	disk := storage.NewDisk(cfg.DiskStorage.BasePath + "/import")
+	dailyUploadDisk := storage.NewDisk(cfg.DiskStorage.BasePath + "/daily_uploads")
 	marketStackClient := marketdata.NewMarketStackClient(providerStore, marketdata.ProviderMarketStack)
-	mds := marketdata.NewService(listingStore, dailyStore, marketStackClient, log)
+	mds := marketdata.NewService(listingStore, dailyStore, marketStackClient, log, providerStore)
 	return &appDependencies{
 		vendorStore:               vendorStore,
 		importStore:               importStore,
+		dailyUploadStore:          dailyUploadStore,
 		accountStore:              accountStore,
 		importAccountStore:        importAccountStore,
 		cashflowAccountStore:      cashflowAccountStore,
@@ -173,6 +180,7 @@ func newAppDependencies(log logging.Logger, db *storage.DB, cfg *config.Config) 
 		positionStore:             storage.NewSQLXPositionStore(db),
 		portfolioSnapshotStore:    storage.NewSQLXPortfolioSnapshotStore(db),
 		disk:                      disk,
+		dailyUploadDisk:           dailyUploadDisk,
 		marketDataService:         mds,
 	}
 }
@@ -290,6 +298,23 @@ func setupRouterWithDeps(
 		), http.WithRequestLogging(log),
 	)
 	router.HandleWithMiddleware(
+		"POST /marketdata/dailies/upload", handlers.UploadDailiesFile(
+			log,
+			deps.dailyUploadStore,
+			deps.listingStore,
+			deps.providerStore,
+			deps.dailyUploadDisk,
+			deps.dailyUploadDisk,
+			deps.dailyUploadEnqueuer,
+		), http.WithRequestLogging(log),
+	)
+	router.HandleWithMiddleware(
+		"GET /marketdata/dailies/uploads/{upload_id}", handlers.GetDailyUploadStatus(
+			log,
+			deps.dailyUploadStore,
+		), http.WithRequestLogging(log),
+	)
+	router.HandleWithMiddleware(
 		"GET /cashflow/transactions",
 		handlers.GetCashflowTransactions(log, deps.cashflowTransactionStore),
 		http.WithRequestLogging(log),
@@ -394,7 +419,7 @@ func setupBus(log logging.Logger, deps *appDependencies) (bus.Bus, error) {
 	return b, nil
 }
 
-func setupJobs(log logging.Logger, deps *appDependencies, cfg *config.Config, b bus.Bus) (*jobs.Manager, importer.ImportEnqueuer, jobs.BulkTagEnqueuer) {
+func setupJobs(log logging.Logger, deps *appDependencies, cfg *config.Config, b bus.Bus) (*jobs.Manager, importer.ImportEnqueuer, jobs.BulkTagEnqueuer, jobs.DailyUploadEnqueuer) {
 	// Setup and start background jobs here
 	importJob := jobs.NewImportJob(
 		deps.vendorStore,
@@ -428,7 +453,16 @@ func setupJobs(log logging.Logger, deps *appDependencies, cfg *config.Config, b 
 		4,
 		256,
 	)
-	return jobs.NewManager(log, importJob, taggerJob, bulkTagJob), importJob, bulkTagJob
+	dailyUploadJob := jobs.NewDailyUploadJob(
+		deps.dailyUploadStore,
+		deps.listingStore,
+		deps.dailyStore,
+		deps.dailyUploadDisk,
+		log,
+		5*time.Second,
+		256,
+	)
+	return jobs.NewManager(log, importJob, dailyUploadJob, taggerJob, bulkTagJob), importJob, bulkTagJob, dailyUploadJob
 }
 
 func bootstrapData(ctx context.Context, deps *appDependencies, b bus.Bus, log logging.Logger, cfg *config.Config) {

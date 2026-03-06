@@ -7,7 +7,9 @@ import (
 	"sync"
 
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
+	"github.com/lennardclaproth/my-finances-tracker/internal/observability"
 	"github.com/lennardclaproth/my-finances-tracker/internal/storage"
+	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -28,8 +30,9 @@ type bulkTagStore interface {
 }
 
 type bulkTagTask struct {
-	query storage.CashflowTransactionQuery
-	tag   string
+	query   storage.CashflowTransactionQuery
+	tag     string
+	headers map[string]string
 }
 
 type BulkTagJob struct {
@@ -62,7 +65,11 @@ func (j *BulkTagJob) Name() string {
 }
 
 func (j *BulkTagJob) EnqueueFilter(ctx context.Context, query storage.CashflowTransactionQuery, tag string) error {
-	task := bulkTagTask{query: query, tag: tag}
+	task := bulkTagTask{
+		query:   query,
+		tag:     tag,
+		headers: observability.PropagationHeadersFromContext(ctx),
+	}
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -93,12 +100,38 @@ func (j *BulkTagJob) runWorker(ctx context.Context, workerID int) {
 		case <-ctx.Done():
 			return
 		case task := <-j.queue:
-			updated, err := j.store.UpdateTagByQuery(ctx, task.query, task.tag)
+			workerCtx := observability.ContextWithPropagationHeaders(ctx, task.headers)
+			apmTx, txCtx, txErr := observability.StartTransactionFromHeaders(
+				workerCtx,
+				observability.JobOperation("bulk_tag"),
+				"job",
+				task.headers,
+			)
+			if txErr != nil {
+				j.log.Error(workerCtx, "failed to parse incoming trace headers for bulk tag job", txErr, "worker_id", workerID)
+			}
+			apmTx.Result = "success"
+			apmTx.Outcome = "success"
+			observability.SetSafeTransactionLabels(apmTx, map[string]any{
+				"operation": observability.JobOperation("bulk_tag"),
+				"component": "job",
+				"worker_id": workerID,
+				"stage":     "persist",
+			})
+
+			persistSpan, persistCtx := apm.StartSpan(txCtx, "persist", "job")
+			updated, err := j.store.UpdateTagByQuery(persistCtx, task.query, task.tag)
+			persistSpan.End()
 			if err != nil {
-				j.log.Error(ctx, "bulk tag job failed", err, "worker_id", workerID)
+				apmTx.Result = "error"
+				apmTx.Outcome = "failure"
+				apm.CaptureError(txCtx, err).Send()
+				j.log.Error(txCtx, "bulk tag job failed", err, "worker_id", workerID)
+				apmTx.End()
 				continue
 			}
-			j.log.Info(ctx, "bulk tag job completed", "worker_id", workerID, "updated_count", updated)
+			j.log.Info(txCtx, "bulk tag job completed", "worker_id", workerID, "updated_count", updated)
+			apmTx.End()
 		}
 	}
 }

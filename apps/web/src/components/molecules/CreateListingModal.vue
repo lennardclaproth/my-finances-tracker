@@ -22,6 +22,7 @@ const emit = defineEmits<{
 const sourceOptions = [
   { label: "Alpha Vantage", value: "alpha_vantage" },
   { label: "MarketStack", value: "market_stack" },
+  { label: "Brand New Day", value: "brandnewday" },
 ];
 
 const currencyOptions = [

@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lennardclaproth/my-finances-tracker/internal/date"
 	"github.com/lennardclaproth/my-finances-tracker/internal/money"
+	"github.com/lennardclaproth/my-finances-tracker/internal/observability"
 )
 
 type fakeListingStore struct {
@@ -131,9 +132,11 @@ type fakeDailyStore struct {
 
 	createFn func(ctx context.Context, daily *Daily) error
 	fetchFn  func(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]Daily, error)
+	countFn  func(ctx context.Context, listingID uuid.UUID, from, to *time.Time) (int, error)
 
 	createCalls int
 	fetchCalls  int
+	countCalls  int
 }
 
 func (f *fakeDailyStore) Create(ctx context.Context, daily *Daily) error {
@@ -155,6 +158,37 @@ func (f *fakeDailyStore) FetchByListingID(ctx context.Context, listingID uuid.UU
 	}
 	out := []Daily{}
 	return &out, nil
+}
+
+func (f *fakeDailyStore) FetchByListingIDWithSort(
+	ctx context.Context,
+	listingID uuid.UUID,
+	from, to *time.Time,
+	limit, offset int,
+	_ DailyDateSortOrder,
+) (*[]Daily, error) {
+	return f.FetchByListingID(ctx, listingID, from, to, limit, offset)
+}
+
+func (f *fakeDailyStore) CountByListingID(ctx context.Context, listingID uuid.UUID, from, to *time.Time) (int, error) {
+	f.mu.Lock()
+	f.countCalls++
+	f.mu.Unlock()
+	if f.countFn != nil {
+		return f.countFn(ctx, listingID, from, to)
+	}
+	return 0, nil
+}
+
+type fakeProviderStore struct {
+	getByNameFn func(ctx context.Context, name ProviderName) (*Provider, error)
+}
+
+func (f *fakeProviderStore) GetByName(ctx context.Context, name ProviderName) (*Provider, error) {
+	if f.getByNameFn != nil {
+		return f.getByNameFn(ctx, name)
+	}
+	return nil, ErrProviderNotFound
 }
 
 type fakeEODClient struct {
@@ -296,6 +330,7 @@ func TestSyncDailyData_ReleasesLockWhenFetchByIDFails(t *testing.T) {
 
 func TestSyncDailyData_DefaultsFromAndTo(t *testing.T) {
 	accEnd := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+	expectedTo := date.LatestBusinessDate(time.Now(), time.Local)
 	id := uuid.New()
 	ls := &fakeListingStore{
 		tryAcquireSyncLockFn: func(ctx context.Context, listingID uuid.UUID) (bool, error) {
@@ -327,6 +362,9 @@ func TestSyncDailyData_DefaultsFromAndTo(t *testing.T) {
 	}
 	if client.lastTo == nil {
 		t.Fatalf("expected non-nil to")
+	}
+	if !date.DateOnly(*client.lastTo, time.Local).Equal(expectedTo) {
+		t.Fatalf("expected to=%s, got %s", expectedTo.Format("2006-01-02"), date.DateOnly(*client.lastTo, time.Local).Format("2006-01-02"))
 	}
 	if ls.releaseSyncLockCalls != 1 {
 		t.Fatalf("expected release call once, got %d", ls.releaseSyncLockCalls)
@@ -522,6 +560,36 @@ func TestGetDailies_WhenSyncingReturnsStaleMessage(t *testing.T) {
 	}
 }
 
+func TestGetDailies_WhenSyncingUsesStoreTotalCount(t *testing.T) {
+	dailies := []Daily{{ID: uuid.New(), Symbol: "AAA"}}
+	ls := &fakeListingStore{
+		fetchBySymbolFn: func(ctx context.Context, symbol string) (*Listing, error) {
+			return &Listing{ID: uuid.New(), Symbol: symbol, Active: true, Syncing: true, Source: SourceAlphaVantage}, nil
+		},
+	}
+	ds := &fakeDailyStore{
+		fetchFn: func(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]Daily, error) {
+			return &dailies, nil
+		},
+		countFn: func(ctx context.Context, listingID uuid.UUID, from, to *time.Time) (int, error) {
+			return 42, nil
+		},
+	}
+	client := &fakeEODClient{}
+	svc := NewService(ls, ds, client, &fakeLogger{})
+
+	resp, err := svc.GetDailies(context.Background(), "AAA", nil, nil, 10, 0)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if resp.Metadata.ResultCount != 1 {
+		t.Fatalf("expected result count 1, got %d", resp.Metadata.ResultCount)
+	}
+	if resp.Metadata.TotalCount != 42 {
+		t.Fatalf("expected total count 42, got %d", resp.Metadata.TotalCount)
+	}
+}
+
 func TestGetDailies_WhenSyncingDailyFetchError(t *testing.T) {
 	ls := &fakeListingStore{
 		fetchBySymbolFn: func(ctx context.Context, symbol string) (*Listing, error) {
@@ -573,6 +641,48 @@ func TestGetDailies_StaleListingUpdateFlagErrorStillReturnsData(t *testing.T) {
 	}
 }
 
+func TestGetDailies_UsesStoreTotalCount(t *testing.T) {
+	id := uuid.New()
+	dailies := []Daily{{ID: uuid.New(), Symbol: "AAA"}}
+	accEnd := time.Now().UTC().AddDate(0, 0, 1)
+	ls := &fakeListingStore{
+		fetchBySymbolFn: func(ctx context.Context, symbol string) (*Listing, error) {
+			return &Listing{
+				ID:             id,
+				Symbol:         symbol,
+				Active:         true,
+				Source:         SourceAlphaVantage,
+				Syncing:        false,
+				AccumulatedEnd: &accEnd,
+			}, nil
+		},
+		updateShouldAccumulateFn: func(ctx context.Context, listingID uuid.UUID, shouldAccumulate bool) error {
+			return nil
+		},
+	}
+	ds := &fakeDailyStore{
+		fetchFn: func(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]Daily, error) {
+			return &dailies, nil
+		},
+		countFn: func(ctx context.Context, listingID uuid.UUID, from, to *time.Time) (int, error) {
+			return 15, nil
+		},
+	}
+	client := &fakeEODClient{}
+	svc := NewService(ls, ds, client, &fakeLogger{})
+
+	resp, err := svc.GetDailies(context.Background(), "AAA", nil, nil, 10, 0)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if resp.Metadata.ResultCount != 1 {
+		t.Fatalf("expected result count 1, got %d", resp.Metadata.ResultCount)
+	}
+	if resp.Metadata.TotalCount != 15 {
+		t.Fatalf("expected total count 15, got %d", resp.Metadata.TotalCount)
+	}
+}
+
 func TestGetDailies_StaleListingStartsAsyncSync(t *testing.T) {
 	id := uuid.New()
 	started := make(chan struct{}, 1)
@@ -609,6 +719,103 @@ func TestGetDailies_StaleListingStartsAsyncSync(t *testing.T) {
 	case <-started:
 	case <-time.After(500 * time.Millisecond):
 		t.Fatalf("expected async sync to start")
+	}
+}
+
+func TestGetDailies_StaleListingStartsAsyncSyncWithCorrelationContext(t *testing.T) {
+	id := uuid.New()
+	type syncContext struct {
+		requestID     string
+		correlationID string
+	}
+	started := make(chan syncContext, 1)
+	dailies := []Daily{{ID: uuid.New(), Symbol: "AAA"}}
+	ls := &fakeListingStore{
+		fetchBySymbolFn: func(ctx context.Context, symbol string) (*Listing, error) {
+			return &Listing{ID: id, Symbol: symbol, Active: true, Source: SourceAlphaVantage}, nil
+		},
+		updateShouldAccumulateFn: func(ctx context.Context, listingID uuid.UUID, shouldAccumulate bool) error {
+			return nil
+		},
+		tryAcquireSyncLockFn: func(ctx context.Context, listingID uuid.UUID) (bool, error) {
+			select {
+			case started <- syncContext{
+				requestID:     observability.RequestIDFromContext(ctx),
+				correlationID: observability.CorrelationIDFromContext(ctx),
+			}:
+			default:
+			}
+			return false, nil
+		},
+	}
+	ds := &fakeDailyStore{
+		fetchFn: func(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]Daily, error) {
+			return &dailies, nil
+		},
+	}
+	client := &fakeEODClient{}
+	svc := NewService(ls, ds, client, &fakeLogger{})
+
+	ctx := observability.ContextWithRequestID(context.Background(), "req-service-1")
+	ctx = observability.ContextWithCorrelationID(ctx, "corr-service-1")
+	_, err := svc.GetDailies(ctx, "AAA", nil, nil, 10, 0)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	select {
+	case got := <-started:
+		if got.requestID != "req-service-1" {
+			t.Fatalf("expected request id req-service-1, got %q", got.requestID)
+		}
+		if got.correlationID != "corr-service-1" {
+			t.Fatalf("expected correlation id corr-service-1, got %q", got.correlationID)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatalf("expected async sync to start")
+	}
+}
+
+func TestGetDailies_ManualProviderSkipsAsyncSync(t *testing.T) {
+	id := uuid.New()
+	dailies := []Daily{{ID: uuid.New(), Symbol: "BND.AS"}}
+	ls := &fakeListingStore{
+		fetchBySymbolFn: func(ctx context.Context, symbol string) (*Listing, error) {
+			return &Listing{ID: id, Symbol: symbol, Active: true, Source: SourceBrandNewDay}, nil
+		},
+		updateShouldAccumulateFn: func(ctx context.Context, listingID uuid.UUID, shouldAccumulate bool) error {
+			return nil
+		},
+		tryAcquireSyncLockFn: func(ctx context.Context, listingID uuid.UUID) (bool, error) {
+			t.Fatalf("expected no sync lock acquisition for manual provider")
+			return false, nil
+		},
+	}
+	ds := &fakeDailyStore{
+		fetchFn: func(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]Daily, error) {
+			return &dailies, nil
+		},
+		countFn: func(ctx context.Context, listingID uuid.UUID, from, to *time.Time) (int, error) {
+			return 1, nil
+		},
+	}
+	client := &fakeEODClient{}
+	ps := &fakeProviderStore{
+		getByNameFn: func(ctx context.Context, name ProviderName) (*Provider, error) {
+			return NewManualProvider(ProviderBrandNewDay)
+		},
+	}
+	svc := NewService(ls, ds, client, &fakeLogger{}, ps)
+
+	resp, err := svc.GetDailies(context.Background(), "BND.AS", nil, nil, 10, 0)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if resp.Metadata.Message != "Manual provider configured; automatic sync disabled" {
+		t.Fatalf("expected manual provider metadata message, got %q", resp.Metadata.Message)
+	}
+	if ls.updateShouldAccumulateCalls != 0 {
+		t.Fatalf("expected no update should accumulate call for manual provider")
 	}
 }
 
@@ -692,6 +899,47 @@ func TestCreateListing_SuccessStartsAsyncSync(t *testing.T) {
 	case <-started:
 	case <-time.After(500 * time.Millisecond):
 		t.Fatalf("expected async sync to start")
+	}
+}
+
+func TestCreateListing_ManualProviderDoesNotStartAsyncSync(t *testing.T) {
+	started := make(chan struct{}, 1)
+	ls := &fakeListingStore{
+		tryAcquireSyncLockFn: func(ctx context.Context, listingID uuid.UUID) (bool, error) {
+			select {
+			case started <- struct{}{}:
+			default:
+			}
+			return false, nil
+		},
+		fetchByIDFn: func(ctx context.Context, listingID uuid.UUID) (*Listing, error) {
+			return &Listing{ID: listingID, Symbol: "BND.AS", Active: true, Source: SourceBrandNewDay}, nil
+		},
+	}
+	ds := &fakeDailyStore{}
+	client := &fakeEODClient{}
+	ps := &fakeProviderStore{
+		getByNameFn: func(ctx context.Context, name ProviderName) (*Provider, error) {
+			return NewManualProvider(ProviderBrandNewDay)
+		},
+	}
+	svc := NewService(ls, ds, client, &fakeLogger{}, ps)
+
+	listing, err := svc.CreateListing(context.Background(), "BND.AS", "Name", SourceBrandNewDay)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if listing == nil || listing.Symbol != "BND.AS" {
+		t.Fatalf("expected listing to be returned")
+	}
+	if ls.createCalls != 1 {
+		t.Fatalf("expected create call once, got %d", ls.createCalls)
+	}
+
+	select {
+	case <-started:
+		t.Fatalf("expected no async sync to start for manual provider")
+	case <-time.After(300 * time.Millisecond):
 	}
 }
 

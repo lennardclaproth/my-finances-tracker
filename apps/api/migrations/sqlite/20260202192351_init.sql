@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS vendors (
     name TEXT NOT NULL UNIQUE,
     type TEXT NOT NULL,
     active INTEGER NOT NULL DEFAULT 1,
+    import_disabled INTEGER NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -49,7 +50,8 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE TABLE IF NOT EXISTS portfolio_transactions (
     id TEXT PRIMARY KEY,
     account_id TEXT,
-    import_id TEXT NOT NULL REFERENCES imports(id) ON DELETE CASCADE,
+    import_id TEXT REFERENCES imports(id) ON DELETE CASCADE,
+    origin TEXT NOT NULL DEFAULT 'IMPORT' CHECK (origin IN ('IMPORT', 'MANUAL')),
     source TEXT NOT NULL,
     occurred_at DATE NOT NULL,
     isin TEXT NOT NULL DEFAULT '',
@@ -63,7 +65,12 @@ CREATE TABLE IF NOT EXISTS portfolio_transactions (
     checksum TEXT NOT NULL UNIQUE,
     row_number INTEGER NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ck_portfolio_transactions_import_origin
+        CHECK (
+            (origin = 'IMPORT' AND import_id IS NOT NULL) OR
+            (origin = 'MANUAL' AND import_id IS NULL)
+        )
 );
 
 CREATE TABLE IF NOT EXISTS accounts (
@@ -205,18 +212,45 @@ CREATE TABLE IF NOT EXISTS dailies (
 );
 
 CREATE TABLE IF NOT EXISTS providers (
+    id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    api_key TEXT NOT NULL,
-    base_uri TEXT NOT NULL,
+    ingestion_mode TEXT NOT NULL CHECK (ingestion_mode IN ('API', 'MANUAL')),
+    api_key TEXT NULL,
+    base_uri TEXT NULL,
     remaining INTEGER NOT NULL DEFAULT 0,
     used INTEGER NOT NULL DEFAULT 0,
     total INTEGER NOT NULL DEFAULT 0,
-    resets_at TEXT NOT NULL DEFAULT '',
-    PRIMARY KEY (name, api_key)
+    resets_at TEXT NULL,
+    CHECK (
+        (ingestion_mode = 'MANUAL' AND api_key IS NULL AND base_uri IS NULL AND resets_at IS NULL)
+        OR
+        (ingestion_mode = 'API' AND api_key IS NOT NULL AND base_uri IS NOT NULL AND resets_at IS NOT NULL)
+    )
+);
+
+CREATE TABLE IF NOT EXISTS daily_uploads (
+    id TEXT PRIMARY KEY,
+    listing_id TEXT NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+    source TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('PENDING', 'PROCESSING', 'SUCCEEDED', 'PARTIAL', 'FAILED')),
+    stored_filename TEXT NOT NULL,
+    original_filename TEXT NOT NULL,
+    status_message TEXT NOT NULL DEFAULT '',
+    total_rows INTEGER NOT NULL DEFAULT 0,
+    inserted_rows INTEGER NOT NULL DEFAULT 0,
+    duplicate_rows INTEGER NOT NULL DEFAULT 0,
+    error_rows INTEGER NOT NULL DEFAULT 0,
+    row_errors_json TEXT NOT NULL DEFAULT '[]',
+    started_at DATETIME,
+    finished_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_daily_listing_id ON dailies(listing_id);
 CREATE INDEX IF NOT EXISTS idx_daily_symbol ON dailies(symbol);
+CREATE INDEX IF NOT EXISTS idx_daily_uploads_listing_id ON daily_uploads(listing_id);
+CREATE INDEX IF NOT EXISTS idx_daily_uploads_status ON daily_uploads(status);
 CREATE INDEX IF NOT EXISTS idx_imports_vendor_id ON imports(vendor_id);
 CREATE INDEX IF NOT EXISTS idx_imports_account_id ON imports(account_id);
 CREATE INDEX IF NOT EXISTS idx_import_accounts_account_id ON import_accounts(account_id);
@@ -225,6 +259,7 @@ CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions(account_i
 CREATE INDEX IF NOT EXISTS idx_cashflow_accounts_account_id ON cashflow_accounts(account_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_analytics ON transactions(date, direction, tag) WHERE ignored = 0;
 CREATE INDEX IF NOT EXISTS idx_portfolio_transactions_occurred_at ON portfolio_transactions(occurred_at);
+CREATE INDEX IF NOT EXISTS idx_portfolio_transactions_account_occurred_created ON portfolio_transactions(account_id, occurred_at DESC, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_portfolio_transactions_position_id ON portfolio_transactions(position_id);
 CREATE INDEX IF NOT EXISTS idx_portfolio_accounts_account_id ON portfolio_accounts(account_id);
 CREATE INDEX IF NOT EXISTS idx_portfolio_positions_account_id ON positions(account_id);
@@ -232,6 +267,8 @@ CREATE INDEX IF NOT EXISTS idx_portfolio_positions_listing_id ON positions(listi
 CREATE INDEX IF NOT EXISTS idx_position_snapshots_account_id ON position_snapshots(account_id);
 CREATE INDEX IF NOT EXISTS idx_position_snapshots_position_id ON position_snapshots(position_id);
 CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_account_id ON portfolio_snapshots(account_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_provider_api_name_key ON providers (name, api_key) WHERE ingestion_mode = 'API';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_provider_manual_name ON providers (name) WHERE ingestion_mode = 'MANUAL';
 
 -- +goose StatementEnd
 
@@ -246,9 +283,10 @@ DROP TABLE IF EXISTS cashflow_accounts;
 DROP TABLE IF EXISTS transactions;
 DROP TABLE IF EXISTS imports;
 DROP TABLE IF EXISTS import_accounts;
+DROP TABLE IF EXISTS daily_uploads;
+DROP TABLE IF EXISTS dailies;
+DROP TABLE IF EXISTS listings;
+DROP TABLE IF EXISTS providers;
 DROP TABLE IF EXISTS accounts;
 DROP TABLE IF EXISTS vendors;
-DROP TABLE IF EXISTS listings;
-DROP TABLE IF EXISTS dailies;
-DROP TABLE IF EXISTS providers;
 -- +goose StatementEnd

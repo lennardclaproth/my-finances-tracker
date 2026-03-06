@@ -10,6 +10,7 @@ const segmentLabelMap: Record<string, string> = {
   analyze: "Portfolio",
   admin: "Admin",
   listings: "Listings",
+  dailies: "Dailies",
   cashflow: "Cashflow",
   portfolio: "Portfolio",
 };

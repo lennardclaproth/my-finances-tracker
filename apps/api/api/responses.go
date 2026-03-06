@@ -111,6 +111,33 @@ type ListingsSearchResponse struct {
 	Data       []ListingResponse `json:"data"`
 }
 
+type DailyUploadAcceptedResponse struct {
+	UploadID uuid.UUID `json:"upload_id"`
+	Status   string    `json:"status"`
+}
+
+type DailyUploadRowErrorResponse struct {
+	RowNumber int    `json:"row_number"`
+	Reason    string `json:"reason"`
+}
+
+type DailyUploadStatusResponse struct {
+	ID            uuid.UUID                     `json:"id"`
+	ListingID     uuid.UUID                     `json:"listing_id"`
+	Source        string                        `json:"source"`
+	Status        string                        `json:"status"`
+	StatusMessage string                        `json:"status_message"`
+	TotalRows     int                           `json:"total_rows"`
+	InsertedRows  int                           `json:"inserted_rows"`
+	DuplicateRows int                           `json:"duplicate_rows"`
+	ErrorRows     int                           `json:"error_rows"`
+	RowErrors     []DailyUploadRowErrorResponse `json:"row_errors"`
+	CreatedAt     time.Time                     `json:"created_at"`
+	StartedAt     *time.Time                    `json:"started_at,omitempty"`
+	FinishedAt    *time.Time                    `json:"finished_at,omitempty"`
+	UpdatedAt     time.Time                     `json:"updated_at"`
+}
+
 type ManualPortfolioTransactionResponse struct {
 	ID          uuid.UUID  `json:"id"`
 	AccountID   uuid.UUID  `json:"account_id"`
@@ -148,7 +175,8 @@ type PortfolioTransactionResponse struct {
 }
 
 type PortfolioTransactionsResponse struct {
-	Data []PortfolioTransactionResponse `json:"data"`
+	Pagination Pagination                     `json:"pagination"`
+	Data       []PortfolioTransactionResponse `json:"data"`
 }
 
 type AsyncEventAcceptedResponse struct {

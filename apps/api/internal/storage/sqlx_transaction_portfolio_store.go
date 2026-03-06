@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -125,35 +126,130 @@ func (s *SQLXPortfolioTransactionStore) GetByPositionID(ctx context.Context, pos
 
 func (s *SQLXPortfolioTransactionStore) FetchForAccount(
 	ctx context.Context,
-	accID uuid.UUID,
-	from, to *time.Time,
-) ([]portfolio.TransactionWithListingID, error) {
-	query := fmt.Sprintf(`
+	query portfolio.TransactionListQuery,
+) (*portfolio.TransactionListResult, error) {
+	whereClause, whereArgs := buildPortfolioTransactionWhereClause(query)
+	orderClause := buildPortfolioTransactionOrderClause(query.SortBy, query.SortOrder)
+
+	limit := query.Limit
+	if limit <= 0 {
+		limit = 25
+	}
+	offset := query.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	executor := s.db.GetExecutor(ctx)
+
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(1)
+		FROM %s t
+		%s
+	`, s.tableName, whereClause)
+	countQuery = s.db.Rebind(strings.TrimSpace(countQuery))
+	var total int
+	if err := sqlx.GetContext(ctx, executor, &total, countQuery, whereArgs...); err != nil {
+		return nil, fmt.Errorf("sqlx_portfolio_transaction_store: count transactions: %w", err)
+	}
+
+	dataQuery := fmt.Sprintf(`
 		SELECT
 			t.*,
 			p.listing_id AS listing_id
 		FROM %s t
 		LEFT JOIN %s p ON p.id = t.position_id
-		WHERE t.account_id = ?
-	`, s.tableName, s.positionsTable)
-	args := []any{accID}
-	if from != nil {
-		query += " AND t.occurred_at >= ?"
-		args = append(args, *from)
+		%s
+		%s
+		LIMIT ?
+		OFFSET ?
+	`, s.tableName, s.positionsTable, whereClause, orderClause)
+	dataArgs := append(append([]any{}, whereArgs...), limit, offset)
+	dataQuery = s.db.Rebind(strings.TrimSpace(dataQuery))
+	rows, err := executor.QueryxContext(ctx, dataQuery, dataArgs...)
+	if err == sql.ErrNoRows {
+		return &portfolio.TransactionListResult{
+			Total:        total,
+			Transactions: []portfolio.TransactionWithListingID{},
+		}, nil
 	}
-	if to != nil {
-		query += " AND t.occurred_at <= ?"
-		args = append(args, *to)
+	if err != nil {
+		return nil, fmt.Errorf("sqlx_portfolio_transaction_store: fetch transactions: %w", err)
 	}
-	query += " ORDER BY t.occurred_at DESC, t.created_at DESC, t.id DESC"
-	query = s.db.Rebind(query)
+	defer rows.Close()
 
-	executor := s.db.GetExecutor(ctx)
-	var txs []portfolio.TransactionWithListingID
-	if err := sqlx.SelectContext(ctx, executor, &txs, query, args...); err != nil {
-		return nil, fmt.Errorf("sqlx_portfolio_transaction_store: fetch for account: %w", err)
+	txs := make([]portfolio.TransactionWithListingID, 0)
+	for rows.Next() {
+		var tx portfolio.TransactionWithListingID
+		if err := rows.StructScan(&tx); err != nil {
+			return nil, fmt.Errorf("sqlx_portfolio_transaction_store: scan transactions: %w", err)
+		}
+		txs = append(txs, tx)
 	}
-	return txs, nil
+	return &portfolio.TransactionListResult{
+		Total:        total,
+		Transactions: txs,
+	}, nil
+}
+
+func buildPortfolioTransactionWhereClause(query portfolio.TransactionListQuery) (string, []any) {
+	conditions := []string{"t.account_id = ?"}
+	args := []any{query.AccountID}
+
+	appendContains := func(column string, value string) {
+		v := strings.ToLower(strings.TrimSpace(value))
+		if v == "" {
+			return
+		}
+		conditions = append(conditions, fmt.Sprintf("LOWER(COALESCE(%s, '')) LIKE ?", column))
+		args = append(args, "%"+v+"%")
+	}
+
+	if query.From != nil {
+		conditions = append(conditions, "t.occurred_at >= ?")
+		args = append(args, *query.From)
+	}
+	if query.To != nil {
+		conditions = append(conditions, "t.occurred_at <= ?")
+		args = append(args, *query.To)
+	}
+	if query.Type != nil {
+		conditions = append(conditions, "t.type = ?")
+		args = append(args, string(*query.Type))
+	}
+	if query.Origin != nil {
+		conditions = append(conditions, "t.origin = ?")
+		args = append(args, string(*query.Origin))
+	}
+	appendContains("t.source", query.Source)
+
+	listing := strings.ToLower(strings.TrimSpace(query.Listing))
+	if listing != "" {
+		conditions = append(conditions, "(LOWER(COALESCE(t.symbol, '')) LIKE ? OR LOWER(COALESCE(t.isin, '')) LIKE ?)")
+		args = append(args, "%"+listing+"%", "%"+listing+"%")
+	}
+
+	q := strings.ToLower(strings.TrimSpace(query.Q))
+	if q != "" {
+		pattern := "%" + q + "%"
+		conditions = append(conditions, "(LOWER(COALESCE(t.description, '')) LIKE ? OR LOWER(COALESCE(t.source, '')) LIKE ? OR LOWER(COALESCE(t.symbol, '')) LIKE ? OR LOWER(COALESCE(t.isin, '')) LIKE ?)")
+		args = append(args, pattern, pattern, pattern, pattern)
+	}
+
+	return "WHERE " + strings.Join(conditions, " AND "), args
+}
+
+func buildPortfolioTransactionOrderClause(sortBy portfolio.TransactionSortBy, sortOrder portfolio.TransactionSortOrder) string {
+	order := "DESC"
+	if portfolio.NormalizeTransactionSortOrder(string(sortOrder)) == portfolio.TransactionSortOrderAsc {
+		order = "ASC"
+	}
+	switch portfolio.NormalizeTransactionSortBy(string(sortBy)) {
+	case portfolio.TransactionSortByDate:
+		return fmt.Sprintf("ORDER BY t.occurred_at %s, t.created_at %s, t.id %s", order, order, order)
+	default:
+		return fmt.Sprintf("ORDER BY t.occurred_at %s, t.created_at %s, t.id %s", order, order, order)
+	}
 }
 
 func isPortfolioDuplicate(err error) bool {

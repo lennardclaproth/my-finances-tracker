@@ -15,6 +15,7 @@ CREATE TABLE vendor.vendors (
     name VARCHAR(255) NOT NULL UNIQUE,
     type VARCHAR(50) NOT NULL,
     active BOOLEAN NOT NULL DEFAULT TRUE,
+    import_disabled BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -104,7 +105,8 @@ CREATE TABLE marketdata.listings (
 CREATE TABLE portfolio.transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     account_id UUID REFERENCES account.accounts(id) ON DELETE SET NULL,
-    import_id UUID NOT NULL REFERENCES import.imports(id) ON DELETE CASCADE,
+    import_id UUID REFERENCES import.imports(id) ON DELETE CASCADE,
+    origin TEXT NOT NULL DEFAULT 'IMPORT' CHECK (origin IN ('IMPORT', 'MANUAL')),
     source VARCHAR(255) NOT NULL,
     occurred_at DATE NOT NULL,
     position_id UUID,
@@ -118,7 +120,11 @@ CREATE TABLE portfolio.transactions (
     checksum VARCHAR(64) NOT NULL UNIQUE,
     row_number INT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ck_portfolio_transactions_import_origin CHECK (
+        (origin = 'IMPORT' AND import_id IS NOT NULL) OR
+        (origin = 'MANUAL' AND import_id IS NULL)
+    )
 );
 
 CREATE TABLE portfolio.accounts (
@@ -217,18 +223,45 @@ CREATE TABLE marketdata.dailies (
 );
 
 CREATE TABLE marketdata.providers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(50) NOT NULL,
-    api_key TEXT NOT NULL,
-    base_uri TEXT NOT NULL,
+    ingestion_mode TEXT NOT NULL CHECK (ingestion_mode IN ('API', 'MANUAL')),
+    api_key TEXT NULL,
+    base_uri TEXT NULL,
     remaining INT NOT NULL DEFAULT 0,
     used INT NOT NULL DEFAULT 0,
     total INT NOT NULL DEFAULT 0,
-    resets_at TEXT NOT NULL DEFAULT '',
-    PRIMARY KEY (name, api_key)
+    resets_at TEXT NULL,
+    CONSTRAINT ck_providers_ingestion_fields CHECK (
+        (ingestion_mode = 'MANUAL' AND api_key IS NULL AND base_uri IS NULL AND resets_at IS NULL)
+        OR
+        (ingestion_mode = 'API' AND api_key IS NOT NULL AND base_uri IS NOT NULL AND resets_at IS NOT NULL)
+    )
+);
+
+CREATE TABLE marketdata.daily_uploads (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    listing_id UUID NOT NULL REFERENCES marketdata.listings(id) ON DELETE CASCADE,
+    source TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('PENDING', 'PROCESSING', 'SUCCEEDED', 'PARTIAL', 'FAILED')),
+    stored_filename TEXT NOT NULL,
+    original_filename TEXT NOT NULL,
+    status_message TEXT NOT NULL DEFAULT '',
+    total_rows INT NOT NULL DEFAULT 0,
+    inserted_rows INT NOT NULL DEFAULT 0,
+    duplicate_rows INT NOT NULL DEFAULT 0,
+    error_rows INT NOT NULL DEFAULT 0,
+    row_errors_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+    started_at TIMESTAMPTZ,
+    finished_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_daily_listing_id ON marketdata.dailies(listing_id);
 CREATE INDEX idx_daily_symbol ON marketdata.dailies(symbol);
+CREATE INDEX idx_daily_uploads_listing_id ON marketdata.daily_uploads(listing_id);
+CREATE INDEX idx_daily_uploads_status ON marketdata.daily_uploads(status);
 CREATE INDEX idx_imports_vendor_id ON import.imports(vendor_id);
 CREATE INDEX idx_imports_account_id ON import.imports(account_id);
 CREATE INDEX idx_import_accounts_account_id ON import.accounts(account_id);
@@ -237,6 +270,7 @@ CREATE INDEX idx_cashflow_transactions_account_id ON cashflow.transactions(accou
 CREATE INDEX idx_cashflow_accounts_account_id ON cashflow.accounts(account_id);
 CREATE INDEX idx_cashflow_transactions_analytics ON cashflow.transactions(date, direction, tag) WHERE ignored = FALSE;
 CREATE INDEX idx_portfolio_transactions_occurred_at ON portfolio.transactions(occurred_at);
+CREATE INDEX idx_portfolio_transactions_account_occurred_created ON portfolio.transactions(account_id, occurred_at DESC, created_at DESC);
 CREATE INDEX idx_portfolio_transactions_position_id ON portfolio.transactions(position_id);
 CREATE INDEX idx_portfolio_accounts_account_id ON portfolio.accounts(account_id);
 CREATE INDEX idx_portfolio_positions_account_id ON portfolio.positions(account_id);
@@ -244,6 +278,8 @@ CREATE INDEX idx_portfolio_positions_listing_id ON portfolio.positions(listing_i
 CREATE INDEX idx_position_snapshots_account_id ON portfolio.position_snapshots(account_id);
 CREATE INDEX idx_position_snapshots_position_id ON portfolio.position_snapshots(position_id);
 CREATE INDEX idx_portfolio_snapshots_account_id ON portfolio.portfolio_snapshots(account_id);
+CREATE UNIQUE INDEX uq_provider_api_name_key ON marketdata.providers (name, api_key) WHERE ingestion_mode = 'API';
+CREATE UNIQUE INDEX uq_provider_manual_name ON marketdata.providers (name) WHERE ingestion_mode = 'MANUAL';
 
 -- +goose StatementEnd
 
@@ -258,9 +294,10 @@ DROP TABLE IF EXISTS cashflow.transactions;
 DROP TABLE IF EXISTS cashflow.accounts;
 DROP TABLE IF EXISTS import.imports;
 DROP TABLE IF EXISTS import.accounts;
+DROP TABLE IF EXISTS marketdata.daily_uploads;
+DROP TABLE IF EXISTS marketdata.dailies;
+DROP TABLE IF EXISTS marketdata.listings;
+DROP TABLE IF EXISTS marketdata.providers;
 DROP TABLE IF EXISTS account.accounts;
 DROP TABLE IF EXISTS vendor.vendors;
-DROP TABLE IF EXISTS marketdata.listings;
-DROP TABLE IF EXISTS marketdata.dailies;
-DROP TABLE IF EXISTS marketdata.providers;
 -- +goose StatementEnd

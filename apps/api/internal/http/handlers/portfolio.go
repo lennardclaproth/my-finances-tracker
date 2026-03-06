@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -44,7 +45,7 @@ func RebuildPortfolio(
 			}
 			return http.StatusInternalServerError, struct{}{}, err
 		}
-		env, err := bus.NewJSONEnvelope(api.PortfolioRebuildRequested{AccID: req.AccountID})
+		env, err := bus.NewJSONEnvelopeFromContext(ctx, api.PortfolioRebuildRequested{AccID: req.AccountID})
 		if err != nil {
 			return http.StatusInternalServerError, struct{}{}, fmt.Errorf("failed to encode portfolio rebuild event: %w", err)
 		}
@@ -85,9 +86,8 @@ type portfolioPositionLister interface {
 type portfolioTransactionLister interface {
 	FetchForAccount(
 		ctx context.Context,
-		accountID uuid.UUID,
-		from, to *time.Time,
-	) ([]portfolio.TransactionWithListingID, error)
+		query portfolio.TransactionListQuery,
+	) (*portfolio.TransactionListResult, error)
 }
 
 // GetPortfolioSnapshots returns snapshot series for charting the portfolio.
@@ -136,6 +136,7 @@ func GetPortfolioSnapshots(
 			if snap.CostBasis != 0 {
 				returnVsCostBasisPct = (snap.TotalPnL.Float64() / snap.CostBasis.Float64()) * 100
 			}
+			valueIndex := 100.0 * (1 + (snap.TimeWeightedReturnPct / 100))
 			out = append(out, api.PortfolioSnapshotPointResponse{
 				OccurredAt:            snap.OccurredAt,
 				MarketValue:           int64(snap.MarketValue),
@@ -145,6 +146,7 @@ func GetPortfolioSnapshots(
 				ReturnVsCostBasisPct:  returnVsCostBasisPct,
 				DailyReturnPct:        snap.DailyDeltaPnLPct,
 				TimeWeightedReturnPct: snap.TimeWeightedReturnPct,
+				ValueIndex:            valueIndex,
 			})
 		}
 		return http.StatusOK, out, nil
@@ -267,6 +269,15 @@ func GetPortfolioPositions(
 // @Param account_id query string true "Account ID"
 // @Param from query string false "Start date (YYYY-MM-DD)"
 // @Param to query string false "End date (YYYY-MM-DD)"
+// @Param limit query int false "Page size (10, 25, 50, 100)"
+// @Param offset query int false "Offset"
+// @Param sort_by query string false "Sort field: date"
+// @Param sort_order query string false "Sort order: asc or desc"
+// @Param q query string false "Contains search over description, source, symbol, isin"
+// @Param type query string false "Transaction type: BUY, SELL, DIVIDEND, TAX, FEE, CASH"
+// @Param origin query string false "Transaction origin: IMPORT, MANUAL"
+// @Param source query string false "Case-insensitive contains filter on source"
+// @Param listing query string false "Case-insensitive contains filter on symbol/isin"
 // @Success 200 {object} api.PortfolioTransactionsResponse
 // @Failure 400 {object} map[string]string
 // @Failure 404 {object} map[string]string
@@ -278,6 +289,25 @@ func GetPortfolioTransactions(
 	lister portfolioTransactionLister,
 ) http.Handler {
 	endpoint := func(ctx context.Context, req api.GetPortfolioTransactionsRequest) (status int, res api.PortfolioTransactionsResponse, err error) {
+		limit := req.Limit
+		if limit == 0 {
+			limit = 25
+		}
+		sortBy := portfolio.NormalizeTransactionSortBy(req.SortBy)
+		sortOrder := portfolio.NormalizeTransactionSortOrder(req.SortOrder)
+
+		var txType *portfolio.TransactionType
+		if normalizedType := strings.ToUpper(strings.TrimSpace(req.Type)); normalizedType != "" {
+			typed := portfolio.TransactionType(normalizedType)
+			txType = &typed
+		}
+
+		var origin *portfolio.TransactionOrigin
+		if normalizedOrigin := strings.ToUpper(strings.TrimSpace(req.Origin)); normalizedOrigin != "" {
+			typed := portfolio.TransactionOrigin(normalizedOrigin)
+			origin = &typed
+		}
+
 		if _, err := fetcher.FetchByID(ctx, req.AccountID); err != nil {
 			if errors.Is(err, account.ErrAccountNotFound) {
 				return http.StatusNotFound, api.PortfolioTransactionsResponse{}, nil
@@ -298,13 +328,26 @@ func GetPortfolioTransactions(
 			}
 		}
 
-		transactions, err := lister.FetchForAccount(ctx, req.AccountID, from, to)
+		result, err := lister.FetchForAccount(ctx, portfolio.TransactionListQuery{
+			AccountID: req.AccountID,
+			From:      from,
+			To:        to,
+			Limit:     limit,
+			Offset:    req.Offset,
+			SortBy:    sortBy,
+			SortOrder: sortOrder,
+			Q:         strings.TrimSpace(req.Q),
+			Type:      txType,
+			Origin:    origin,
+			Source:    strings.TrimSpace(req.Source),
+			Listing:   strings.TrimSpace(req.Listing),
+		})
 		if err != nil {
 			return http.StatusInternalServerError, api.PortfolioTransactionsResponse{}, err
 		}
 
-		out := make([]api.PortfolioTransactionResponse, 0, len(transactions))
-		for _, tx := range transactions {
+		out := make([]api.PortfolioTransactionResponse, 0, len(result.Transactions))
+		for _, tx := range result.Transactions {
 			amount := tx.AmountCents.Float64()
 			if tx.Type == portfolio.TxCash && tx.Quantity < 0 {
 				amount = -amount
@@ -332,6 +375,12 @@ func GetPortfolioTransactions(
 			})
 		}
 		return http.StatusOK, api.PortfolioTransactionsResponse{
+			Pagination: api.Pagination{
+				Limit:  limit,
+				Offset: req.Offset,
+				Count:  len(out),
+				Total:  result.Total,
+			},
 			Data: out,
 		}, nil
 	}

@@ -29,6 +29,22 @@ func (r ImportCsv) Valid(ctx context.Context) map[string]string {
 	return problems
 }
 
+type UploadDailiesRequest struct {
+	File      multipart.File       `multipart:"file"`
+	Filename  string               `multipart:"filename"`
+	Size      int64                `multipart:"size"`
+	Header    textproto.MIMEHeader `multipart:"header"`
+	ListingID uuid.UUID            `form:"listing_id"`
+}
+
+func (r UploadDailiesRequest) Valid(ctx context.Context) map[string]string {
+	problems := make(map[string]string)
+	if r.ListingID == uuid.Nil {
+		problems["listing_id"] = "listing_id is required"
+	}
+	return problems
+}
+
 type GetUntaggedTransactionsRequest struct {
 	Page     int `json:"page" query:"page"`
 	PageSize int `json:"page_size" query:"page_size"`
@@ -88,23 +104,31 @@ type GetCashflowAnalyticsRequest struct {
 }
 
 type GetDailiesRequest struct {
-	Symbol string `json:"symbol" query:"symbol"`
-	From   string `json:"from,omitempty" query:"from"`
-	To     string `json:"to,omitempty" query:"to"`
-	Limit  int    `json:"limit,omitempty" query:"limit"`
-	Offset int    `json:"offset,omitempty" query:"offset"`
+	ListingID string `json:"listing_id,omitempty" query:"listing_id"`
+	Symbol    string `json:"symbol" query:"symbol"`
+	From      string `json:"from,omitempty" query:"from"`
+	To        string `json:"to,omitempty" query:"to"`
+	SortOrder string `json:"sort_order,omitempty" query:"sort_order"`
+	Limit     int    `json:"limit,omitempty" query:"limit"`
+	Offset    int    `json:"offset,omitempty" query:"offset"`
 }
 
 func (r GetDailiesRequest) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
-	if r.Symbol == "" {
-		problems["symbol"] = "symbol is required"
+	if strings.TrimSpace(r.Symbol) == "" && strings.TrimSpace(r.ListingID) == "" {
+		problems["symbol"] = "symbol is required when listing_id is not provided"
 	}
 	if r.Limit < 0 {
 		problems["limit"] = "limit must be greater than or equal to 0"
 	}
 	if r.Offset < 0 {
 		problems["offset"] = "offset must be greater than or equal to 0"
+	}
+	if r.SortOrder != "" {
+		order := strings.ToLower(strings.TrimSpace(r.SortOrder))
+		if order != "asc" && order != "desc" {
+			problems["sort_order"] = "sort_order must be either asc or desc"
+		}
 	}
 	return problems
 }
@@ -321,12 +345,53 @@ type GetPortfolioTransactionsRequest struct {
 	AccountID uuid.UUID `json:"account_id" query:"account_id"`
 	From      string    `json:"from,omitempty" query:"from"`
 	To        string    `json:"to,omitempty" query:"to"`
+	Limit     int       `json:"limit,omitempty" query:"limit"`
+	Offset    int       `json:"offset,omitempty" query:"offset"`
+	SortBy    string    `json:"sort_by,omitempty" query:"sort_by"`
+	SortOrder string    `json:"sort_order,omitempty" query:"sort_order"`
+	Q         string    `json:"q,omitempty" query:"q"`
+	Type      string    `json:"type,omitempty" query:"type"`
+	Origin    string    `json:"origin,omitempty" query:"origin"`
+	Source    string    `json:"source,omitempty" query:"source"`
+	Listing   string    `json:"listing,omitempty" query:"listing"`
 }
 
 func (r GetPortfolioTransactionsRequest) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if r.AccountID == uuid.Nil {
 		problems["account_id"] = "account_id is required"
+	}
+	if r.Limit < 0 {
+		problems["limit"] = "limit must be greater than or equal to 0"
+	}
+	if r.Limit != 0 && r.Limit != 10 && r.Limit != 25 && r.Limit != 50 && r.Limit != 100 {
+		problems["limit"] = "limit must be one of: 10, 25, 50, 100"
+	}
+	if r.Offset < 0 {
+		problems["offset"] = "offset must be greater than or equal to 0"
+	}
+	if r.SortBy != "" && strings.ToLower(strings.TrimSpace(r.SortBy)) != "date" {
+		problems["sort_by"] = "sort_by must be one of: date"
+	}
+	if r.SortOrder != "" {
+		order := strings.ToLower(strings.TrimSpace(r.SortOrder))
+		if order != "asc" && order != "desc" {
+			problems["sort_order"] = "sort_order must be either asc or desc"
+		}
+	}
+	if r.Type != "" {
+		switch strings.ToUpper(strings.TrimSpace(r.Type)) {
+		case "BUY", "SELL", "DIVIDEND", "TAX", "FEE", "CASH":
+		default:
+			problems["type"] = "type must be one of: BUY, SELL, DIVIDEND, TAX, FEE, CASH"
+		}
+	}
+	if r.Origin != "" {
+		switch strings.ToUpper(strings.TrimSpace(r.Origin)) {
+		case "IMPORT", "MANUAL":
+		default:
+			problems["origin"] = "origin must be one of: IMPORT, MANUAL"
+		}
 	}
 	return problems
 }

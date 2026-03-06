@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from "vue";
 
 interface Props {
   open?: boolean;
@@ -10,6 +10,8 @@ interface Props {
   offsetClass?: string;
   zIndexClass?: string;
   closeOnOutside?: boolean;
+  portal?: boolean;
+  offsetPx?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -21,6 +23,8 @@ const props = withDefaults(defineProps<Props>(), {
   offsetClass: "mt-2",
   zIndexClass: "z-30",
   closeOnOutside: true,
+  portal: false,
+  offsetPx: 8,
 });
 
 const emit = defineEmits<{
@@ -28,7 +32,9 @@ const emit = defineEmits<{
 }>();
 
 const rootRef = ref<HTMLElement | null>(null);
+const panelRef = ref<HTMLElement | null>(null);
 const uncontrolledOpen = ref(false);
+const portalPanelStyle = ref<CSSProperties>({});
 
 const isControlled = computed(() => props.open !== undefined);
 const isOpen = computed(() =>
@@ -72,9 +78,47 @@ function onDocumentClick(event: MouseEvent): void {
   }
 
   const target = event.target as Node | null;
-  if (target && rootRef.value && !rootRef.value.contains(target)) {
+  if (!target) {
+    closePopover();
+    return;
+  }
+
+  const isInsideRoot = Boolean(rootRef.value?.contains(target));
+  const isInsidePanel = Boolean(panelRef.value?.contains(target));
+  if (!isInsideRoot && !isInsidePanel) {
     closePopover();
   }
+}
+
+function updatePortalPosition(): void {
+  if (!props.portal || !isOpen.value || !rootRef.value) {
+    return;
+  }
+
+  const rect = rootRef.value.getBoundingClientRect();
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const nextStyle: CSSProperties = {
+    position: "fixed",
+  };
+
+  if (props.align === "left") {
+    nextStyle.left = `${Math.max(8, rect.left)}px`;
+    nextStyle.right = "auto";
+  } else {
+    nextStyle.right = `${Math.max(8, viewportWidth - rect.right)}px`;
+    nextStyle.left = "auto";
+  }
+
+  if (props.side === "top") {
+    nextStyle.bottom = `${Math.max(8, viewportHeight - rect.top + props.offsetPx)}px`;
+    nextStyle.top = "auto";
+  } else {
+    nextStyle.top = `${Math.max(8, rect.bottom + props.offsetPx)}px`;
+    nextStyle.bottom = "auto";
+  }
+
+  portalPanelStyle.value = nextStyle;
 }
 
 onMounted(() => {
@@ -83,7 +127,39 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener("mousedown", onDocumentClick);
+  window.removeEventListener("resize", updatePortalPosition);
+  window.removeEventListener("scroll", updatePortalPosition, true);
 });
+
+watch(isOpen, (open) => {
+  if (!props.portal) {
+    return;
+  }
+
+  if (open) {
+    void nextTick(() => {
+      updatePortalPosition();
+    });
+    window.addEventListener("resize", updatePortalPosition);
+    window.addEventListener("scroll", updatePortalPosition, true);
+    return;
+  }
+
+  window.removeEventListener("resize", updatePortalPosition);
+  window.removeEventListener("scroll", updatePortalPosition, true);
+});
+
+watch(
+  () => [props.portal, props.align, props.side, props.offsetPx],
+  () => {
+    if (!props.portal || !isOpen.value) {
+      return;
+    }
+    void nextTick(() => {
+      updatePortalPosition();
+    });
+  },
+);
 </script>
 
 <template>
@@ -96,8 +172,15 @@ onBeforeUnmount(() => {
       :toggle="togglePopover"
     />
 
+    <Teleport v-if="portal" to="body">
+      <div v-if="isOpen" ref="panelRef" :class="[zIndexClass, panelClass]" :style="portalPanelStyle">
+        <slot :is-open="isOpen" :close="closePopover" :open="openPopover" :toggle="togglePopover" />
+      </div>
+    </Teleport>
+
     <div
-      v-if="isOpen"
+      v-else-if="isOpen"
+      ref="panelRef"
       :class="['absolute', panelPositionClass, panelSideClass, offsetClass, zIndexClass, panelClass]"
     >
       <slot :is-open="isOpen" :close="closePopover" :open="openPopover" :toggle="togglePopover" />

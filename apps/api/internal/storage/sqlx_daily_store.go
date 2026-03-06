@@ -23,8 +23,13 @@ func NewSQLXDailyStore(db *DB) *SQLXDailyStore {
 }
 
 func (s *SQLXDailyStore) Create(ctx context.Context, daily *marketdata.Daily) error {
+	_, err := s.CreateWithInsertStatus(ctx, daily)
+	return err
+}
+
+func (s *SQLXDailyStore) CreateWithInsertStatus(ctx context.Context, daily *marketdata.Daily) (bool, error) {
 	if daily.ListingID == uuid.Nil {
-		return marketdata.ErrDailyListingIDEmpty
+		return false, marketdata.ErrDailyListingIDEmpty
 	}
 	query := fmt.Sprintf(`
 		INSERT INTO %s (
@@ -54,11 +59,28 @@ func (s *SQLXDailyStore) Create(ctx context.Context, daily *marketdata.Daily) er
 		)
 		ON CONFLICT(listing_id, date) DO NOTHING
 	`, s.tableName)
-	_, err := s.db.NamedExecContext(ctx, query, daily)
-	return err
+	res, err := s.db.NamedExecContext(ctx, query, daily)
+	if err != nil {
+		return false, err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return affected > 0, nil
 }
 
 func (s *SQLXDailyStore) FetchByListingID(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]marketdata.Daily, error) {
+	return s.FetchByListingIDWithSort(ctx, listingID, from, to, limit, offset, marketdata.DailyDateSortAsc)
+}
+
+func (s *SQLXDailyStore) FetchByListingIDWithSort(
+	ctx context.Context,
+	listingID uuid.UUID,
+	from, to *time.Time,
+	limit, offset int,
+	sortOrder marketdata.DailyDateSortOrder,
+) (*[]marketdata.Daily, error) {
 	query := fmt.Sprintf(`
 		SELECT
 			id,
@@ -85,7 +107,11 @@ func (s *SQLXDailyStore) FetchByListingID(ctx context.Context, listingID uuid.UU
 		query += " AND date <= ?"
 		args = append(args, *to)
 	}
-	query += " ORDER BY date ASC"
+	if marketdata.NormalizeDailyDateSortOrder(string(sortOrder)) == marketdata.DailyDateSortDesc {
+		query += " ORDER BY date DESC"
+	} else {
+		query += " ORDER BY date ASC"
+	}
 
 	if limit > 0 {
 		query += " LIMIT ?"
@@ -102,4 +128,29 @@ func (s *SQLXDailyStore) FetchByListingID(ctx context.Context, listingID uuid.UU
 		return nil, err
 	}
 	return &dailies, nil
+}
+
+func (s *SQLXDailyStore) CountByListingID(ctx context.Context, listingID uuid.UUID, from, to *time.Time) (int, error) {
+	query := fmt.Sprintf(`
+		SELECT COUNT(1)
+		FROM %s
+		WHERE listing_id = ?
+	`, s.tableName)
+
+	args := []any{listingID}
+	if from != nil {
+		query += " AND date >= ?"
+		args = append(args, *from)
+	}
+	if to != nil {
+		query += " AND date <= ?"
+		args = append(args, *to)
+	}
+
+	query = s.db.Rebind(strings.TrimSpace(query))
+	var total int
+	if err := s.db.GetContext(ctx, &total, query, args...); err != nil {
+		return 0, err
+	}
+	return total, nil
 }

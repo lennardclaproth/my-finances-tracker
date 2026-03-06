@@ -59,6 +59,7 @@ var (
 const (
 	SourceAlphaVantage Source = "alpha_vantage"
 	SourceMarketStack  Source = "market_stack"
+	SourceBrandNewDay  Source = "brandnewday"
 )
 
 func NewListing(symbol, name string, source Source, options ...ListingOption) (*Listing, error) {

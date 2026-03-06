@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -117,6 +118,7 @@ func ReadConfig() (*Config, error) {
 	}
 
 	cfg.hydrateProviderEnv()
+	cfg.applyAPMDefaults()
 
 	os.Setenv("ELASTIC_APM_SERVER_URL", cfg.APM.ServerURL)
 	os.Setenv("ELASTIC_APM_SERVICE_NAME", cfg.APM.ServiceName)
@@ -124,6 +126,7 @@ func ReadConfig() (*Config, error) {
 	os.Setenv("ELASTIC_APM_SECRET_TOKEN", cfg.APM.SecretToken)
 	os.Setenv("ELASTIC_APM_VERIFY_SERVER_CERT", fmt.Sprintf("%t", cfg.APM.VerifyServerCert))
 	os.Setenv("ELASTIC_APM_LOG_LEVEL", cfg.APM.LogLevel)
+	os.Setenv("ELASTIC_APM_TRANSACTION_SAMPLE_RATE", strconv.FormatFloat(cfg.APM.TransactionSampleRate, 'f', 2, 64))
 
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -172,6 +175,31 @@ func splitAndDedupeCommaValues(raw string) []string {
 	}
 
 	return out
+}
+
+func (c *Config) applyAPMDefaults() {
+	if raw := strings.TrimSpace(os.Getenv("ELASTIC_APM_TRANSACTION_SAMPLE_RATE")); raw != "" {
+		if parsed, err := strconv.ParseFloat(raw, 64); err == nil {
+			c.APM.TransactionSampleRate = parsed
+			return
+		}
+	}
+
+	if c.APM.TransactionSampleRate > 0 {
+		return
+	}
+
+	environment := strings.ToLower(strings.TrimSpace(c.Server.Environment))
+	if environment == "" {
+		environment = strings.ToLower(strings.TrimSpace(c.APM.Environment))
+	}
+
+	switch environment {
+	case "prod", "production":
+		c.APM.TransactionSampleRate = 0.2
+	default:
+		c.APM.TransactionSampleRate = 1.0
+	}
 }
 
 func (l *Logging) GetLogLevel() slog.Leveler {

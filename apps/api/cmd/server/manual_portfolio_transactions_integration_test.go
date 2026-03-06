@@ -348,3 +348,154 @@ func TestIntegration_GetPortfolioTransactionsEndpoint_UnknownAccountReturns404(t
 		t.Fatalf("expected 404, got %d body=%s", res.StatusCode, string(body))
 	}
 }
+
+func TestIntegration_GetPortfolioTransactionsEndpoint_PaginationSortingAndFilters(t *testing.T) {
+	app := newIntegrationApp(t)
+	ctx := context.Background()
+
+	acc, err := account.NewAccount("portfolio-query-it", nil)
+	if err != nil {
+		t.Fatalf("failed creating account: %v", err)
+	}
+	if err := storage.NewSQLXAccountStore(app.db).Create(ctx, acc); err != nil {
+		t.Fatalf("failed storing account: %v", err)
+	}
+
+	v, err := vendor.NewVendor(vendor.VendorDEGIRO, vendor.VendorTypeBrokerage)
+	if err != nil {
+		t.Fatalf("failed creating vendor: %v", err)
+	}
+	if err := storage.NewSQLXVendorStore(app.db).Create(ctx, v); err != nil {
+		t.Fatalf("failed storing vendor: %v", err)
+	}
+
+	listingA, err := marketdata.NewListing(
+		"AAAQ.AS",
+		"Listing Alpha",
+		marketdata.SourceAlphaVantage,
+		marketdata.ListingWithISIN("NLAAA0000001"),
+	)
+	if err != nil {
+		t.Fatalf("failed creating listing A: %v", err)
+	}
+	listingB, err := marketdata.NewListing(
+		"BBBQ.AS",
+		"Listing Beta",
+		marketdata.SourceAlphaVantage,
+		marketdata.ListingWithISIN("NLBBB0000002"),
+	)
+	if err != nil {
+		t.Fatalf("failed creating listing B: %v", err)
+	}
+	listingStore := storage.NewSQLXListingStore(app.db)
+	if err := listingStore.Create(ctx, listingA); err != nil {
+		t.Fatalf("failed storing listing A: %v", err)
+	}
+	if err := listingStore.Create(ctx, listingB); err != nil {
+		t.Fatalf("failed storing listing B: %v", err)
+	}
+
+	postManual := func(occurredAt, typ, amount string, quantity *string, listingID *uuid.UUID, description string) {
+		raw, err := json.Marshal(api.CreateManualPortfolioTransactionRequest{
+			AccountID:   acc.ID,
+			VendorID:    v.ID,
+			OccurredAt:  occurredAt,
+			Type:        typ,
+			ListingID:   listingID,
+			Amount:      amount,
+			Quantity:    quantity,
+			Description: ptrStringManual(description),
+		})
+		if err != nil {
+			t.Fatalf("failed marshalling request: %v", err)
+		}
+		req, err := http.NewRequest(http.MethodPost, app.server.URL+"/portfolio/transactions/manual", bytes.NewReader(raw))
+		if err != nil {
+			t.Fatalf("failed creating request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("POST /portfolio/transactions/manual failed: %v", err)
+		}
+		defer res.Body.Close()
+		if res.StatusCode != http.StatusCreated {
+			body, _ := io.ReadAll(res.Body)
+			t.Fatalf("expected 201, got %d body=%s", res.StatusCode, string(body))
+		}
+	}
+
+	qBuy := "2"
+	postManual("2026-01-10", "BUY", "100", &qBuy, &listingA.ID, "Alpha buy one")
+	postManual("2026-01-11", "FEE", "2", nil, &listingA.ID, "Service fee")
+	qSell := "1"
+	postManual("2026-01-12", "SELL", "50", &qSell, &listingB.ID, "Beta sell one")
+
+	req, err := http.NewRequest(
+		http.MethodGet,
+		app.server.URL+"/portfolio/transactions?account_id="+acc.ID.String()+"&type=BUY&origin=MANUAL&source=degiro&listing=aaaq&q=alpha&sort_order=asc&limit=10&offset=0",
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("failed creating request: %v", err)
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /portfolio/transactions filtered request failed: %v", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(res.Body)
+		t.Fatalf("expected 200, got %d body=%s", res.StatusCode, string(body))
+	}
+	var filtered api.PortfolioTransactionsResponse
+	if err := json.NewDecoder(res.Body).Decode(&filtered); err != nil {
+		t.Fatalf("failed decoding filtered payload: %v", err)
+	}
+	if filtered.Pagination.Total != 1 {
+		t.Fatalf("expected filtered total 1, got %d", filtered.Pagination.Total)
+	}
+	if filtered.Pagination.Count != 1 || len(filtered.Data) != 1 {
+		t.Fatalf("expected filtered page count 1, got count=%d rows=%d", filtered.Pagination.Count, len(filtered.Data))
+	}
+	if filtered.Data[0].Type != "BUY" {
+		t.Fatalf("expected filtered tx type BUY, got %s", filtered.Data[0].Type)
+	}
+
+	req2, err := http.NewRequest(
+		http.MethodGet,
+		app.server.URL+"/portfolio/transactions?account_id="+acc.ID.String()+"&origin=MANUAL&sort_order=desc&limit=10&offset=1",
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("failed creating request 2: %v", err)
+	}
+	res2, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		t.Fatalf("GET /portfolio/transactions paged request failed: %v", err)
+	}
+	defer res2.Body.Close()
+
+	if res2.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(res2.Body)
+		t.Fatalf("expected 200, got %d body=%s", res2.StatusCode, string(body))
+	}
+	var paged api.PortfolioTransactionsResponse
+	if err := json.NewDecoder(res2.Body).Decode(&paged); err != nil {
+		t.Fatalf("failed decoding paged payload: %v", err)
+	}
+	if paged.Pagination.Total != 3 {
+		t.Fatalf("expected total 3, got %d", paged.Pagination.Total)
+	}
+	if paged.Pagination.Count != 2 || len(paged.Data) != 2 {
+		t.Fatalf("expected paged count 2, got count=%d rows=%d", paged.Pagination.Count, len(paged.Data))
+	}
+	if paged.Data[0].OccurredAt.Format("2006-01-02") != "2026-01-11" {
+		t.Fatalf("expected first row date 2026-01-11 at offset 1 desc, got %s", paged.Data[0].OccurredAt.Format("2006-01-02"))
+	}
+}
+
+func ptrStringManual(v string) *string {
+	return &v
+}

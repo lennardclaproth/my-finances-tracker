@@ -184,15 +184,18 @@ func (c *MarketStackClient) constructEODRequest(ctx context.Context, symbols []s
 	if provider == nil {
 		return nil, fmt.Errorf("constructEODRequest failed, provider %s not found", c.providerName)
 	}
-	if provider.BaseURI == "" {
+	if !provider.IsAPIIngestion() {
+		return nil, fmt.Errorf("constructEODRequest failed, provider %s is not API ingestion mode", c.providerName)
+	}
+	if provider.BaseURI == nil || *provider.BaseURI == "" {
 		return nil, fmt.Errorf("constructEODRequest failed, provider %s base URI is empty", c.providerName)
 	}
-	if provider.ApiKey == "" {
+	if provider.ApiKey == nil || *provider.ApiKey == "" {
 		return nil, fmt.Errorf("constructEODRequest failed, provider %s api key is empty", c.providerName)
 	}
 
 	// Set up the request to the MarketStack API
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, provider.BaseURI+"/eod", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, *provider.BaseURI+"/eod", nil)
 	if err != nil {
 		return nil, fmt.Errorf("constructEODRequest failed to construct request: %w", err)
 	}
@@ -201,7 +204,7 @@ func (c *MarketStackClient) constructEODRequest(ctx context.Context, symbols []s
 	q.Add("symbols", strings.Join(symbols, ","))
 	q.Add("limit", fmt.Sprintf("%d", limit))
 	q.Add("offset", fmt.Sprintf("%d", offset))
-	q.Add("access_key", provider.ApiKey)
+	q.Add("access_key", *provider.ApiKey)
 	if from != nil {
 		q.Add("date_from", from.Format("2006-01-02"))
 	}

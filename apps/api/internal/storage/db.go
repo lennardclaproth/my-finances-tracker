@@ -35,6 +35,7 @@ const (
 	TableImports       = "imports"
 	TableListings      = "listings"
 	TableHistories     = "dailies"
+	TableDailyUploads  = "daily_uploads"
 	TableProviders     = "providers"
 	TableAccounts      = "accounts"
 	TablePositions     = "positions"

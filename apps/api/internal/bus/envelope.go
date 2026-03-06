@@ -1,10 +1,12 @@
 package bus
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lennardclaproth/my-finances-tracker/internal/observability"
 )
 
 type EnvelopeOption func(*Envelope)
@@ -63,4 +65,34 @@ func NewJSONEnvelope[T Message](payload T, opts ...EnvelopeOption) (Envelope, er
 		opt(&env)
 	}
 	return env, nil
+}
+
+func NewJSONEnvelopeFromContext[T Message](ctx context.Context, payload T, opts ...EnvelopeOption) (Envelope, error) {
+	env, err := NewJSONEnvelope(payload, opts...)
+	if err != nil {
+		return Envelope{}, err
+	}
+	ApplyContextToEnvelope(ctx, &env)
+	return env, nil
+}
+
+func ApplyContextToEnvelope(ctx context.Context, env *Envelope) {
+	if env == nil {
+		return
+	}
+	if env.Headers == nil {
+		env.Headers = map[string]string{}
+	}
+
+	for k, v := range observability.PropagationHeadersFromContext(ctx) {
+		env.Headers[k] = v
+	}
+
+	if env.CorrelationID == uuid.Nil {
+		if correlationID := observability.CorrelationUUIDFromContext(ctx); correlationID != uuid.Nil {
+			env.CorrelationID = correlationID
+		} else if env.MessageID != uuid.Nil {
+			env.CorrelationID = env.MessageID
+		}
+	}
 }

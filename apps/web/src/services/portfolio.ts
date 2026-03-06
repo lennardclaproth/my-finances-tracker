@@ -4,6 +4,8 @@ import type {
   PortfolioPosition,
   PortfolioPositionDto,
   PortfolioPositionsResponseDto,
+  PortfolioTransactionsQuery,
+  PortfolioTransactionsResponse,
   PortfolioSnapshotPoint,
   PortfolioSnapshotPointDto,
   PortfolioTransaction,
@@ -120,19 +122,34 @@ export async function requestPortfolioRebuild(accountId: string): Promise<{
 }
 
 export async function fetchPortfolioTransactions(
-  accountId: string,
-  from?: string,
-  to?: string,
-): Promise<PortfolioTransaction[]> {
+  query: PortfolioTransactionsQuery,
+): Promise<PortfolioTransactionsResponse> {
   const payload = await requestJson<PortfolioTransactionsResponseDto>("/portfolio/transactions", {
     method: "GET",
     query: {
-      account_id: accountId,
-      from,
-      to,
+      account_id: query.accountId,
+      from: query.from,
+      to: query.to,
+      limit: query.limit,
+      offset: query.offset,
+      sort_by: query.sortBy,
+      sort_order: query.sortOrder,
+      q: query.q || undefined,
+      type: query.type || undefined,
+      origin: query.origin || undefined,
+      source: query.source || undefined,
+      listing: query.listing || undefined,
     },
   });
-  return payload.data.map(toPortfolioTransaction);
+  return {
+    pagination: {
+      limit: payload.pagination.limit,
+      offset: payload.pagination.offset,
+      count: payload.pagination.count,
+      total: payload.pagination.total,
+    },
+    data: payload.data.map(toPortfolioTransaction),
+  };
 }
 
 export async function createManualPortfolioTransaction(

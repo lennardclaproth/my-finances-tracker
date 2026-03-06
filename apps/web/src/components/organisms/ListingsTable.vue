@@ -7,11 +7,13 @@ interface Props {
   rows: Listing[];
   loading?: boolean;
   errorMessage?: string;
+  framed?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
   errorMessage: "",
+  framed: true,
 });
 
 const emit = defineEmits<{
@@ -30,7 +32,7 @@ function formatDate(value: string): string {
 </script>
 
 <template>
-  <section class="h-full overflow-hidden rounded-3xl border border-slate-300 bg-white/95 p-4 shadow-sm">
+  <section :class="props.framed ? 'h-full overflow-hidden rounded-3xl border border-slate-300 bg-white/95 p-4 shadow-sm' : 'h-full'">
     <div class="relative h-full">
       <div class="h-full overflow-auto bg-slate-100">
         <table class="w-full min-w-[1120px] border-separate border-spacing-0 bg-white">

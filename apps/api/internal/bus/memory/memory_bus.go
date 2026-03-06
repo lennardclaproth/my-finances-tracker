@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/lennardclaproth/my-finances-tracker/internal/bus"
+	"github.com/lennardclaproth/my-finances-tracker/internal/observability"
+	"go.elastic.co/apm/v2"
 )
 
 type BackpressurePolicy int
@@ -85,6 +87,11 @@ func NewMemoryBus(opts ...Option) *MemoryBus {
 }
 
 func (b *MemoryBus) Publish(ctx context.Context, envelope bus.Envelope) error {
+	bus.ApplyContextToEnvelope(ctx, &envelope)
+
+	span, _ := apm.StartSpan(ctx, observability.BusPublishOperation(envelope.Topic), "messaging")
+	defer span.End()
+
 	if b.closed.Load() {
 		return ErrBusClosed
 	}

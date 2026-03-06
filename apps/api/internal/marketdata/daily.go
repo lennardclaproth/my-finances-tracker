@@ -2,6 +2,7 @@ package marketdata
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,6 +27,22 @@ var (
 	ErrDailySymbolEmpty    = fmt.Errorf("daily symbol cannot be empty")
 	ErrDailyListingIDEmpty = fmt.Errorf("daily listing id cannot be empty")
 )
+
+type DailyDateSortOrder string
+
+const (
+	DailyDateSortAsc  DailyDateSortOrder = "asc"
+	DailyDateSortDesc DailyDateSortOrder = "desc"
+)
+
+func NormalizeDailyDateSortOrder(raw string) DailyDateSortOrder {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case string(DailyDateSortDesc):
+		return DailyDateSortDesc
+	default:
+		return DailyDateSortAsc
+	}
+}
 
 func NewDaily(symbol string, date time.Time, open, close, high, low float64, volume int64) (Daily, error) {
 	if symbol == "" {

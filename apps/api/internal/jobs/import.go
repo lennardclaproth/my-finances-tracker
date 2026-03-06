@@ -16,6 +16,7 @@ import (
 	cashflowParsers "github.com/lennardclaproth/my-finances-tracker/internal/cashflow/parsers"
 	"github.com/lennardclaproth/my-finances-tracker/internal/importer"
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
+	"github.com/lennardclaproth/my-finances-tracker/internal/observability"
 	"github.com/lennardclaproth/my-finances-tracker/internal/portfolio"
 	portfolioParsers "github.com/lennardclaproth/my-finances-tracker/internal/portfolio/parsers"
 	"github.com/lennardclaproth/my-finances-tracker/internal/vendor"
@@ -71,6 +72,7 @@ type ImportJob struct {
 	queue           chan uuid.UUID
 	inQueue         map[uuid.UUID]struct{}
 	inFlight        map[uuid.UUID]struct{}
+	queueHeaders    map[uuid.UUID]map[string]string
 	mu              sync.Mutex
 	cashflowParser  cashflowParserFactory
 	portfolioParser portfolioParserFactory
@@ -106,6 +108,7 @@ func NewImportJob(
 		queue:           make(chan uuid.UUID, queueSize),
 		inQueue:         make(map[uuid.UUID]struct{}),
 		inFlight:        make(map[uuid.UUID]struct{}),
+		queueHeaders:    make(map[uuid.UUID]map[string]string),
 		cashflowParser:  cashflowParsers.CreateCsvParser,
 		portfolioParser: portfolioParsers.CreateCsvParser,
 		b:               b,
@@ -131,12 +134,14 @@ func (j *ImportJob) Enqueue(ctx context.Context, importID uuid.UUID) error {
 		return nil
 	}
 	j.inQueue[importID] = struct{}{}
+	j.queueHeaders[importID] = observability.PropagationHeadersFromContext(ctx)
 	j.mu.Unlock()
 
 	select {
 	case <-ctx.Done():
 		j.mu.Lock()
 		delete(j.inQueue, importID)
+		delete(j.queueHeaders, importID)
 		j.mu.Unlock()
 		return ctx.Err()
 	case j.queue <- importID:
@@ -144,6 +149,7 @@ func (j *ImportJob) Enqueue(ctx context.Context, importID uuid.UUID) error {
 	default:
 		j.mu.Lock()
 		delete(j.inQueue, importID)
+		delete(j.queueHeaders, importID)
 		j.mu.Unlock()
 		return ErrImportQueueFull
 	}
@@ -162,8 +168,8 @@ func (j *ImportJob) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case importID := <-j.queue:
-			j.markDequeued(importID)
-			if err := j.processByID(ctx, importID); err != nil {
+			headers := j.markDequeued(importID)
+			if err := j.processByID(ctx, importID, headers); err != nil {
 				j.log.Error(ctx, "failed processing import", err, "import_id", importID)
 			}
 			j.markDone(importID)
@@ -203,24 +209,53 @@ func (j *ImportJob) syncQueueFromDB(ctx context.Context) error {
 	return nil
 }
 
-func (j *ImportJob) markDequeued(importID uuid.UUID) {
+func (j *ImportJob) markDequeued(importID uuid.UUID) map[string]string {
 	j.mu.Lock()
 	defer j.mu.Unlock()
+	headers := j.queueHeaders[importID]
 	delete(j.inQueue, importID)
+	delete(j.queueHeaders, importID)
 	j.inFlight[importID] = struct{}{}
+	return headers
 }
 
 func (j *ImportJob) markDone(importID uuid.UUID) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	delete(j.inQueue, importID)
+	delete(j.queueHeaders, importID)
 	delete(j.inFlight, importID)
 }
 
-func (j *ImportJob) processByID(ctx context.Context, importID uuid.UUID) error {
-	apmTx := apm.DefaultTracer().StartTransaction("ImportJob.processByID", "job")
-	defer apmTx.End()
-	ctx = apm.ContextWithTransaction(ctx, apmTx)
+func (j *ImportJob) processByID(ctx context.Context, importID uuid.UUID, headers map[string]string) (err error) {
+	ctx = observability.ContextWithPropagationHeaders(ctx, headers)
+
+	apmTx, txCtx, txErr := observability.StartTransactionFromHeaders(
+		ctx,
+		observability.JobOperation("import"),
+		"job",
+		headers,
+	)
+	if txErr != nil {
+		j.log.Error(ctx, "failed to parse incoming trace headers for import job", txErr, "import_id", importID)
+	}
+	ctx = txCtx
+	observability.SetSafeTransactionLabels(apmTx, map[string]any{
+		"operation": observability.JobOperation("import"),
+		"component": "job",
+		"import_id": importID.String(),
+		"stage":     "process",
+	})
+	apmTx.Result = "success"
+	apmTx.Outcome = "success"
+	defer func() {
+		if err != nil {
+			apmTx.Result = "error"
+			apmTx.Outcome = "failure"
+			apm.CaptureError(ctx, err).Send()
+		}
+		apmTx.End()
+	}()
 
 	imp, err := j.importStore.FetchByID(ctx, importID)
 	if err != nil {
@@ -277,10 +312,15 @@ func (j *ImportJob) processCashflow(ctx context.Context, imp *importer.Import, v
 	if err != nil {
 		return 0, 0, 0, 0, err
 	}
+	parseSpan, parseCtx := apm.StartSpan(ctx, "parse", "job")
 	seq, err := parser.ParseAll(rc)
+	parseSpan.End()
 	if err != nil {
 		return 0, 0, 0, 0, err
 	}
+
+	persistSpan, persistCtx := apm.StartSpan(parseCtx, "persist", "job")
+	defer persistSpan.End()
 
 	for rowNumber, txd := range seq {
 		totalRows++
@@ -299,17 +339,17 @@ func (j *ImportJob) processCashflow(ctx context.Context, imp *importer.Import, v
 		)
 		if err != nil {
 			failedCount++
-			j.log.Error(ctx, "failed creating cashflow transaction", err, "import_id", imp.ID, "row_number", rowNumber)
+			j.log.Error(persistCtx, "failed creating cashflow transaction", err, "import_id", imp.ID, "row_number", rowNumber)
 			continue
 		}
 
-		if err := j.cashflowStore.Create(ctx, tx); err != nil {
+		if err := j.cashflowStore.Create(persistCtx, tx); err != nil {
 			if errors.Is(err, cashflow.ErrDuplicateTransaction) {
 				duplicates++
 				continue
 			}
 			failedCount++
-			j.log.Error(ctx, "failed persisting cashflow transaction", err, "import_id", imp.ID, "row_number", rowNumber)
+			j.log.Error(persistCtx, "failed persisting cashflow transaction", err, "import_id", imp.ID, "row_number", rowNumber)
 			continue
 		}
 		importedCount++
@@ -327,25 +367,30 @@ func (j *ImportJob) processPortfolio(ctx context.Context, imp *importer.Import, 
 	if err != nil {
 		return 0, 0, err
 	}
+	parseSpan, parseCtx := apm.StartSpan(ctx, "parse", "job")
 	seq, err := parser.ParseAll(rc)
+	parseSpan.End()
 	if err != nil {
 		return 0, 0, err
 	}
+
+	persistSpan, persistCtx := apm.StartSpan(parseCtx, "persist", "job")
+	defer persistSpan.End()
 
 	for rowNumber, txd := range seq {
 		ptx, err := portfolio.NewTransaction(txd, rowNumber, imp.ID, imp.AccountID, nil)
 		if err != nil {
 			failedCount++
-			j.log.Error(ctx, "failed creating portfolio transaction", err, "import_id", imp.ID, "row_number", rowNumber)
+			j.log.Error(persistCtx, "failed creating portfolio transaction", err, "import_id", imp.ID, "row_number", rowNumber)
 			continue
 		}
-		if err := j.portfolioStore.Create(ctx, ptx); err != nil {
+		if err := j.portfolioStore.Create(persistCtx, ptx); err != nil {
 			if errors.Is(err, portfolio.ErrDuplicateTransaction) {
 				duplicates++
 				continue
 			}
 			failedCount++
-			j.log.Error(ctx, "failed persisting portfolio transaction", err, "import_id", imp.ID, "row_number", rowNumber)
+			j.log.Error(persistCtx, "failed persisting portfolio transaction", err, "import_id", imp.ID, "row_number", rowNumber)
 			continue
 		}
 	}
@@ -358,12 +403,15 @@ func (j *ImportJob) processPortfolio(ctx context.Context, imp *importer.Import, 
 		j.log.Info(ctx, "skip transactions created event: bus not configured", "import_id", imp.ID, "account_id", imp.AccountID.String())
 		return duplicates, failedCount, nil
 	}
-	msg, err := bus.NewJSONEnvelope(api.TransactionsCreated{AccID: *imp.AccountID})
+	publishSpan, publishCtx := apm.StartSpan(ctx, "publish", "job")
+	defer publishSpan.End()
+
+	msg, err := bus.NewJSONEnvelopeFromContext(publishCtx, api.TransactionsCreated{AccID: *imp.AccountID})
 	if err != nil {
 		j.log.Error(ctx, "failed to encode transactions created event", err, "import_id", imp.ID, "account_id", imp.AccountID.String())
 		return duplicates, failedCount, nil
 	}
-	if err := j.b.Publish(ctx, msg); err != nil {
+	if err := j.b.Publish(publishCtx, msg); err != nil {
 		j.log.Error(ctx, "failed to publish transactions created event", err, "import_id", imp.ID, "account_id", imp.AccountID.String())
 	}
 	return duplicates, failedCount, nil

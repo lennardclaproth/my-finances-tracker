@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lennardclaproth/my-finances-tracker/api"
 	httpx "github.com/lennardclaproth/my-finances-tracker/internal/http"
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
@@ -19,9 +21,11 @@ import (
 // @Tags dailies
 // @Accept json
 // @Produce json
-// @Param symbol query string true "Listing symbol (e.g. TDT.AS)"
+// @Param listing_id query string false "Listing ID (preferred when duplicate symbols exist across sources)"
+// @Param symbol query string false "Listing symbol (required when listing_id is omitted, e.g. TDT.AS)"
 // @Param from query string false "Start date (YYYY-MM-DD)"
 // @Param to query string false "End date (YYYY-MM-DD)"
+// @Param sort_order query string false "Date sort order: asc or desc (default asc)"
 // @Param limit query int false "Page size"
 // @Param offset query int false "Offset"
 // @Success 200 {object} marketdata.DailyResponse
@@ -55,8 +59,18 @@ func GetDailies(
 		if limit == 0 {
 			limit = 100
 		}
+		sortOrder := marketdata.NormalizeDailyDateSortOrder(req.SortOrder)
 
-		resp, err := mds.GetDailies(ctx, req.Symbol, from, to, limit, req.Offset)
+		var resp *marketdata.DailyResponse
+		if strings.TrimSpace(req.ListingID) != "" {
+			listingID, parseErr := uuid.Parse(strings.TrimSpace(req.ListingID))
+			if parseErr != nil {
+				return http.StatusBadRequest, map[string]string{"listing_id": "listing_id must be a valid UUID"}, nil
+			}
+			resp, err = mds.GetDailiesByListingIDWithSort(ctx, listingID, from, to, limit, req.Offset, sortOrder)
+		} else {
+			resp, err = mds.GetDailiesWithSort(ctx, req.Symbol, from, to, limit, req.Offset, sortOrder)
+		}
 		if err != nil {
 			return http.StatusInternalServerError, struct{}{}, err
 		}

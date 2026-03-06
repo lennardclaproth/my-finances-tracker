@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
+	"github.com/lennardclaproth/my-finances-tracker/internal/observability"
 )
 
 type EndpointFunc[T any, R any] func(ctx context.Context, req T) (status int, res R, err error)
@@ -18,14 +19,25 @@ type Validator interface {
 // model which it passes into the fn HandlerFunc.
 func Endpoint[T any, R any](decode DecoderFunc[T], log logging.Logger, fn EndpointFunc[T, R]) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		operationRoute := r.Pattern
+		if operationRoute == "" {
+			operationRoute = r.URL.Path
+		}
+		operation := observability.HTTPOperation(r.Method, operationRoute)
+
 		// decode the request body or query paramaters based on the decode
 		// function passed into the handle func
 		req, err := decode(r)
 		if err != nil {
 			// if the decoding of the request fails we return an error of a
 			// internal server error to the client
-			log.Error(r.Context(), "handle: a decode error occurred", err)
-			_ = encode(w, http.StatusInternalServerError, map[string]string{"error": "internal server eror"})
+			log.Error(r.Context(), "handle: a decode error occurred", err,
+				"operation", operation,
+				"component", "http",
+				"outcome", "failure",
+				"error_class", "internal",
+			)
+			_ = encode(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
 			return
 		}
 		// if the request implements the Validator interface we execute the
@@ -34,6 +46,13 @@ func Endpoint[T any, R any](decode DecoderFunc[T], log logging.Logger, fn Endpoi
 		// as a bad request with the problems as a body
 		if validator, ok := any(req).(Validator); ok {
 			if problems := validator.Valid(r.Context()); len(problems) > 0 {
+				log.Info(r.Context(), "handle: request validation failed",
+					"operation", operation,
+					"component", "http",
+					"outcome", "failure",
+					"error_class", "validation",
+					"status", http.StatusBadRequest,
+				)
 				_ = encode(w, http.StatusBadRequest, problems)
 				return
 			}
@@ -42,10 +61,17 @@ func Endpoint[T any, R any](decode DecoderFunc[T], log logging.Logger, fn Endpoi
 		// above. we pass the request context and the decoded context.
 		status, res, err := fn(r.Context(), req)
 		if err != nil {
-			log.Error(r.Context(), "handle: an error occurred while handling a request", err)
+			log.Error(r.Context(), "handle: an error occurred while handling a request", err,
+				"operation", operation,
+				"component", "http",
+				"outcome", "failure",
+				"error_class", "internal",
+				"status", http.StatusInternalServerError,
+			)
 			_ = encode(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
 			return
 		}
+
 		_ = encode(w, status, res)
 	}
 }

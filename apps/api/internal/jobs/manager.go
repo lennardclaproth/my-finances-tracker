@@ -35,7 +35,7 @@ func (m *Manager) Start(ctx context.Context) error {
 		go func(j Job) {
 			defer m.wg.Done()
 			if err := j.Start(ctx); err != nil {
-				m.log.Error(ctx, "Job %s exited with error: %v", err, j.Name())
+				m.log.Error(ctx, "job exited with error", err, "operation", "job."+j.Name())
 			}
 		}(job)
 	}

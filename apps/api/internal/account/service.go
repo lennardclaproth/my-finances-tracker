@@ -27,7 +27,7 @@ func (s *CreateService) Create(ctx context.Context, acc *Account) error {
 	if s.publisher == nil {
 		return nil
 	}
-	env, err := bus.NewJSONEnvelope(api.AccountCreated{AccID: acc.ID})
+	env, err := bus.NewJSONEnvelopeFromContext(ctx, api.AccountCreated{AccID: acc.ID})
 	if err != nil {
 		return fmt.Errorf("account create service: encode account created event: %w", err)
 	}

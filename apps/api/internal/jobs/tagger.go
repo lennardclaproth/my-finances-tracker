@@ -7,6 +7,7 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/agent"
 	"github.com/lennardclaproth/my-finances-tracker/internal/cashflow"
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
+	"github.com/lennardclaproth/my-finances-tracker/internal/observability"
 	"github.com/lennardclaproth/my-finances-tracker/internal/storage"
 	"go.elastic.co/apm/v2"
 )
@@ -87,17 +88,26 @@ func (j *TaggerJob) Start(ctx context.Context) error {
 }
 
 func (j *TaggerJob) process(ctx context.Context, tx *cashflow.Transaction) error {
-	apmTx := apm.DefaultTracer().StartTransaction("TaggerJob.process", "job")
+	apmTx := apm.DefaultTracer().StartTransaction(observability.JobOperation("tagger"), "job")
 	defer apmTx.End()
 
 	ctx = apm.ContextWithTransaction(ctx, apmTx)
+	apmTx.Result = "success"
+	apmTx.Outcome = "success"
+	observability.SetSafeTransactionLabels(apmTx, map[string]any{
+		"operation":      observability.JobOperation("tagger"),
+		"component":      "job",
+		"transaction_id": tx.ID.String(),
+		"stage":          "agent_call",
+	})
 
-	span, ctx := apm.StartSpan(ctx, "RunTagAgent", "app")
+	span, ctx := apm.StartSpan(ctx, "agent_call", "job")
 	defer span.End()
 
 	err := j.ar.RunTagAgent(ctx, tx)
 	if err != nil {
 		apmTx.Result = "error"
+		apmTx.Outcome = "failure"
 		apm.CaptureError(ctx, err).Send()
 	}
 	return err

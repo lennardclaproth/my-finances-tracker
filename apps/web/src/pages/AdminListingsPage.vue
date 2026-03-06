@@ -76,28 +76,31 @@ onBeforeUnmount(() => {
       <TopNavbar :show-filter-controls="false" />
     </template>
 
-    <div class="flex h-full min-h-0 flex-col px-4 pb-24">
-      <ListingsTable
-        class="min-h-0 flex-1"
-        :rows="listings"
-        :loading="loading"
-        :error-message="errorMessage"
-        @retry="void loadListings()"
-      />
+    <div class="flex h-full min-h-0 flex-col gap-3 px-4 pb-4">
+      <section class="relative flex h-full min-h-0 flex-col rounded-3xl border border-slate-300 bg-white/95 p-4 shadow-sm">
+        <ListingsTable
+          class="min-h-0 flex-1"
+          :rows="listings"
+          :loading="loading"
+          :error-message="errorMessage"
+          :framed="false"
+          @retry="void loadListings()"
+        />
+
+        <div class="absolute bottom-6 right-6 z-40">
+          <IconButton
+            tone="primary"
+            size="fab"
+            title="Add listing"
+            @click="createModalOpen = true"
+          >
+            <PlusIcon class="h-6 w-6" />
+          </IconButton>
+        </div>
+      </section>
     </div>
 
     <CreateListingModal :open="createModalOpen" @close="createModalOpen = false" @created="void onListingCreated()" />
-
-    <div class="fixed bottom-6 right-6 z-40">
-      <IconButton
-        tone="primary"
-        size="fab"
-        title="Add listing"
-        @click="createModalOpen = true"
-      >
-        <PlusIcon class="h-6 w-6" />
-      </IconButton>
-    </div>
 
     <div class="pointer-events-none fixed right-4 top-4 z-50">
       <Transition

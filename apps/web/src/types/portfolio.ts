@@ -82,8 +82,19 @@ export interface PortfolioTransactionDto {
 }
 
 export interface PortfolioTransactionsResponseDto {
+  pagination: {
+    limit: number;
+    offset: number;
+    count: number;
+    total: number;
+  };
   data: PortfolioTransactionDto[];
 }
+
+export type PortfolioTransactionSortBy = "date";
+export type PortfolioTransactionSortOrder = "asc" | "desc";
+export type PortfolioTransactionTypeFilter = "" | "BUY" | "SELL" | "DIVIDEND" | "TAX" | "FEE" | "CASH";
+export type PortfolioTransactionOriginFilter = "" | "IMPORT" | "MANUAL";
 
 export interface PortfolioTransaction {
   id: string;
@@ -101,6 +112,33 @@ export interface PortfolioTransaction {
   unitPrice: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PortfolioTransactionsPagination {
+  limit: number;
+  offset: number;
+  count: number;
+  total: number;
+}
+
+export interface PortfolioTransactionsResponse {
+  pagination: PortfolioTransactionsPagination;
+  data: PortfolioTransaction[];
+}
+
+export interface PortfolioTransactionsQuery {
+  accountId: string;
+  from?: string;
+  to?: string;
+  limit: number;
+  offset: number;
+  sortBy: PortfolioTransactionSortBy;
+  sortOrder: PortfolioTransactionSortOrder;
+  q: string;
+  type: PortfolioTransactionTypeFilter;
+  origin: PortfolioTransactionOriginFilter;
+  source: string;
+  listing: string;
 }
 
 export interface CreateManualPortfolioTransactionPayload {

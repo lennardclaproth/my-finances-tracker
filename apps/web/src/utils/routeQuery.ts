@@ -1,5 +1,12 @@
 import type { LocationQuery, LocationQueryRaw } from "vue-router";
 import type { CashflowTransactionsQuery, DirectionFilter, SortBy, SortOrder } from "../types/cashflow";
+import type {
+  PortfolioTransactionOriginFilter,
+  PortfolioTransactionsQuery,
+  PortfolioTransactionSortBy,
+  PortfolioTransactionSortOrder,
+  PortfolioTransactionTypeFilter,
+} from "../types/portfolio";
 
 export const LIMIT_OPTIONS = [10, 25, 50, 100] as const;
 
@@ -8,6 +15,8 @@ const DEFAULT_OFFSET = 0;
 const DEFAULT_SORT_BY: SortBy = "date";
 const DEFAULT_SORT_ORDER: SortOrder = "desc";
 const SORTABLE_FIELDS: SortBy[] = ["date", "description", "note", "tag", "source", "amount"];
+const DEFAULT_PORTFOLIO_SORT_BY: PortfolioTransactionSortBy = "date";
+const DEFAULT_PORTFOLIO_SORT_ORDER: PortfolioTransactionSortOrder = "desc";
 
 function firstValue(value: LocationQuery[string]): string {
   if (Array.isArray(value)) {
@@ -44,6 +53,36 @@ function parseSortOrder(value: string): SortOrder {
     return value;
   }
   return DEFAULT_SORT_ORDER;
+}
+
+function parsePortfolioSortBy(value: string): PortfolioTransactionSortBy {
+  if (value === "date") {
+    return "date";
+  }
+  return DEFAULT_PORTFOLIO_SORT_BY;
+}
+
+function parsePortfolioSortOrder(value: string): PortfolioTransactionSortOrder {
+  if (value === "asc" || value === "desc") {
+    return value;
+  }
+  return DEFAULT_PORTFOLIO_SORT_ORDER;
+}
+
+function parsePortfolioTransactionType(value: string): PortfolioTransactionTypeFilter {
+  const normalized = value.trim().toUpperCase();
+  if (normalized === "BUY" || normalized === "SELL" || normalized === "DIVIDEND" || normalized === "TAX" || normalized === "FEE" || normalized === "CASH") {
+    return normalized;
+  }
+  return "";
+}
+
+function parsePortfolioTransactionOrigin(value: string): PortfolioTransactionOriginFilter {
+  const normalized = value.trim().toUpperCase();
+  if (normalized === "IMPORT" || normalized === "MANUAL") {
+    return normalized;
+  }
+  return "";
 }
 
 function parseDirection(value: string): DirectionFilter {
@@ -150,4 +189,88 @@ export function areRouteQueriesEqual(a: LocationQueryRaw, b: LocationQueryRaw): 
   };
 
   return toParams(a) === toParams(b);
+}
+
+export interface PortfolioTransactionsRouteQueryState {
+  from: string;
+  to: string;
+  limit: number;
+  offset: number;
+  sortBy: PortfolioTransactionSortBy;
+  sortOrder: PortfolioTransactionSortOrder;
+  q: string;
+  type: PortfolioTransactionTypeFilter;
+  origin: PortfolioTransactionOriginFilter;
+  source: string;
+  listing: string;
+}
+
+export const DEFAULT_PORTFOLIO_TRANSACTIONS_QUERY: PortfolioTransactionsRouteQueryState = {
+  from: "",
+  to: "",
+  limit: DEFAULT_LIMIT,
+  offset: DEFAULT_OFFSET,
+  sortBy: DEFAULT_PORTFOLIO_SORT_BY,
+  sortOrder: DEFAULT_PORTFOLIO_SORT_ORDER,
+  q: "",
+  type: "",
+  origin: "",
+  source: "",
+  listing: "",
+};
+
+export function parsePortfolioTransactionsQuery(query: LocationQuery): PortfolioTransactionsRouteQueryState {
+  return {
+    from: cleanString(firstValue(query.from)),
+    to: cleanString(firstValue(query.to)),
+    limit: parseLimit(firstValue(query.limit)),
+    offset: parseOffset(firstValue(query.offset)),
+    sortBy: parsePortfolioSortBy(firstValue(query.sort_by)),
+    sortOrder: parsePortfolioSortOrder(firstValue(query.sort_order)),
+    q: cleanString(firstValue(query.q)),
+    type: parsePortfolioTransactionType(firstValue(query.type)),
+    origin: parsePortfolioTransactionOrigin(firstValue(query.origin)),
+    source: cleanString(firstValue(query.source)),
+    listing: cleanString(firstValue(query.listing)),
+  };
+}
+
+export function toPortfolioTransactionsRouteQuery(
+  state: PortfolioTransactionsRouteQueryState,
+  activeTab: "positions" | "transactions",
+): LocationQueryRaw {
+  return {
+    ...(state.from ? { from: state.from } : {}),
+    ...(state.to ? { to: state.to } : {}),
+    ...(activeTab === "transactions" ? { tab: "transactions" } : {}),
+    limit: String(state.limit),
+    offset: String(state.offset),
+    sort_by: state.sortBy,
+    sort_order: state.sortOrder,
+    ...(state.q ? { q: state.q } : {}),
+    ...(state.type ? { type: state.type } : {}),
+    ...(state.origin ? { origin: state.origin } : {}),
+    ...(state.source ? { source: state.source } : {}),
+    ...(state.listing ? { listing: state.listing } : {}),
+  };
+}
+
+export function toPortfolioTransactionsServiceQuery(
+  state: PortfolioTransactionsRouteQueryState,
+  accountId: string,
+): PortfolioTransactionsQuery {
+  return {
+    accountId,
+    from: state.from || undefined,
+    to: state.to || undefined,
+    limit: state.limit,
+    offset: state.offset,
+    sortBy: state.sortBy,
+    sortOrder: state.sortOrder,
+    q: state.q,
+    type: state.type,
+    origin: state.origin,
+    source: state.source,
+    listing: state.listing,
+  };
 }

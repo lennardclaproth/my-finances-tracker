@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   Bars3Icon,
+  CalendarDaysIcon,
   ChartBarSquareIcon,
   ChevronDownIcon,
   CloudArrowUpIcon,
@@ -84,6 +85,14 @@ const adminActions: ActionItem[] = [
     description: "Create and review listing metadata.",
     to: "/admin/listings",
     icon: QueueListIcon,
+  },
+  {
+    id: "admin-dailies",
+    kind: "route",
+    label: "Dailies",
+    description: "Review listing daily price history.",
+    to: "/admin/dailies",
+    icon: CalendarDaysIcon,
   },
 ];
 

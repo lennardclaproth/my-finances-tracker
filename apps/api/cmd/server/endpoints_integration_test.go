@@ -1742,13 +1742,23 @@ func seedImportAccount(t *testing.T, db *storage.DB) *importer.Account {
 
 func seedMarketStackProvider(t *testing.T, db *storage.DB, baseURI, apiKey string) {
 	t.Helper()
-	provider := &marketdata.Provider{
-		Name:    marketdata.ProviderMarketStack,
-		BaseURI: baseURI,
-		ApiKey:  apiKey,
+	provider, err := marketdata.NewAPIProviderWithAPIKey(marketdata.ProviderMarketStack, baseURI, apiKey)
+	if err != nil {
+		t.Fatalf("failed creating marketstack provider seed: %v", err)
 	}
 	if err := storage.NewSQLXProviderStore(db).Create(context.Background(), provider); err != nil {
 		t.Fatalf("failed creating marketstack provider seed: %v", err)
+	}
+}
+
+func seedBrandNewDayManualProvider(t *testing.T, db *storage.DB) {
+	t.Helper()
+	provider, err := marketdata.NewManualProvider(marketdata.ProviderBrandNewDay)
+	if err != nil {
+		t.Fatalf("failed creating brandnewday provider seed: %v", err)
+	}
+	if err := storage.NewSQLXProviderStore(db).Create(context.Background(), provider); err != nil {
+		t.Fatalf("failed creating brandnewday provider seed: %v", err)
 	}
 }
 

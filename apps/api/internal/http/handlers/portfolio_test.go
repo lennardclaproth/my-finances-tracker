@@ -89,18 +89,21 @@ func (f *fakePortfolioPositionLister) ListForAccountWithLatestSnapshot(
 }
 
 type fakePortfolioTransactionLister struct {
-	listFn func(ctx context.Context, accountID uuid.UUID, from, to *time.Time) ([]portfolio.TransactionWithListingID, error)
+	listFn      func(ctx context.Context, query portfolio.TransactionListQuery) (*portfolio.TransactionListResult, error)
+	lastQuery   portfolio.TransactionListQuery
+	calledCount int
 }
 
 func (f *fakePortfolioTransactionLister) FetchForAccount(
 	ctx context.Context,
-	accountID uuid.UUID,
-	from, to *time.Time,
-) ([]portfolio.TransactionWithListingID, error) {
+	query portfolio.TransactionListQuery,
+) (*portfolio.TransactionListResult, error) {
+	f.calledCount++
+	f.lastQuery = query
 	if f.listFn != nil {
-		return f.listFn(ctx, accountID, from, to)
+		return f.listFn(ctx, query)
 	}
-	return nil, nil
+	return &portfolio.TransactionListResult{}, nil
 }
 
 func TestRebuildPortfolio_PublishesRequestedEvent(t *testing.T) {
@@ -353,58 +356,61 @@ func TestGetPortfolioTransactions_MapsResponseAndDateRange(t *testing.T) {
 		},
 	}
 	lister := &fakePortfolioTransactionLister{
-		listFn: func(ctx context.Context, accountID uuid.UUID, from, to *time.Time) ([]portfolio.TransactionWithListingID, error) {
-			if accountID != accID {
-				t.Fatalf("unexpected account id: %s", accountID)
+		listFn: func(ctx context.Context, query portfolio.TransactionListQuery) (*portfolio.TransactionListResult, error) {
+			if query.AccountID != accID {
+				t.Fatalf("unexpected account id: %s", query.AccountID)
 			}
-			if from == nil || to == nil {
+			if query.From == nil || query.To == nil {
 				t.Fatalf("expected from and to to be set")
 			}
-			if from.Format("2006-01-02") != "2026-01-01" {
-				t.Fatalf("unexpected from: %s", from.Format("2006-01-02"))
+			if query.From.Format("2006-01-02") != "2026-01-01" {
+				t.Fatalf("unexpected from: %s", query.From.Format("2006-01-02"))
 			}
-			if to.Format("2006-01-02") != "2026-01-31" {
-				t.Fatalf("unexpected to date: %s", to.Format("2006-01-02"))
+			if query.To.Format("2006-01-02") != "2026-01-31" {
+				t.Fatalf("unexpected to date: %s", query.To.Format("2006-01-02"))
 			}
 			symbol := "VWCE"
 			isin := "IE00BK5BQT80"
 			now := time.Date(2026, 1, 31, 9, 0, 0, 0, time.UTC)
-			return []portfolio.TransactionWithListingID{
-				{
-					Transaction: portfolio.Transaction{
-						ID:          uuid.New(),
-						AccountID:   &accID,
-						Origin:      portfolio.TransactionOriginImport,
-						Source:      "DEGIRO",
-						OccurredAt:  now,
-						Type:        portfolio.TxBuy,
-						Symbol:      &symbol,
-						ISIN:        &isin,
-						Description: "Buy",
-						Quantity:    2,
-						UnitPrice:   1000000,
-						AmountCents: 2000000,
-						CreatedAt:   now,
-						UpdatedAt:   now,
+			return &portfolio.TransactionListResult{
+				Total: 2,
+				Transactions: []portfolio.TransactionWithListingID{
+					{
+						Transaction: portfolio.Transaction{
+							ID:          uuid.New(),
+							AccountID:   &accID,
+							Origin:      portfolio.TransactionOriginImport,
+							Source:      "DEGIRO",
+							OccurredAt:  now,
+							Type:        portfolio.TxBuy,
+							Symbol:      &symbol,
+							ISIN:        &isin,
+							Description: "Buy",
+							Quantity:    2,
+							UnitPrice:   1000000,
+							AmountCents: 2000000,
+							CreatedAt:   now,
+							UpdatedAt:   now,
+						},
+						ListingID: &listingID,
 					},
-					ListingID: &listingID,
-				},
-				{
-					Transaction: portfolio.Transaction{
-						ID:          uuid.New(),
-						AccountID:   &accID,
-						Origin:      portfolio.TransactionOriginManual,
-						Source:      "DEGIRO",
-						OccurredAt:  now,
-						Type:        portfolio.TxCash,
-						Description: "Cash withdrawal",
-						Quantity:    -1,
-						UnitPrice:   0,
-						AmountCents: 5050000,
-						CreatedAt:   now,
-						UpdatedAt:   now,
+					{
+						Transaction: portfolio.Transaction{
+							ID:          uuid.New(),
+							AccountID:   &accID,
+							Origin:      portfolio.TransactionOriginManual,
+							Source:      "DEGIRO",
+							OccurredAt:  now,
+							Type:        portfolio.TxCash,
+							Description: "Cash withdrawal",
+							Quantity:    -1,
+							UnitPrice:   0,
+							AmountCents: 5050000,
+							CreatedAt:   now,
+							UpdatedAt:   now,
+						},
+						ListingID: nil,
 					},
-					ListingID: nil,
 				},
 			}, nil
 		},
@@ -426,6 +432,12 @@ func TestGetPortfolioTransactions_MapsResponseAndDateRange(t *testing.T) {
 	if len(response.Data) != 2 {
 		t.Fatalf("expected 2 transactions, got %d", len(response.Data))
 	}
+	if response.Pagination.Total != 2 {
+		t.Fatalf("expected pagination total 2, got %d", response.Pagination.Total)
+	}
+	if response.Pagination.Count != 2 {
+		t.Fatalf("expected pagination count 2, got %d", response.Pagination.Count)
+	}
 	if response.Data[0].ListingID == nil || *response.Data[0].ListingID != listingID {
 		t.Fatalf("expected first listing id %s, got %v", listingID, response.Data[0].ListingID)
 	}
@@ -437,6 +449,66 @@ func TestGetPortfolioTransactions_MapsResponseAndDateRange(t *testing.T) {
 	}
 	if response.Data[1].Amount != "-5.05" {
 		t.Fatalf("expected signed CASH amount -5.05, got %s", response.Data[1].Amount)
+	}
+}
+
+func TestGetPortfolioTransactions_MapsQueryFiltersSortAndPagination(t *testing.T) {
+	accID := uuid.New()
+	fetcher := &fakeAccountFetcher{
+		fetchFn: func(ctx context.Context, id uuid.UUID) (*account.Account, error) {
+			return &account.Account{ID: id, Name: "ok"}, nil
+		},
+	}
+	lister := &fakePortfolioTransactionLister{
+		listFn: func(ctx context.Context, query portfolio.TransactionListQuery) (*portfolio.TransactionListResult, error) {
+			return &portfolio.TransactionListResult{
+				Total:        0,
+				Transactions: []portfolio.TransactionWithListingID{},
+			}, nil
+		},
+	}
+	h := GetPortfolioTransactions(&testLogger{}, fetcher, lister)
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/portfolio/transactions?account_id="+accID.String()+"&limit=50&offset=100&sort_by=date&sort_order=asc&q=foo&type=BUY&origin=MANUAL&source=degiro&listing=vwce",
+		nil,
+	)
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if lister.calledCount != 1 {
+		t.Fatalf("expected lister called once, got %d", lister.calledCount)
+	}
+	if lister.lastQuery.Limit != 50 {
+		t.Fatalf("expected limit 50, got %d", lister.lastQuery.Limit)
+	}
+	if lister.lastQuery.Offset != 100 {
+		t.Fatalf("expected offset 100, got %d", lister.lastQuery.Offset)
+	}
+	if lister.lastQuery.SortBy != portfolio.TransactionSortByDate {
+		t.Fatalf("expected sort_by date, got %s", lister.lastQuery.SortBy)
+	}
+	if lister.lastQuery.SortOrder != portfolio.TransactionSortOrderAsc {
+		t.Fatalf("expected sort_order asc, got %s", lister.lastQuery.SortOrder)
+	}
+	if lister.lastQuery.Q != "foo" {
+		t.Fatalf("expected q foo, got %q", lister.lastQuery.Q)
+	}
+	if lister.lastQuery.Type == nil || *lister.lastQuery.Type != portfolio.TxBuy {
+		t.Fatalf("expected type BUY, got %+v", lister.lastQuery.Type)
+	}
+	if lister.lastQuery.Origin == nil || *lister.lastQuery.Origin != portfolio.TransactionOriginManual {
+		t.Fatalf("expected origin MANUAL, got %+v", lister.lastQuery.Origin)
+	}
+	if lister.lastQuery.Source != "degiro" {
+		t.Fatalf("expected source degiro, got %q", lister.lastQuery.Source)
+	}
+	if lister.lastQuery.Listing != "vwce" {
+		t.Fatalf("expected listing vwce, got %q", lister.lastQuery.Listing)
 	}
 }
 

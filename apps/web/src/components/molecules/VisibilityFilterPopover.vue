@@ -21,6 +21,8 @@ const emit = defineEmits<{
 <template>
   <BasePopover
     :disabled="loading"
+    :portal="true"
+    z-index-class="z-[60]"
     panel-class="w-44 rounded-lg border border-slate-200 bg-white p-2 shadow-lg"
   >
     <template #trigger="{ toggle }">

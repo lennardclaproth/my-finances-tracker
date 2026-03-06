@@ -32,9 +32,12 @@ func NewServer(addr string, router *Router, log logging.Logger) *Server {
 
 // Run starts the http server on the address provided
 func (s *Server) Run(ctx context.Context) error {
+	handler := apmhttp.Wrap(s.mux)
+	handler = WithRequestIdentifiers()(handler)
+
 	server := &http.Server{
 		Addr:    s.addr,
-		Handler: apmhttp.Wrap(s.mux),
+		Handler: handler,
 	}
 
 	s.log.Info(context.Background(),

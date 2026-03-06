@@ -333,22 +333,24 @@ func seedPortfolioReadFixture(
 	}
 
 	oldPortfolioSnapshot := &portfolio.PortfolioSnapshot{
-		ID:               uuid.New(),
-		AccountID:        acc.ID,
-		OccurredAt:       time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC),
-		MarketValue:      money.Price(22000),
-		CostBasis:        money.Price(20000),
-		TotalPnL:         money.Price(1500),
-		DailyDeltaPnLPct: 1.0,
+		ID:                    uuid.New(),
+		AccountID:             acc.ID,
+		OccurredAt:            time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC),
+		MarketValue:           money.Price(22000),
+		CostBasis:             money.Price(20000),
+		TotalPnL:              money.Price(1500),
+		DailyDeltaPnLPct:      1.0,
+		TimeWeightedReturnPct: 0,
 	}
 	newPortfolioSnapshot := &portfolio.PortfolioSnapshot{
-		ID:               uuid.New(),
-		AccountID:        acc.ID,
-		OccurredAt:       latestOpenSnapshotAt,
-		MarketValue:      money.Price(24000),
-		CostBasis:        money.Price(20000),
-		TotalPnL:         money.Price(2800),
-		DailyDeltaPnLPct: 2.0,
+		ID:                    uuid.New(),
+		AccountID:             acc.ID,
+		OccurredAt:            latestOpenSnapshotAt,
+		MarketValue:           money.Price(24000),
+		CostBasis:             money.Price(20000),
+		TotalPnL:              money.Price(2800),
+		DailyDeltaPnLPct:      2.0,
+		TimeWeightedReturnPct: 4,
 	}
 	// Insert out of order to prove API ordering is by occurred_at.
 	if err := deps.portfolioSnapshotStore.CreateSnapshot(ctx, newPortfolioSnapshot); err != nil {
