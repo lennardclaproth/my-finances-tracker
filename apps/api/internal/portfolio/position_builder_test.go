@@ -1265,6 +1265,9 @@ func TestGetPositionFromMap_ReturnsExistingPosition(t *testing.T) {
 	accID := uuid.New()
 	isin := "NL0000000991"
 	existing, err := NewPosition(accID, &isin, nil, nil, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("expected no error creating existing position, got %v", err)
+	}
 	positions := map[string]*Position{
 		isin: existing,
 	}

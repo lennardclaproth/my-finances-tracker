@@ -37,7 +37,9 @@ func TestIntegration_GetPortfolioSnapshotsEndpoint_ReturnsChronologicalSeries(t 
 
 	t.Cleanup(func() {
 		server.Close()
-		_ = db.Close()
+		if err := db.Close(); err != nil {
+			t.Errorf("failed closing database: %v", err)
+		}
 	})
 
 	ctx := context.Background()
@@ -51,7 +53,11 @@ func TestIntegration_GetPortfolioSnapshotsEndpoint_ReturnsChronologicalSeries(t 
 	if err != nil {
 		t.Fatalf("GET /portfolio/snapshots failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
 		t.Fatalf("expected status 200, got %d body=%s", res.StatusCode, string(body))
@@ -97,7 +103,9 @@ func TestIntegration_GetPortfolioSnapshotsEndpoint_AppliesDateRangeFilter(t *tes
 
 	t.Cleanup(func() {
 		server.Close()
-		_ = db.Close()
+		if err := db.Close(); err != nil {
+			t.Errorf("failed closing database: %v", err)
+		}
 	})
 
 	ctx := context.Background()
@@ -111,7 +119,11 @@ func TestIntegration_GetPortfolioSnapshotsEndpoint_AppliesDateRangeFilter(t *tes
 	if err != nil {
 		t.Fatalf("GET /portfolio/snapshots with range failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
 		t.Fatalf("expected status 200, got %d body=%s", res.StatusCode, string(body))
@@ -145,7 +157,9 @@ func TestIntegration_GetPortfolioPositionsEndpoint_RespectsIncludeClosed(t *test
 
 	t.Cleanup(func() {
 		server.Close()
-		_ = db.Close()
+		if err := db.Close(); err != nil {
+			t.Errorf("failed closing database: %v", err)
+		}
 	})
 
 	ctx := context.Background()
@@ -159,7 +173,11 @@ func TestIntegration_GetPortfolioPositionsEndpoint_RespectsIncludeClosed(t *test
 	if err != nil {
 		t.Fatalf("GET /portfolio/positions failed: %v", err)
 	}
-	defer resOpenOnly.Body.Close()
+	defer func() {
+		if err := resOpenOnly.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if resOpenOnly.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resOpenOnly.Body)
 		t.Fatalf("expected status 200, got %d body=%s", resOpenOnly.StatusCode, string(body))
@@ -190,7 +208,11 @@ func TestIntegration_GetPortfolioPositionsEndpoint_RespectsIncludeClosed(t *test
 	if err != nil {
 		t.Fatalf("GET /portfolio/positions include_closed failed: %v", err)
 	}
-	defer resAll.Body.Close()
+	defer func() {
+		if err := resAll.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if resAll.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resAll.Body)
 		t.Fatalf("expected status 200, got %d body=%s", resAll.StatusCode, string(body))

@@ -58,7 +58,11 @@ func TestIntegration_GetDailiesEndpoint_TotalCountRespectsFiltersAndPagination(t
 	if err != nil {
 		t.Fatalf("GET /marketdata/dailies failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", res.StatusCode)
@@ -113,7 +117,11 @@ func TestIntegration_GetDailiesEndpoint_ManualProviderDoesNotAutoSync(t *testing
 	if err != nil {
 		t.Fatalf("GET /marketdata/dailies failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", res.StatusCode)
@@ -185,7 +193,11 @@ func TestIntegration_GetDailiesEndpoint_ListingIDSelectsCorrectSourceWhenSymbolD
 	if err != nil {
 		t.Fatalf("GET /marketdata/dailies failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", res.StatusCode)
@@ -252,7 +264,11 @@ func TestIntegration_GetDailiesEndpoint_SortOrderByDateDesc(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /marketdata/dailies failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", res.StatusCode)

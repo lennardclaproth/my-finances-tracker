@@ -158,7 +158,7 @@ func (s *Service) getDailiesForListing(
 	if listing == nil {
 		return nil, fmt.Errorf("GetDaily failed, listing not found")
 	}
-	if listing.Active == false {
+	if !listing.Active {
 		return nil, fmt.Errorf("GetDaily failed, listing with symbol %s is not active", listing.Symbol)
 	}
 
@@ -195,7 +195,7 @@ func (s *Service) getDailiesForListing(
 
 	// If the listing is currently syncing it means that there is already a sync in progress.
 	// In this case we can just fetch the existing data from the database, we don't need to trigger another sync.
-	if listing.Syncing == true {
+	if listing.Syncing {
 		data, err := s.dailyStore.FetchByListingIDWithSort(
 			ctx,
 			listing.ID,
@@ -310,7 +310,9 @@ func (s *Service) syncDailyData(ctx context.Context, listingID uuid.UUID, from, 
 			continue
 		}
 	}
-	s.listingStore.UpdateAccumulatedRange(ctx, listingID, from, to)
+	if err := s.listingStore.UpdateAccumulatedRange(ctx, listingID, from, to); err != nil {
+		s.log.Warn(ctx, "syncDailyData failed to update accumulated range", "listing_id", listingID.String(), "error", err.Error())
+	}
 	return nil
 }
 

@@ -1,4 +1,115 @@
 definitions:
+  api.AccountResponse:
+    properties:
+      created_at:
+        type: string
+      external_id:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  api.AdjustAssetItemWorthRequest:
+    properties:
+      account_id:
+        type: string
+      amount:
+        type: string
+      class_id:
+        type: string
+      direction:
+        type: string
+      effective_date:
+        type: string
+      item_id:
+        type: string
+      note:
+        type: string
+    type: object
+  api.AssetClassDetailsResponse:
+    properties:
+      class:
+        $ref: '#/definitions/api.AssetClassResponse'
+      growth:
+        items:
+          $ref: '#/definitions/api.AssetGrowthPointResponse'
+        type: array
+      history:
+        items:
+          $ref: '#/definitions/api.AssetHistoryResponse'
+        type: array
+      items:
+        items:
+          $ref: '#/definitions/api.AssetItemResponse'
+        type: array
+    type: object
+  api.AssetClassResponse:
+    properties:
+      archived:
+        type: boolean
+      current_worth:
+        type: string
+      growth_pct:
+        type: number
+      id:
+        type: string
+      last_change_at:
+        type: string
+      name:
+        type: string
+      source:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  api.AssetGrowthPointResponse:
+    properties:
+      date:
+        type: string
+      total_worth:
+        type: string
+    type: object
+  api.AssetHistoryResponse:
+    properties:
+      amount:
+        type: string
+      change_type:
+        type: string
+      class_total_worth:
+        type: string
+      created_at:
+        type: string
+      direction:
+        type: string
+      effective_date:
+        type: string
+      id:
+        type: string
+      item_id:
+        type: string
+      new_worth:
+        type: string
+      note:
+        type: string
+      previous_worth:
+        type: string
+    type: object
+  api.AssetItemResponse:
+    properties:
+      archived:
+        type: boolean
+      current_worth:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
   api.AsyncEventAcceptedResponse:
     properties:
       account_id:
@@ -86,6 +197,35 @@ definitions:
       pagination:
         $ref: '#/definitions/api.Pagination'
     type: object
+  api.CreateAccountRequest:
+    properties:
+      external_id:
+        type: string
+      name:
+        type: string
+    type: object
+  api.CreateAssetClassRequest:
+    properties:
+      account_id:
+        type: string
+      name:
+        type: string
+    type: object
+  api.CreateAssetItemRequest:
+    properties:
+      account_id:
+        type: string
+      class_id:
+        type: string
+      effective_date:
+        type: string
+      initial_worth:
+        type: string
+      name:
+        type: string
+      note:
+        type: string
+    type: object
   api.CreateListingRequest:
     properties:
       currency:
@@ -108,6 +248,98 @@ definitions:
       ticker:
         type: string
       type:
+        type: string
+    type: object
+  api.CreateManualCashflowTransactionEntryRequest:
+    properties:
+      amount:
+        type: string
+      date:
+        type: string
+      description:
+        type: string
+      note:
+        type: string
+      tag:
+        type: string
+      type:
+        type: string
+      vendor:
+        type: string
+    type: object
+  api.CreateManualCashflowTransactionsRequest:
+    properties:
+      account_id:
+        type: string
+      transactions:
+        items:
+          $ref: '#/definitions/api.CreateManualCashflowTransactionEntryRequest'
+        type: array
+    type: object
+  api.CreateManualPortfolioTransactionRequest:
+    properties:
+      account_id:
+        type: string
+      amount:
+        type: string
+      description:
+        type: string
+      listing_id:
+        type: string
+      occurred_at:
+        type: string
+      quantity:
+        type: string
+      type:
+        type: string
+      vendor_id:
+        type: string
+    type: object
+  api.DailyUploadAcceptedResponse:
+    properties:
+      status:
+        type: string
+      upload_id:
+        type: string
+    type: object
+  api.DailyUploadRowErrorResponse:
+    properties:
+      reason:
+        type: string
+      row_number:
+        type: integer
+    type: object
+  api.DailyUploadStatusResponse:
+    properties:
+      created_at:
+        type: string
+      duplicate_rows:
+        type: integer
+      error_rows:
+        type: integer
+      finished_at:
+        type: string
+      id:
+        type: string
+      inserted_rows:
+        type: integer
+      listing_id:
+        type: string
+      row_errors:
+        items:
+          $ref: '#/definitions/api.DailyUploadRowErrorResponse'
+        type: array
+      source:
+        type: string
+      started_at:
+        type: string
+      status:
+        type: string
+      status_message:
+        type: string
+      total_rows:
+        type: integer
+      updated_at:
         type: string
     type: object
   api.IgnoreTransactionsByFilterRequest:
@@ -155,6 +387,57 @@ definitions:
       updated_at:
         type: string
     type: object
+  api.ListingsSearchResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/api.ListingResponse'
+        type: array
+      pagination:
+        $ref: '#/definitions/api.Pagination'
+    type: object
+  api.ManualCashflowTransactionsResponse:
+    properties:
+      created_count:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/api.Transaction'
+        type: array
+    type: object
+  api.ManualPortfolioTransactionResponse:
+    properties:
+      account_id:
+        type: string
+      amount:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      isin:
+        type: string
+      listing_id:
+        type: string
+      occurred_at:
+        type: string
+      origin:
+        type: string
+      quantity:
+        type: string
+      source:
+        type: string
+      symbol:
+        type: string
+      type:
+        type: string
+      unit_price:
+        type: string
+      updated_at:
+        type: string
+    type: object
   api.Pagination:
     properties:
       count:
@@ -166,9 +449,123 @@ definitions:
       total:
         type: integer
     type: object
+  api.PortfolioPositionResponse:
+    properties:
+      close_date:
+        type: string
+      cost_basis:
+        type: integer
+      id:
+        type: string
+      is_closed:
+        type: boolean
+      last_snapshot_at:
+        type: string
+      market_value:
+        type: integer
+      name:
+        type: string
+      open_date:
+        type: string
+      quantity:
+        type: number
+      realized_pnl:
+        type: integer
+      symbol:
+        type: string
+      unrealized_pnl_pct:
+        type: number
+    type: object
+  api.PortfolioPositionsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/api.PortfolioPositionResponse'
+        type: array
+      include_closed:
+        type: boolean
+    type: object
+  api.PortfolioSnapshotPointResponse:
+    properties:
+      daily_return_pct:
+        type: number
+      market_value:
+        type: integer
+      occurred_at:
+        type: string
+      return_vs_cost_basis_pct:
+        type: number
+      time_weighted_return_pct:
+        type: number
+      total_cost_basis:
+        type: integer
+      total_pnl:
+        type: integer
+      total_pnl_pct:
+        type: number
+      value_index:
+        type: number
+    type: object
+  api.PortfolioTransactionResponse:
+    properties:
+      account_id:
+        type: string
+      amount:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      isin:
+        type: string
+      listing_id:
+        type: string
+      occurred_at:
+        type: string
+      origin:
+        type: string
+      quantity:
+        type: string
+      source:
+        type: string
+      symbol:
+        type: string
+      type:
+        type: string
+      unit_price:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  api.PortfolioTransactionsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/api.PortfolioTransactionResponse'
+        type: array
+      pagination:
+        $ref: '#/definitions/api.Pagination'
+    type: object
   api.RebuildPortfolioRequest:
     properties:
       account_id:
+        type: string
+    type: object
+  api.SetAssetItemWorthRequest:
+    properties:
+      account_id:
+        type: string
+      class_id:
+        type: string
+      effective_date:
+        type: string
+      item_id:
+        type: string
+      note:
+        type: string
+      worth:
         type: string
     type: object
   api.TagTransactionRequest:
@@ -180,6 +577,8 @@ definitions:
     type: object
   api.TagTransactionsByFilterRequest:
     properties:
+      account_id:
+        type: string
       filters:
         $ref: '#/definitions/api.CashflowTagFilters'
       tag:
@@ -231,6 +630,17 @@ definitions:
         example: Food
         type: string
     type: object
+  api.UpdateAssetClassRequest:
+    properties:
+      account_id:
+        type: string
+      archived:
+        type: boolean
+      id:
+        type: string
+      name:
+        type: string
+    type: object
   api.UpdateListingFieldsRequest:
     properties:
       currency:
@@ -251,6 +661,23 @@ definitions:
       type:
         type: string
     type: object
+  api.VendorResponse:
+    properties:
+      active:
+        type: boolean
+      created_at:
+        type: string
+      id:
+        type: string
+      import_disabled:
+        type: boolean
+      name:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+    type: object
   marketdata.Daily:
     properties:
       close:
@@ -263,12 +690,14 @@ definitions:
         type: integer
       id:
         type: string
+      listingID:
+        type: string
       low:
         type: integer
       open:
         type: integer
       symbol:
-        description: This is used to link back to the listing, e.g. "AAPL"
+        description: Kept for response readability
         type: string
       updatedAt:
         type: string
@@ -296,6 +725,473 @@ definitions:
 info:
   contact: {}
 paths:
+  /accounts:
+    get:
+      consumes:
+      - application/json
+      description: Lists all available accounts.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.AccountResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List accounts
+      tags:
+      - accounts
+    post:
+      consumes:
+      - application/json
+      description: Creates a new account.
+      parameters:
+      - description: Create account payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.CreateAccountRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.AccountResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create account
+      tags:
+      - accounts
+  /assets/classes:
+    get:
+      consumes:
+      - application/json
+      description: Returns asset classes with totals and growth metadata.
+      parameters:
+      - description: Account ID
+        in: query
+        name: account_id
+        required: true
+        type: string
+      - description: Include archived classes
+        in: query
+        name: include_archived
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.AssetClassResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List asset classes
+      tags:
+      - assets
+    patch:
+      consumes:
+      - application/json
+      description: Updates manual asset class name and archived state.
+      parameters:
+      - description: Update asset class payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpdateAssetClassRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Update asset class
+      tags:
+      - assets
+    post:
+      consumes:
+      - application/json
+      description: Creates a manual asset class for the selected account.
+      parameters:
+      - description: Create asset class payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.CreateAssetClassRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/api.AssetClassResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create asset class
+      tags:
+      - assets
+  /assets/classes/{class_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a manual class and its items/history.
+      parameters:
+      - description: Class ID
+        in: path
+        name: class_id
+        required: true
+        type: string
+      - description: Account ID
+        in: query
+        name: account_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete asset class
+      tags:
+      - assets
+    get:
+      consumes:
+      - application/json
+      description: Returns class details for drawer rendering.
+      parameters:
+      - description: Class ID
+        in: path
+        name: class_id
+        required: true
+        type: string
+      - description: Account ID
+        in: query
+        name: account_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.AssetClassDetailsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get asset class details
+      tags:
+      - assets
+  /assets/items:
+    post:
+      consumes:
+      - application/json
+      description: Adds a tracked asset item and records its initial worth.
+      parameters:
+      - description: Create asset item payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.CreateAssetItemRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/api.AssetItemResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create asset item
+      tags:
+      - assets
+  /assets/items/worth/adjust:
+    post:
+      consumes:
+      - application/json
+      description: Applies increase/decrease delta using non-future effective date.
+      parameters:
+      - description: Adjust worth payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.AdjustAssetItemWorthRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Adjust asset item worth
+      tags:
+      - assets
+  /assets/items/worth/set:
+    post:
+      consumes:
+      - application/json
+      description: Replaces item worth using a non-future effective date.
+      parameters:
+      - description: Set worth payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.SetAssetItemWorthRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Set asset item worth
+      tags:
+      - assets
+  /assets/snapshots:
+    get:
+      consumes:
+      - application/json
+      description: Returns account-level daily total worth snapshot points.
+      parameters:
+      - description: Account ID
+        in: query
+        name: account_id
+        required: true
+        type: string
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.AssetGrowthPointResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List asset snapshots
+      tags:
+      - assets
   /cashflow/analytics/monthly:
     get:
       consumes:
@@ -532,6 +1428,52 @@ paths:
       summary: Ignore selected cashflow transactions
       tags:
       - Transactions
+  /cashflow/transactions/manual:
+    post:
+      consumes:
+      - application/json
+      description: Creates one or more manual cashflow transactions for an account.
+      parameters:
+      - description: Manual cashflow transactions payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/api.CreateManualCashflowTransactionsRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/api.ManualCashflowTransactionsResponse'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create manual cashflow transactions
+      tags:
+      - Transactions
   /cashflow/transactions/tag:
     post:
       consumes:
@@ -641,56 +1583,6 @@ paths:
       summary: Tag selected cashflow transactions
       tags:
       - Transactions
-  /dailies:
-    get:
-      consumes:
-      - application/json
-      description: Get daily market data for a symbol with optional date range and
-        pagination
-      parameters:
-      - description: Listing symbol (e.g. TDT.AS)
-        in: query
-        name: symbol
-        required: true
-        type: string
-      - description: Start date (YYYY-MM-DD)
-        in: query
-        name: from
-        type: string
-      - description: End date (YYYY-MM-DD)
-        in: query
-        name: to
-        type: string
-      - description: Page size
-        in: query
-        name: limit
-        type: integer
-      - description: Offset
-        in: query
-        name: offset
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/marketdata.DailyResponse'
-        "400":
-          description: Bad request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: Internal server error
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Fetch daily market data
-      tags:
-      - dailies
   /health:
     get:
       consumes:
@@ -725,9 +1617,10 @@ paths:
         name: vendor_id
         required: true
         type: string
-      - description: UUID of the account (required for brokerage vendors)
+      - description: UUID of the account
         in: formData
         name: account_id
+        required: true
         type: string
       produces:
       - application/json
@@ -763,6 +1656,154 @@ paths:
       summary: Import transactions from CSV file
       tags:
       - imports
+  /marketdata/dailies:
+    get:
+      consumes:
+      - application/json
+      description: Get daily market data for a symbol with optional date range and
+        pagination
+      parameters:
+      - description: Listing ID (preferred when duplicate symbols exist across sources)
+        in: query
+        name: listing_id
+        type: string
+      - description: Listing symbol (required when listing_id is omitted, e.g. TDT.AS)
+        in: query
+        name: symbol
+        type: string
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      - description: 'Date sort order: asc or desc (default asc)'
+        in: query
+        name: sort_order
+        type: string
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/marketdata.DailyResponse'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Fetch daily market data
+      tags:
+      - dailies
+  /marketdata/dailies/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a .csv/.txt file with listing daily values and process it
+        asynchronously based on listing source parser.
+      parameters:
+      - description: Daily data file
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: Listing UUID
+        in: formData
+        name: listing_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/api.DailyUploadAcceptedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "422":
+          description: Unprocessable Entity
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Upload listing daily data file
+      tags:
+      - dailies
+  /marketdata/dailies/uploads/{upload_id}:
+    get:
+      consumes:
+      - application/json
+      description: Returns counters and row-level errors for a daily upload processing
+        job.
+      parameters:
+      - description: Daily upload UUID
+        in: path
+        name: upload_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.DailyUploadStatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get daily upload status
+      tags:
+      - dailies
   /marketdata/listing:
     patch:
       consumes:
@@ -865,6 +1906,92 @@ paths:
       summary: List listings
       tags:
       - listings
+  /marketdata/listings/search:
+    get:
+      consumes:
+      - application/json
+      description: Search market-data listings using a case-insensitive partial query
+        over symbol, name and isin.
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Page size (max 100, default 25)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ListingsSearchResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Search listings
+      tags:
+      - listings
+  /portfolio/positions:
+    get:
+      consumes:
+      - application/json
+      description: Returns portfolio positions for the given account and include_closed
+        filter.
+      parameters:
+      - description: Account ID
+        in: query
+        name: account_id
+        required: true
+        type: string
+      - description: Include closed positions
+        in: query
+        name: include_closed
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.PortfolioPositionsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get portfolio positions
+      tags:
+      - portfolio
   /portfolio/rebuild:
     post:
       consumes:
@@ -891,6 +2018,12 @@ paths:
             additionalProperties:
               type: string
             type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "500":
           description: Internal Server Error
           schema:
@@ -906,4 +2039,239 @@ paths:
       summary: Rebuild portfolio
       tags:
       - portfolio
+  /portfolio/snapshots:
+    get:
+      consumes:
+      - application/json
+      description: Returns snapshot points for the given account and optional date
+        range.
+      parameters:
+      - description: Account ID
+        in: query
+        name: account_id
+        required: true
+        type: string
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.PortfolioSnapshotPointResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get portfolio snapshots
+      tags:
+      - portfolio
+  /portfolio/transactions:
+    get:
+      consumes:
+      - application/json
+      description: Returns portfolio transactions for the given account and optional
+        date range.
+      parameters:
+      - description: Account ID
+        in: query
+        name: account_id
+        required: true
+        type: string
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      - description: Page size (10, 25, 50, 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      - description: 'Sort field: date'
+        in: query
+        name: sort_by
+        type: string
+      - description: 'Sort order: asc or desc'
+        in: query
+        name: sort_order
+        type: string
+      - description: Contains search over description, source, symbol, isin
+        in: query
+        name: q
+        type: string
+      - description: 'Transaction type: BUY, SELL, DIVIDEND, TAX, FEE, CASH'
+        in: query
+        name: type
+        type: string
+      - description: 'Transaction origin: IMPORT, MANUAL'
+        in: query
+        name: origin
+        type: string
+      - description: Case-insensitive contains filter on source
+        in: query
+        name: source
+        type: string
+      - description: Case-insensitive contains filter on symbol/isin
+        in: query
+        name: listing
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.PortfolioTransactionsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get portfolio transactions
+      tags:
+      - portfolio
+  /portfolio/transactions/manual:
+    post:
+      consumes:
+      - application/json
+      description: Creates a manual portfolio transaction and persists it without
+        publishing rebuild events.
+      parameters:
+      - description: Manual portfolio transaction payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.CreateManualPortfolioTransactionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/api.ManualPortfolioTransactionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "422":
+          description: Unprocessable Entity
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create manual portfolio transaction
+      tags:
+      - portfolio
+  /vendors:
+    get:
+      consumes:
+      - application/json
+      description: Lists active vendors for imports.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.VendorResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List vendors
+      tags:
+      - vendors
+  /ws/accounts/{account_id}:
+    get:
+      description: Opens an account-scoped websocket that emits data-changed notifications.
+      parameters:
+      - description: Account ID
+        in: path
+        name: account_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "101":
+          description: Switching Protocols
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Subscribe to account realtime updates
+      tags:
+      - realtime
 swagger: "2.0"

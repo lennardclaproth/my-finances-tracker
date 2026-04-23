@@ -57,7 +57,9 @@ func (s *fakeDailyUploadProviderHandlerStore) GetByName(ctx context.Context, nam
 type fakeDailyUploadFileWriter struct{}
 
 func (w *fakeDailyUploadFileWriter) WriteCsv(r io.Reader) (string, error) {
-	_, _ = io.ReadAll(r)
+	if _, err := io.ReadAll(r); err != nil {
+		return "", err
+	}
 	return "test.csv", nil
 }
 
@@ -131,7 +133,9 @@ func TestUploadDailiesFile_BadFileExtensionReturns400(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed creating part: %v", err)
 	}
-	_, _ = part.Write([]byte("Date\tNAV\tAsk\tBid\tDividend\n28/02/2026\t1\t1\t1\t-\n"))
+	if _, err := part.Write([]byte("Date\tNAV\tAsk\tBid\tDividend\n28/02/2026\t1\t1\t1\t-\n")); err != nil {
+		t.Fatalf("failed writing multipart payload: %v", err)
+	}
 	if err := writer.WriteField("listing_id", listingID.String()); err != nil {
 		t.Fatalf("failed writing listing_id: %v", err)
 	}
@@ -181,7 +185,9 @@ func TestUploadDailiesFile_NonManualProviderReturns422(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed creating part: %v", err)
 	}
-	_, _ = part.Write([]byte("Date\tNAV\tAsk\tBid\tDividend\n28/02/2026\t1\t1\t1\t-\n"))
+	if _, err := part.Write([]byte("Date\tNAV\tAsk\tBid\tDividend\n28/02/2026\t1\t1\t1\t-\n")); err != nil {
+		t.Fatalf("failed writing multipart payload: %v", err)
+	}
 	if err := writer.WriteField("listing_id", listingID.String()); err != nil {
 		t.Fatalf("failed writing listing_id: %v", err)
 	}
@@ -227,7 +233,9 @@ func TestUploadDailiesFile_MissingProviderReturns422(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed creating part: %v", err)
 	}
-	_, _ = part.Write([]byte("Date\tNAV\tAsk\tBid\tDividend\n28/02/2026\t1\t1\t1\t-\n"))
+	if _, err := part.Write([]byte("Date\tNAV\tAsk\tBid\tDividend\n28/02/2026\t1\t1\t1\t-\n")); err != nil {
+		t.Fatalf("failed writing multipart payload: %v", err)
+	}
 	if err := writer.WriteField("listing_id", listingID.String()); err != nil {
 		t.Fatalf("failed writing listing_id: %v", err)
 	}

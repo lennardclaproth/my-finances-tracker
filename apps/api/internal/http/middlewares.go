@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"time"
@@ -9,7 +10,7 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/observability"
 )
 
-// withRequestLogging returns a http logging middleware function.
+// WithRequestLogging returns middleware that logs request metadata after handler execution.
 func WithRequestLogging(logger logging.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -37,11 +38,13 @@ func WithRequestLogging(logger logging.Logger) func(http.Handler) http.Handler {
 				"component", "http",
 				"outcome", outcome,
 			)
-			logger.Info(r.Context(), "request completed", observability.FilterFields(fields...)...)
+			// Context identifiers are already embedded in fields above.
+			logger.Info(context.Background(), "request completed", observability.FilterFields(fields...)...)
 		})
 	}
 }
 
+// WithRequestIdentifiers ensures request/correlation IDs exist on context and response headers.
 func WithRequestIdentifiers() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

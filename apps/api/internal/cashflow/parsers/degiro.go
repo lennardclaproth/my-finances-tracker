@@ -1,7 +1,9 @@
 package parsers
 
 import (
+	"bytes"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"iter"
@@ -28,7 +30,18 @@ func NewDegiroParser() *DegiroParser {
 }
 
 func (p *DegiroParser) ParseAll(rc io.ReadCloser) (iter.Seq2[int, cashflow.TransactionData], error) {
-	csvReader := csv.NewReader(rc)
+	raw, err := io.ReadAll(rc)
+	closeErr := rc.Close()
+	if err != nil {
+		if closeErr != nil {
+			return nil, errors.Join(err, closeErr)
+		}
+		return nil, err
+	}
+	if closeErr != nil {
+		return nil, closeErr
+	}
+	csvReader := csv.NewReader(bytes.NewReader(raw))
 	csvReader.Comma = ','
 	csvReader.LazyQuotes = true
 	csvReader.TrimLeadingSpace = true
@@ -42,7 +55,6 @@ func (p *DegiroParser) ParseAll(rc io.ReadCloser) (iter.Seq2[int, cashflow.Trans
 	}
 
 	seq := func(yield func(int, cashflow.TransactionData) bool) {
-		defer rc.Close()
 		rowNumber := 1 // first data row after header
 		for {
 			record, err := csvReader.Read()

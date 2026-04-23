@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	stdhttp "net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,9 +14,11 @@ import (
 	_ "github.com/lennardclaproth/my-finances-tracker/docs"
 	"github.com/lennardclaproth/my-finances-tracker/internal/account"
 	"github.com/lennardclaproth/my-finances-tracker/internal/agent"
+	"github.com/lennardclaproth/my-finances-tracker/internal/assets"
 	"github.com/lennardclaproth/my-finances-tracker/internal/bootstrap"
 	"github.com/lennardclaproth/my-finances-tracker/internal/bus"
 	memorybus "github.com/lennardclaproth/my-finances-tracker/internal/bus/memory"
+	cashflowservice "github.com/lennardclaproth/my-finances-tracker/internal/cashflow/service"
 	"github.com/lennardclaproth/my-finances-tracker/internal/config"
 	"github.com/lennardclaproth/my-finances-tracker/internal/http"
 	handlers "github.com/lennardclaproth/my-finances-tracker/internal/http/handlers"
@@ -23,9 +26,11 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/jobs"
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
 	"github.com/lennardclaproth/my-finances-tracker/internal/marketdata"
+	assetshandlers "github.com/lennardclaproth/my-finances-tracker/internal/messaging/handlers/assets"
 	cashflowhandlers "github.com/lennardclaproth/my-finances-tracker/internal/messaging/handlers/cashflow"
 	importhandlers "github.com/lennardclaproth/my-finances-tracker/internal/messaging/handlers/importer"
 	portfoliohandlers "github.com/lennardclaproth/my-finances-tracker/internal/messaging/handlers/portfolio"
+	"github.com/lennardclaproth/my-finances-tracker/internal/notify"
 	"github.com/lennardclaproth/my-finances-tracker/internal/portfolio"
 	"github.com/lennardclaproth/my-finances-tracker/internal/storage"
 	"github.com/lennardclaproth/my-finances-tracker/migrations"
@@ -46,6 +51,7 @@ type appDependencies struct {
 	dailyStore                *storage.SQLXDailyStore
 	cashflowTransactionStore  *storage.SQLXBankTransactionStore
 	portfolioTransactionStore *storage.SQLXPortfolioTransactionStore
+	assetStore                *storage.SQLXAssetStore
 	positionStore             *storage.SQLXPositionStore
 	portfolioSnapshotStore    *storage.SQLXPortfolioSnapshotStore
 	disk                      *storage.Disk
@@ -66,7 +72,11 @@ func run(ctx context.Context, args []string) error {
 	// Setup
 	logger := setupLogger(cfg)
 	db := setupDatabase(logger, cfg)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			logger.Error(context.Background(), "failed closing database", err)
+		}
+	}()
 
 	deps := newAppDependencies(logger, db, cfg)
 	b, err := setupBus(logger, deps)
@@ -78,6 +88,15 @@ func run(ctx context.Context, args []string) error {
 			logger.Error(context.Background(), "failed closing bus", err)
 		}
 	}()
+	realtimeHub := notify.NewHub(logger)
+	defer func() {
+		if err := realtimeHub.Close(); err != nil {
+			logger.Error(context.Background(), "failed closing realtime hub", err)
+		}
+	}()
+	if err := setupRealtimeNotifications(logger, b, realtimeHub); err != nil {
+		return err
+	}
 	// Bootstrap initial data
 	bootstrapData(ctx, deps, b, logger, cfg)
 
@@ -86,7 +105,7 @@ func run(ctx context.Context, args []string) error {
 	deps.dailyUploadEnqueuer = dailyUploadEnqueuer
 
 	// Wiring: construct handlers and routes at the composition root
-	router := setupRouterWithDeps(logger, deps, b, importEnqueuer, bulkTagEnqueuer)
+	router := setupRouterWithDeps(logger, deps, b, importEnqueuer, bulkTagEnqueuer, realtimeHub.Handler())
 
 	// Create server and job manager
 	srv := http.NewServer(fmt.Sprintf(":%d", cfg.Server.Port), router, logger)
@@ -177,6 +196,7 @@ func newAppDependencies(log logging.Logger, db *storage.DB, cfg *config.Config) 
 		dailyStore:                dailyStore,
 		cashflowTransactionStore:  storage.NewSQLXBankTransactionStore(db),
 		portfolioTransactionStore: storage.NewSQLXPortfolioTransactionStore(db),
+		assetStore:                storage.NewSQLXAssetStore(db),
 		positionStore:             storage.NewSQLXPositionStore(db),
 		portfolioSnapshotStore:    storage.NewSQLXPortfolioSnapshotStore(db),
 		disk:                      disk,
@@ -204,6 +224,7 @@ func setupRouterWithDeps(
 	b bus.Bus,
 	importEnqueuer importer.ImportEnqueuer,
 	bulkTagEnqueuer jobs.BulkTagEnqueuer,
+	wsHandlers ...stdhttp.Handler,
 ) *http.Router {
 	router := http.NewRouter()
 	manualPortfolioTxService := portfolio.NewManualTransactionService(
@@ -211,6 +232,20 @@ func setupRouterWithDeps(
 		deps.vendorStore,
 		deps.listingStore,
 		deps.portfolioTransactionStore,
+	)
+	manualCashflowTxService := cashflowservice.NewManualCreateService(
+		deps.accountStore,
+		deps.cashflowAccountStore,
+		deps.importAccountStore,
+		deps.vendorStore,
+		deps.importStore,
+		deps.cashflowTransactionStore,
+	)
+	assetService := assets.NewService(
+		deps.accountStore,
+		deps.portfolioSnapshotStore,
+		deps.assetStore,
+		b,
 	)
 
 	// Register routes with their handlers
@@ -320,6 +355,11 @@ func setupRouterWithDeps(
 		http.WithRequestLogging(log),
 	)
 	router.HandleWithMiddleware(
+		"POST /cashflow/transactions/manual",
+		handlers.CreateManualCashflowTransactions(log, manualCashflowTxService),
+		http.WithRequestLogging(log),
+	)
+	router.HandleWithMiddleware(
 		"GET /cashflow/analytics/monthly",
 		handlers.GetCashflowMonthlyAnalytics(log, deps.cashflowTransactionStore),
 		http.WithRequestLogging(log),
@@ -354,9 +394,69 @@ func setupRouterWithDeps(
 		handlers.IgnoreTransactionsByFilter(log, deps.cashflowTransactionStore),
 		http.WithRequestLogging(log),
 	)
+	router.HandleWithMiddleware(
+		"GET /assets/classes",
+		handlers.GetAssetClasses(log, assetService),
+		http.WithRequestLogging(log),
+	)
+	router.HandleWithMiddleware(
+		"GET /assets/snapshots",
+		handlers.GetAssetSnapshots(log, assetService),
+		http.WithRequestLogging(log),
+	)
+	router.HandleWithMiddleware(
+		"POST /assets/classes",
+		handlers.CreateAssetClass(log, assetService),
+		http.WithRequestLogging(log),
+	)
+	router.HandleWithMiddleware(
+		"PATCH /assets/classes",
+		handlers.UpdateAssetClass(log, assetService),
+		http.WithRequestLogging(log),
+	)
+	router.HandleWithMiddleware(
+		"DELETE /assets/classes/{class_id}",
+		handlers.DeleteAssetClass(log, assetService),
+		http.WithRequestLogging(log),
+	)
+	router.HandleWithMiddleware(
+		"GET /assets/classes/{class_id}",
+		handlers.GetAssetClassDetails(log, assetService),
+		http.WithRequestLogging(log),
+	)
+	router.HandleWithMiddleware(
+		"POST /assets/items",
+		handlers.CreateAssetItem(log, assetService),
+		http.WithRequestLogging(log),
+	)
+	router.HandleWithMiddleware(
+		"POST /assets/items/worth/set",
+		handlers.SetAssetItemWorth(log, assetService),
+		http.WithRequestLogging(log),
+	)
+	router.HandleWithMiddleware(
+		"POST /assets/items/worth/adjust",
+		handlers.AdjustAssetItemWorth(log, assetService),
+		http.WithRequestLogging(log),
+	)
+	if len(wsHandlers) > 0 && wsHandlers[0] != nil {
+		router.HandleWithMiddleware(
+			"GET /ws/accounts/{account_id}",
+			wsHandlers[0],
+			http.WithRequestLogging(log),
+		)
+	}
 
-	router.Handle("GET /swagger/", httpSwagger.WrapHandler)
-	router.Handle("GET /health", handlers.HealthHandler())
+	router.HandleWithMiddleware(
+		"GET /swagger/",
+		httpSwagger.WrapHandler,
+		http.WithRequestLogging(log),
+	)
+	router.HandleWithMiddleware(
+		"GET /health",
+		handlers.HealthHandler(log),
+		http.WithRequestLogging(log),
+	)
 
 	return router
 }
@@ -382,40 +482,62 @@ func setupBus(log logging.Logger, deps *appDependencies) (bus.Bus, error) {
 	)
 
 	reg := bus.NewRegistry(bus.JSONCodec{})
-	handler := portfoliohandlers.NewTransactionsImportedHandler(pb)
+	closeBusWithContext := func(failure error) error {
+		if closeErr := b.Close(); closeErr != nil {
+			log.Error(context.Background(), "failed closing bus after subscription error", closeErr)
+			return fmt.Errorf("%w (additionally failed to close bus: %v)", failure, closeErr)
+		}
+		return failure
+	}
+	handler := portfoliohandlers.NewTransactionsImportedHandler(pb, b, log)
 	topic := api.TransactionsCreated{}.MessageTopic()
 	if _, err := b.Subscribe(topic, bus.DecodeHandler(reg, handler.Handle)); err != nil {
-		_ = b.Close()
-		return nil, fmt.Errorf("failed to subscribe portfolio handler on topic %s: %w", topic, err)
+		return nil, closeBusWithContext(fmt.Errorf("failed to subscribe portfolio handler on topic %s: %w", topic, err))
 	}
-	rebuildHandler := portfoliohandlers.NewPortfolioRebuildRequestedHandler(pb)
+	rebuildHandler := portfoliohandlers.NewPortfolioRebuildRequestedHandler(pb, b, log)
 	rebuildTopic := api.PortfolioRebuildRequested{}.MessageTopic()
 	if _, err := b.Subscribe(rebuildTopic, bus.DecodeHandler(reg, rebuildHandler.Handle)); err != nil {
-		_ = b.Close()
-		return nil, fmt.Errorf("failed to subscribe portfolio rebuild handler on topic %s: %w", rebuildTopic, err)
+		return nil, closeBusWithContext(fmt.Errorf("failed to subscribe portfolio rebuild handler on topic %s: %w", rebuildTopic, err))
 	}
 
 	accountTopic := api.AccountCreated{}.MessageTopic()
 
 	portfolioAccountHandler := portfoliohandlers.NewAccountCreatedHandler(deps.portfolioAccountStore)
 	if _, err := b.Subscribe(accountTopic, bus.DecodeHandler(reg, portfolioAccountHandler.Handle)); err != nil {
-		_ = b.Close()
-		return nil, fmt.Errorf("failed to subscribe portfolio account handler: %w", err)
+		return nil, closeBusWithContext(fmt.Errorf("failed to subscribe portfolio account handler: %w", err))
 	}
 
 	cashflowAccountHandler := cashflowhandlers.NewAccountCreatedHandler(deps.cashflowAccountStore)
 	if _, err := b.Subscribe(accountTopic, bus.DecodeHandler(reg, cashflowAccountHandler.Handle)); err != nil {
-		_ = b.Close()
-		return nil, fmt.Errorf("failed to subscribe cashflow account handler: %w", err)
+		return nil, closeBusWithContext(fmt.Errorf("failed to subscribe cashflow account handler: %w", err))
+	}
+	assetService := assets.NewService(
+		deps.accountStore,
+		deps.portfolioSnapshotStore,
+		deps.assetStore,
+		b,
+	)
+	assetsAccountHandler := assetshandlers.NewAccountCreatedHandler(assetService)
+	if _, err := b.Subscribe(accountTopic, bus.DecodeHandler(reg, assetsAccountHandler.Handle)); err != nil {
+		return nil, closeBusWithContext(fmt.Errorf("failed to subscribe assets account handler: %w", err))
 	}
 
 	importAccountHandler := importhandlers.NewAccountCreatedHandler(deps.importAccountStore)
 	if _, err := b.Subscribe(accountTopic, bus.DecodeHandler(reg, importAccountHandler.Handle)); err != nil {
-		_ = b.Close()
-		return nil, fmt.Errorf("failed to subscribe import account handler: %w", err)
+		return nil, closeBusWithContext(fmt.Errorf("failed to subscribe import account handler: %w", err))
+	}
+	portfolioRebuiltTopic := api.PortfolioRebuilt{}.MessageTopic()
+	assetsPortfolioRebuiltHandler := assetshandlers.NewPortfolioRebuiltHandler(assetService)
+	if _, err := b.Subscribe(portfolioRebuiltTopic, bus.DecodeHandler(reg, assetsPortfolioRebuiltHandler.Handle)); err != nil {
+		return nil, closeBusWithContext(fmt.Errorf("failed to subscribe assets portfolio rebuilt handler: %w", err))
+	}
+	assetsSnapshotsRebuildTopic := api.AssetsSnapshotsRebuildRequested{}.MessageTopic()
+	assetsSnapshotsRebuildHandler := assetshandlers.NewSnapshotsRebuildRequestedHandler(assetService, b, log)
+	if _, err := b.Subscribe(assetsSnapshotsRebuildTopic, bus.DecodeHandler(reg, assetsSnapshotsRebuildHandler.Handle)); err != nil {
+		return nil, closeBusWithContext(fmt.Errorf("failed to subscribe assets snapshots rebuild handler: %w", err))
 	}
 
-	log.Info(context.Background(), "registered bus subscriptions", "topics", []string{topic, rebuildTopic, accountTopic})
+	log.Info(context.Background(), "registered bus subscriptions", "topics", []string{topic, rebuildTopic, accountTopic, portfolioRebuiltTopic, assetsSnapshotsRebuildTopic})
 	return b, nil
 }
 
@@ -433,25 +555,12 @@ func setupJobs(log logging.Logger, deps *appDependencies, cfg *config.Config, b 
 		b,
 	)
 
-	var agentID uuid.UUID
-	agentID, err := uuid.Parse(cfg.Agent.DefaultTagAgentID)
-	if err != nil {
-		agentID = uuid.Nil
-	}
-	taggerJob := jobs.NewTaggerJob(
-		agent.NewRunner(
-			cfg.Agent.AgentBaseURL,
-			agentID,
-		),
-		deps.cashflowTransactionStore,
-		100*time.Millisecond,
-		log,
-	)
 	bulkTagJob := jobs.NewBulkTagJob(
 		deps.cashflowTransactionStore,
 		log,
 		4,
 		256,
+		b,
 	)
 	dailyUploadJob := jobs.NewDailyUploadJob(
 		deps.dailyUploadStore,
@@ -462,7 +571,62 @@ func setupJobs(log logging.Logger, deps *appDependencies, cfg *config.Config, b 
 		5*time.Second,
 		256,
 	)
-	return jobs.NewManager(log, importJob, dailyUploadJob, taggerJob, bulkTagJob), importJob, bulkTagJob, dailyUploadJob
+
+	managedJobs := []jobs.Job{importJob, dailyUploadJob}
+
+	if cfg.Agent.Enabled {
+		agentID, err := uuid.Parse(cfg.Agent.DefaultTagAgentID)
+		if err != nil {
+			log.Error(context.Background(), "agent auto-tagging disabled due to invalid default_tag_agent_id", err)
+		} else {
+			taggerJob := jobs.NewTaggerJob(
+				agent.NewRunner(
+					cfg.Agent.AgentBaseURL,
+					agentID,
+				),
+				deps.cashflowTransactionStore,
+				100*time.Millisecond,
+				log,
+			)
+			managedJobs = append(managedJobs, taggerJob)
+			log.Info(context.Background(), "agent auto-tagging background job enabled")
+		}
+	} else {
+		log.Info(context.Background(), "agent auto-tagging background job disabled by configuration")
+	}
+
+	managedJobs = append(managedJobs, bulkTagJob)
+
+	return jobs.NewManager(log, managedJobs...), importJob, bulkTagJob, dailyUploadJob
+}
+
+func setupRealtimeNotifications(log logging.Logger, b bus.Bus, hub *notify.Hub) error {
+	if b == nil || hub == nil {
+		return nil
+	}
+
+	reg := bus.NewRegistry(bus.JSONCodec{})
+	importTopic := api.ImportCompleted{}.MessageTopic()
+	if _, err := b.Subscribe(importTopic, bus.DecodeHandler(reg, notify.NewImportCompletedHandler(hub).Handle)); err != nil {
+		return fmt.Errorf("failed to subscribe realtime import completed handler: %w", err)
+	}
+
+	portfolioTopic := api.PortfolioRebuilt{}.MessageTopic()
+	if _, err := b.Subscribe(portfolioTopic, bus.DecodeHandler(reg, notify.NewPortfolioRebuiltHandler(hub).Handle)); err != nil {
+		return fmt.Errorf("failed to subscribe realtime portfolio rebuilt handler: %w", err)
+	}
+
+	bulkTagTopic := api.BulkTagCompleted{}.MessageTopic()
+	if _, err := b.Subscribe(bulkTagTopic, bus.DecodeHandler(reg, notify.NewBulkTagCompletedHandler(hub).Handle)); err != nil {
+		return fmt.Errorf("failed to subscribe realtime bulk tag completed handler: %w", err)
+	}
+	assetsSnapshotsTopic := api.AssetsSnapshotsRebuilt{}.MessageTopic()
+	if _, err := b.Subscribe(assetsSnapshotsTopic, bus.DecodeHandler(reg, notify.NewAssetsSnapshotsRebuiltHandler(hub).Handle)); err != nil {
+		return fmt.Errorf("failed to subscribe realtime assets snapshots rebuilt handler: %w", err)
+	}
+
+	log.Info(context.Background(), "registered realtime subscriptions", "topics", []string{importTopic, portfolioTopic, bulkTagTopic, assetsSnapshotsTopic})
+	return nil
 }
 
 func bootstrapData(ctx context.Context, deps *appDependencies, b bus.Bus, log logging.Logger, cfg *config.Config) {

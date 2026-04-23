@@ -13,7 +13,6 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/marketdata"
 	marketdataParsers "github.com/lennardclaproth/my-finances-tracker/internal/marketdata/parsers"
 	"github.com/lennardclaproth/my-finances-tracker/internal/observability"
-	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -211,147 +210,49 @@ func (j *DailyUploadJob) markDone(uploadID uuid.UUID) {
 }
 
 func (j *DailyUploadJob) processByID(ctx context.Context, uploadID uuid.UUID, headers map[string]string) (err error) {
-	ctx = observability.ContextWithPropagationHeaders(ctx, headers)
-	apmTx, txCtx, txErr := observability.StartTransactionFromHeaders(
-		ctx,
-		observability.JobOperation("daily_upload"),
-		"job",
-		headers,
+	parserFactory := func(source marketdata.Source) (marketdata.DailyUploadParser, error) {
+		parser, err := j.parserFactory(source)
+		if err != nil {
+			return nil, err
+		}
+		return dailyUploadParserAdapter{parser: parser}, nil
+	}
+	processor := marketdata.NewDailyUploadProcessor(
+		j.uploadStore,
+		j.listingStore,
+		j.dailyStore,
+		j.fileReader,
+		parserFactory,
+		j.log,
+		defaultDailyUploadErrMaxRows,
 	)
-	if txErr != nil {
-		j.log.Error(ctx, "failed to parse incoming trace headers for daily upload job", txErr, "upload_id", uploadID)
-	}
-	ctx = txCtx
-	apmTx.Result = "success"
-	apmTx.Outcome = "success"
-	observability.SetSafeTransactionLabels(apmTx, map[string]any{
-		"operation": observability.JobOperation("daily_upload"),
-		"component": "job",
-		"upload_id": uploadID.String(),
-		"stage":     "process",
-	})
-	defer func() {
-		if err != nil {
-			apmTx.Result = "error"
-			apmTx.Outcome = "failure"
-			apm.CaptureError(ctx, err).Send()
-		}
-		apmTx.End()
-	}()
-
-	upload, err := j.uploadStore.FetchByID(ctx, uploadID)
-	if err != nil {
-		if errors.Is(err, marketdata.ErrDailyUploadNotFound) {
-			return nil
-		}
-		return err
-	}
-
-	claimed, err := j.uploadStore.TryMarkProcessing(ctx, upload.ID)
-	if err != nil {
-		return err
-	}
-	if !claimed {
-		return nil
-	}
-	upload.MarkProcessing()
-
-	listing, err := j.listingStore.FetchByID(ctx, upload.ListingID)
-	if err != nil {
-		return j.markFailed(ctx, upload, fmt.Sprintf("failed to fetch listing: %v", err))
-	}
-	if listing == nil {
-		return j.markFailed(ctx, upload, "listing not found")
-	}
-
-	parser, err := j.parserFactory(listing.Source)
-	if err != nil {
-		return j.markFailed(ctx, upload, fmt.Sprintf("unsupported parser for source %s", listing.Source))
-	}
-
-	rc, err := j.fileReader.ReadCsv(upload.StoredFilename)
-	if err != nil {
-		return j.markFailed(ctx, upload, fmt.Sprintf("failed to open uploaded file: %v", err))
-	}
-
-	parseSpan, parseCtx := apm.StartSpan(ctx, "parse", "job")
-	parsed, err := parser.ParseAll(rc)
-	parseSpan.End()
-	if err != nil {
-		return j.markFailed(ctx, upload, fmt.Sprintf("failed parsing file: %v", err))
-	}
-
-	allErrors := make([]marketdata.DailyUploadRowError, 0, len(parsed.RowErrors))
-	allErrors = append(allErrors, parsed.RowErrors...)
-	insertedRows := 0
-	duplicateRows := 0
-
-	persistSpan, persistCtx := apm.StartSpan(parseCtx, "persist", "job")
-	defer persistSpan.End()
-
-	for _, row := range parsed.Rows {
-		daily, err := marketdata.NewDaily(
-			listing.Symbol,
-			row.Date,
-			row.Open,
-			row.Close,
-			row.High,
-			row.Low,
-			row.Volume,
-		)
-		if err != nil {
-			allErrors = append(allErrors, marketdata.DailyUploadRowError{
-				RowNumber: row.RowNumber,
-				Reason:    "invalid price payload",
-			})
-			continue
-		}
-		daily.ListingID = listing.ID
-		inserted, err := j.dailyStore.CreateWithInsertStatus(persistCtx, &daily)
-		if err != nil {
-			allErrors = append(allErrors, marketdata.DailyUploadRowError{
-				RowNumber: row.RowNumber,
-				Reason:    "failed to persist row",
-			})
-			continue
-		}
-		if inserted {
-			insertedRows++
-		} else {
-			duplicateRows++
-		}
-	}
-
-	statusMsg := ""
-	if len(allErrors) > 0 {
-		statusMsg = "completed with row errors"
-	}
-	if err := upload.MarkCompleted(parsed.TotalRows, insertedRows, duplicateRows, len(allErrors), allErrors, statusMsg); err != nil {
-		return err
-	}
-	if len(upload.RowErrors) > defaultDailyUploadErrMaxRows {
-		upload.RowErrors = upload.RowErrors[:defaultDailyUploadErrMaxRows]
-		if err := upload.SetRowErrors(upload.RowErrors, defaultDailyUploadErrMaxRows); err != nil {
-			return err
-		}
-	}
-	if err := j.uploadStore.UpdateState(persistCtx, upload); err != nil {
-		return err
-	}
-	return nil
+	return processor.ProcessByID(ctx, uploadID, headers)
 }
 
-func (j *DailyUploadJob) markFailed(ctx context.Context, upload *marketdata.DailyUpload, message string) error {
-	if upload == nil {
-		return nil
+type dailyUploadParserAdapter struct {
+	parser marketdataParsers.DailyParser
+}
+
+func (a dailyUploadParserAdapter) ParseAll(rc io.ReadCloser) (marketdata.DailyUploadParseResult, error) {
+	parsed, err := a.parser.ParseAll(rc)
+	if err != nil {
+		return marketdata.DailyUploadParseResult{}, err
 	}
-	upload.StatusMessage = message
-	if err := upload.MarkFailed(message); err != nil {
-		return err
+	rows := make([]marketdata.DailyUploadParsedRow, 0, len(parsed.Rows))
+	for _, row := range parsed.Rows {
+		rows = append(rows, marketdata.DailyUploadParsedRow{
+			RowNumber: row.RowNumber,
+			Date:      row.Date,
+			Open:      row.Open,
+			High:      row.High,
+			Low:       row.Low,
+			Close:     row.Close,
+			Volume:    row.Volume,
+		})
 	}
-	if err := j.uploadStore.UpdateState(ctx, upload); err != nil {
-		j.log.Error(ctx, "failed to mark daily upload as failed", err, "upload_id", upload.ID)
-		return err
-	}
-	return nil
+	return marketdata.DailyUploadParseResult{
+		Rows:      rows,
+		RowErrors: parsed.RowErrors,
+		TotalRows: parsed.TotalRows,
+	}, nil
 }

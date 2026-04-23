@@ -1,4 +1,4 @@
-.PHONY: help build run test test-coverage clean fmt vet lint swagger dev install-tools env migrate-up migrate-down migrate-status migrate-create
+.PHONY: help build run test test-coverage clean fmt vet lint web-lint swagger dev install-tools env migrate-up migrate-down migrate-status migrate-create
 
 # --- OS detection ---
 ifeq ($(OS),Windows_NT)
@@ -17,6 +17,8 @@ endif
 
 BINARY_PATH := ./apps/api/bin/$(BINARY_NAME)$(EXE)
 MAIN_PATH := ./apps/api/cmd/server/main.go
+API_DIR := ./apps/api
+WEB_DIR := ./apps/web
 COVERAGE_FILE := coverage.out
 MIGRATION_DIR := ./apps/api/migrations/postgres
 
@@ -48,6 +50,7 @@ help:
 	@echo "  make fmt              - Format code with go fmt"
 	@echo "  make vet              - Run go vet"
 	@echo "  make lint             - Run golangci-lint (requires golangci-lint)"
+	@echo "  make web-lint         - Run ESLint for the web app"
 	@echo "  make swagger          - Generate Swagger documentation"
 	@echo "  make clean            - Remove binary and coverage files"
 	@echo "  make env              - Copy config.example.env to .env if not exists"
@@ -77,12 +80,12 @@ dev: env
 ## test: Run all tests
 test:
 	@echo "Running tests..."
-	@go test -v ./...
+	@go test -v $(API_DIR)/...
 
 ## test-coverage: Run tests with coverage
 test-coverage:
 	@echo "Running tests with coverage..."
-	@go test -v -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic ./...
+	@go test -v -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic $(API_DIR)/...
 	@echo "Coverage report:"
 	@go tool cover -func=$(COVERAGE_FILE)
 	@echo ""
@@ -91,17 +94,22 @@ test-coverage:
 ## fmt: Format code
 fmt:
 	@echo "Formatting code..."
-	@go fmt ./...
+	@cd $(API_DIR) && go fmt ./...
 
 ## vet: Run go vet
 vet:
 	@echo "Running go vet..."
-	@go vet ./...
+	@cd $(API_DIR) && go vet ./...
 
 ## lint: Run golangci-lint
 lint: fmt vet
 	@echo "Running golangci-lint..."
-	@golangci-lint run ./...
+	@cd $(API_DIR) && golangci-lint run ./...
+
+## web-lint: Run web linting with ESLint
+web-lint:
+	@echo "Running web lint..."
+	@cd $(WEB_DIR) && npm run lint
 
 ## swagger: Generate Swagger documentation
 swagger:

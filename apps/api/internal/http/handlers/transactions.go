@@ -2,19 +2,24 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/lennardclaproth/my-finances-tracker/api"
+	"github.com/lennardclaproth/my-finances-tracker/internal/cashflow"
+	cashflowservice "github.com/lennardclaproth/my-finances-tracker/internal/cashflow/service"
 	httpx "github.com/lennardclaproth/my-finances-tracker/internal/http"
 	"github.com/lennardclaproth/my-finances-tracker/internal/jobs"
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
 	"github.com/lennardclaproth/my-finances-tracker/internal/storage"
 )
 
-const bulkTagAsyncCutoff = 1000
+type manualCashflowTransactionCreator interface {
+	CreateMany(ctx context.Context, input cashflowservice.ManualCashflowCreateInput) (*cashflowservice.ManualCashflowCreateResult, error)
+}
 
 // GetCashflowTransactions searches and filters cashflow transactions.
 //
@@ -248,6 +253,105 @@ func GetCashflowTagDistribution(log logging.Logger, store *storage.SQLXBankTrans
 	return httpx.Endpoint(decodeFn, log, endpoint)
 }
 
+// CreateManualCashflowTransactions creates manual cashflow transactions in bulk.
+//
+// @Summary     Create manual cashflow transactions
+// @Description Creates one or more manual cashflow transactions for an account.
+// @Tags        Transactions
+// @Accept      application/json
+// @Produce     application/json
+// @Param       payload body     api.CreateManualCashflowTransactionsRequest true "Manual cashflow transactions payload"
+// @Success     201 {object} api.ManualCashflowTransactionsResponse
+// @Failure     400 {object} map[string]string "Bad request"
+// @Failure     404 {object} map[string]string "Not found"
+// @Failure     409 {object} map[string]string "Conflict"
+// @Failure     500 {object} map[string]string "Internal server error"
+// @Router      /cashflow/transactions/manual [post]
+func CreateManualCashflowTransactions(
+	log logging.Logger,
+	svc manualCashflowTransactionCreator,
+) http.Handler {
+	endpoint := func(ctx context.Context, req api.CreateManualCashflowTransactionsRequest) (status int, res any, err error) {
+		result, err := svc.CreateMany(ctx, cashflowservice.ManualCashflowCreateInput{
+			AccountID: req.AccountID,
+			Transactions: toManualCashflowCreateTransactions(
+				req.Transactions,
+			),
+		})
+		if err != nil {
+			switch {
+			case errors.Is(err, cashflowservice.ErrManualCashflowAccountNotFound):
+				return http.StatusNotFound, map[string]string{"account_id": err.Error()}, nil
+			case errors.Is(err, cashflowservice.ErrManualCashflowTransactionsRequired),
+				errors.Is(err, cashflowservice.ErrManualCashflowTransactionLimitExceeded),
+				errors.Is(err, cashflowservice.ErrManualCashflowInvalidDate),
+				errors.Is(err, cashflowservice.ErrManualCashflowInvalidType),
+				errors.Is(err, cashflowservice.ErrManualCashflowInvalidAmount),
+				errors.Is(err, cashflowservice.ErrManualCashflowDescriptionRequired),
+				errors.Is(err, cashflowservice.ErrManualCashflowNoteRequired),
+				errors.Is(err, cashflowservice.ErrManualCashflowTagRequired):
+				return http.StatusBadRequest, map[string]string{"transaction": err.Error()}, nil
+			case errors.Is(err, cashflow.ErrDuplicateTransaction):
+				return http.StatusConflict, map[string]string{"transaction": "duplicate transaction"}, nil
+			default:
+				return http.StatusInternalServerError, struct{}{}, err
+			}
+		}
+		if result == nil {
+			return http.StatusInternalServerError, struct{}{}, fmt.Errorf("manual cashflow create: empty result")
+		}
+
+		data := make([]api.Transaction, 0, len(result.Transactions))
+		for _, tx := range result.Transactions {
+			data = append(data, api.Transaction{
+				ID:          tx.ID,
+				Description: tx.Description,
+				Note:        tx.Note,
+				Source:      tx.Source,
+				AmountCents: int64(tx.AmountCents),
+				Direction:   string(tx.Direction),
+				Date:        tx.Date,
+				Tag:         tx.Tag,
+				Ignored:     tx.Ignored,
+			})
+		}
+
+		return http.StatusCreated, api.ManualCashflowTransactionsResponse{
+			CreatedCount: len(data),
+			Data:         data,
+		}, nil
+	}
+
+	decodeFn := httpx.DecoderFunc[api.CreateManualCashflowTransactionsRequest](func(r *http.Request) (api.CreateManualCashflowTransactionsRequest, error) {
+		var req api.CreateManualCashflowTransactionsRequest
+		res, err := httpx.DecodeJSON[api.CreateManualCashflowTransactionsRequest](r)
+		if err != nil {
+			return req, fmt.Errorf("CreateManualCashflowTransactions failed to decode request: %w", err)
+		}
+		return res, nil
+	})
+
+	return httpx.Endpoint(decodeFn, log, endpoint)
+}
+
+func toManualCashflowCreateTransactions(
+	transactions []api.CreateManualCashflowTransactionEntryRequest,
+) []cashflowservice.ManualCashflowCreateTransactionInput {
+	out := make([]cashflowservice.ManualCashflowCreateTransactionInput, 0, len(transactions))
+	for _, tx := range transactions {
+		out = append(out, cashflowservice.ManualCashflowCreateTransactionInput{
+			Date:        tx.Date,
+			Amount:      tx.Amount,
+			Type:        tx.Type,
+			Description: tx.Description,
+			Note:        tx.Note,
+			Tag:         tx.Tag,
+			Vendor:      tx.Vendor,
+		})
+	}
+	return out
+}
+
 // TagTransaction applies a tag to an existing transaction.
 //
 // @Summary     Tag a transaction
@@ -322,40 +426,49 @@ func TagTransactionsByFilter(
 	tagger *storage.SQLXBankTransactionStore,
 	enqueuer jobs.BulkTagEnqueuer,
 ) http.HandlerFunc {
+	svc := cashflowservice.NewBulkTagService(tagger, enqueuer, cashflowservice.DefaultBulkTagAsyncCutoff)
 	endpoint := func(ctx context.Context, req api.TagTransactionsByFilterRequest) (status int, res any, err error) {
-		query, parseErr := buildCashflowTagQuery(req.Filters)
-		if parseErr != nil {
-			return http.StatusBadRequest, map[string]string{"filters": parseErr.Error()}, nil
-		}
-
-		total, err := tagger.CountByQuery(ctx, query)
+		result, err := svc.TagByFilter(ctx, cashflowservice.BulkTagRequest{
+			Tag:       req.Tag,
+			AccountID: req.AccountID,
+			Filters:   toBulkTagFilters(req.Filters),
+		})
 		if err != nil {
+			if errors.Is(err, cashflowservice.ErrBulkTagFiltersInvalid) {
+				return http.StatusBadRequest, map[string]string{"filters": err.Error()}, nil
+			}
 			return http.StatusInternalServerError, struct{}{}, err
 		}
-
-		if total > bulkTagAsyncCutoff && enqueuer != nil {
-			if err := enqueuer.EnqueueFilter(ctx, query, req.Tag); err != nil {
-				return http.StatusInternalServerError, struct{}{}, err
-			}
+		if result.Mode == cashflowservice.TagByFilterModeAsync {
 			return http.StatusAccepted, api.TagTransactionsResponse{
 				UpdatedCount: 0,
-				Status:       fmt.Sprintf("scheduled background bulk tag job for %d transactions", total),
+				Status:       fmt.Sprintf("scheduled background bulk tag job for %d transactions", result.TotalMatched),
 			}, nil
 		}
-
-		updated, err := tagger.UpdateTagByQuery(ctx, query, req.Tag)
-		if err != nil {
-			return http.StatusInternalServerError, struct{}{}, err
-		}
 		return http.StatusOK, api.TagTransactionsResponse{
-			UpdatedCount: updated,
-			Status:       fmt.Sprintf("updated %d filtered transactions", updated),
+			UpdatedCount: result.UpdatedCount,
+			Status:       fmt.Sprintf("updated %d filtered transactions", result.UpdatedCount),
 		}, nil
 	}
 	decoderFn := httpx.DecoderFunc[api.TagTransactionsByFilterRequest](func(r *http.Request) (api.TagTransactionsByFilterRequest, error) {
 		return httpx.DecodeJSON[api.TagTransactionsByFilterRequest](r)
 	})
 	return httpx.Endpoint(decoderFn, log, endpoint)
+}
+
+func toBulkTagFilters(filters api.CashflowTagFilters) cashflowservice.BulkTagFilters {
+	return cashflowservice.BulkTagFilters{
+		Q:           filters.Q,
+		Description: filters.Description,
+		Note:        filters.Note,
+		Source:      filters.Source,
+		Direction:   filters.Direction,
+		Tags:        filters.Tags,
+		Untagged:    filters.Untagged,
+		HideIgnored: filters.HideIgnored,
+		From:        filters.From,
+		To:          filters.To,
+	}
 }
 
 // IgnoreTransactionsBySelection sets the ignored status for selected transaction IDs.
@@ -405,7 +518,7 @@ func IgnoreTransactionsBySelection(log logging.Logger, store *storage.SQLXBankTr
 // @Tags        Transactions
 func IgnoreTransactionsByFilter(log logging.Logger, store *storage.SQLXBankTransactionStore) http.HandlerFunc {
 	endpoint := func(ctx context.Context, req api.IgnoreTransactionsByFilterRequest) (status int, res any, err error) {
-		query, parseErr := buildCashflowTagQuery(req.Filters)
+		query, parseErr := cashflowservice.BuildBulkTagQuery(toBulkTagFilters(req.Filters))
 		if parseErr != nil {
 			return http.StatusBadRequest, map[string]string{"filters": parseErr.Error()}, nil
 		}
@@ -456,48 +569,6 @@ func splitTags(tags string) []string {
 		out = append(out, tag)
 	}
 	return out
-}
-
-func buildCashflowTagQuery(filters api.CashflowTagFilters) (storage.CashflowTransactionQuery, error) {
-	var query storage.CashflowTransactionQuery
-	query.Q = filters.Q
-	query.Description = filters.Description
-	query.Note = filters.Note
-	query.Source = filters.Source
-	normalizedDirection, err := normalizeDirectionFilter(filters.Direction)
-	if err != nil {
-		return storage.CashflowTransactionQuery{}, err
-	}
-	query.Direction = normalizedDirection
-	query.Tags = splitTags(filters.Tags)
-	if filters.Untagged != nil {
-		query.Untagged = *filters.Untagged
-	}
-	if filters.HideIgnored != nil {
-		query.HideIgnored = *filters.HideIgnored
-	}
-
-	if filters.From != "" {
-		from, err := time.Parse("2006-01-02", filters.From)
-		if err != nil {
-			return storage.CashflowTransactionQuery{}, fmt.Errorf("from must be in YYYY-MM-DD format")
-		}
-		query.From = &from
-	}
-
-	if filters.To != "" {
-		to, err := time.Parse("2006-01-02", filters.To)
-		if err != nil {
-			return storage.CashflowTransactionQuery{}, fmt.Errorf("to must be in YYYY-MM-DD format")
-		}
-		query.To = &to
-	}
-
-	if query.From != nil && query.To != nil && query.From.After(*query.To) {
-		return storage.CashflowTransactionQuery{}, fmt.Errorf("from must be before or equal to to")
-	}
-
-	return query, nil
 }
 
 func normalizeDirectionFilter(raw string) (string, error) {

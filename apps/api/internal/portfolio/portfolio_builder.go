@@ -2,6 +2,7 @@ package portfolio
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -47,7 +48,7 @@ func NewPortfolioBuilder(psb PositionBuilder, psf PositionFetcher, txs CashFlowT
 }
 
 // Build builds the portfolio based on the transactions.
-func (s *PortfolioBuilder) Build(ctx context.Context, accID uuid.UUID) error {
+func (s *PortfolioBuilder) Build(ctx context.Context, accID uuid.UUID) (err error) {
 	// Acquire lock on account
 	acquired, err := s.as.TryAcquireBuildLock(ctx, accID)
 	if err != nil {
@@ -65,8 +66,13 @@ func (s *PortfolioBuilder) Build(ctx context.Context, accID uuid.UUID) error {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		if err := s.as.ReleaseBuildLock(cleanupCtx, accID); err != nil {
-			// s.log.Error(cleanupCtx, "syncDailyData failed to release sync lock: %w", err)
+		if releaseErr := s.as.ReleaseBuildLock(cleanupCtx, accID); releaseErr != nil {
+			wrapped := fmt.Errorf("portfolio build failed to release build lock: %w", releaseErr)
+			if err == nil {
+				err = wrapped
+			} else {
+				err = errors.Join(err, wrapped)
+			}
 		}
 	}()
 	// Build the positions

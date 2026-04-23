@@ -4,9 +4,11 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 
+	"github.com/gorilla/websocket"
 	"github.com/lennardclaproth/my-finances-tracker/internal/observability"
 	"go.elastic.co/apm/v2"
 )
@@ -16,7 +18,19 @@ type captureLogger struct {
 	fields []any
 }
 
+func (l *captureLogger) Debug(_ context.Context, _ string, fields ...any) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.fields = append([]any{}, fields...)
+}
+
 func (l *captureLogger) Info(_ context.Context, _ string, fields ...any) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.fields = append([]any{}, fields...)
+}
+
+func (l *captureLogger) Warn(_ context.Context, _ string, fields ...any) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.fields = append([]any{}, fields...)
@@ -40,6 +54,22 @@ func (l *captureLogger) asMap() map[string]any {
 		out[key] = l.fields[i+1]
 	}
 	return out
+}
+
+func (l *captureLogger) keyCount(key string) int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	count := 0
+	for i := 0; i+1 < len(l.fields); i += 2 {
+		k, ok := l.fields[i].(string)
+		if !ok {
+			continue
+		}
+		if k == key {
+			count++
+		}
+	}
+	return count
 }
 
 func TestWithRequestIdentifiers_GeneratesAndEchoesHeaders(t *testing.T) {
@@ -126,5 +156,60 @@ func TestWithRequestLogging_IncludesTraceAndCorrelationFields(t *testing.T) {
 	}
 	if got := fields["operation"]; got != "http.get.portfolio" {
 		t.Fatalf("expected operation http.get.portfolio, got %#v", got)
+	}
+	if got := logger.keyCount("request_id"); got != 1 {
+		t.Fatalf("expected request_id to appear exactly once, got %d", got)
+	}
+	if got := logger.keyCount("correlation_id"); got != 1 {
+		t.Fatalf("expected correlation_id to appear exactly once, got %d", got)
+	}
+	if got := logger.keyCount("trace.id"); got != 1 {
+		t.Fatalf("expected trace.id to appear exactly once, got %d", got)
+	}
+	if got := logger.keyCount("transaction.id"); got != 1 {
+		t.Fatalf("expected transaction.id to appear exactly once, got %d", got)
+	}
+}
+
+func TestWithRequestLogging_PreservesHijackerForWebsocketUpgrade(t *testing.T) {
+	t.Parallel()
+
+	logger := &captureLogger{}
+	upgrader := websocket.Upgrader{
+		CheckOrigin: func(_ *http.Request) bool { return true },
+	}
+	upgradeErr := make(chan error, 1)
+
+	handler := WithRequestLogging(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			upgradeErr <- err
+			return
+		}
+		if closeErr := conn.Close(); closeErr != nil {
+			upgradeErr <- closeErr
+			return
+		}
+		upgradeErr <- nil
+	}))
+
+	server := httptest.NewServer(WithRequestIdentifiers()(handler))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	conn, resp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		status := 0
+		if resp != nil {
+			status = resp.StatusCode
+		}
+		t.Fatalf("websocket dial failed (status=%d): %v", status, err)
+	}
+	if closeErr := conn.Close(); closeErr != nil {
+		t.Fatalf("failed closing websocket client connection: %v", closeErr)
+	}
+
+	if err := <-upgradeErr; err != nil {
+		t.Fatalf("expected websocket upgrade to succeed through middleware wrapper: %v", err)
 	}
 }

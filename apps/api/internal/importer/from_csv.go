@@ -2,6 +2,7 @@ package importer
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/google/uuid"
@@ -10,18 +11,22 @@ import (
 
 // Single-use interfaces only used by FromCsvHandler
 
+// ImportFileWriter persists uploaded CSV payloads and returns the stored path.
 type ImportFileWriter interface {
 	WriteCsv(r io.Reader) (string, error)
 }
 
+// FileRemover removes a previously persisted file path.
 type FileRemover interface {
 	Remove(path string) error
 }
 
+// VendorFetcher loads vendors by ID for import validation.
 type VendorFetcher interface {
 	FetchById(ctx context.Context, id uuid.UUID) (*vendor.Vendor, error)
 }
 
+// FromCsvHandler validates import metadata, persists the uploaded file, and creates an import job record.
 type FromCsvHandler struct {
 	ic  ImportCreator
 	ifw ImportFileWriter
@@ -30,6 +35,7 @@ type FromCsvHandler struct {
 	af  AccountFetcher
 }
 
+// NewFromCsvHandler creates a CSV import handler with injected dependencies.
 func NewFromCsvHandler(ic ImportCreator, ifw ImportFileWriter, fr FileRemover, vf VendorFetcher, af AccountFetcher) *FromCsvHandler {
 	return &FromCsvHandler{
 		ic:  ic,
@@ -64,8 +70,10 @@ func (h *FromCsvHandler) Handle(ctx context.Context, r io.Reader, vendorID, acco
 	// Create import via ImportCreator
 	imp := NewImport(*v, path, accountID)
 	if err := h.ic.Create(ctx, imp); err != nil {
-		_ = h.fr.Remove(path) // best effort cleanup
-		return uuid.Nil, err  // return original error
+		if removeErr := h.fr.Remove(path); removeErr != nil {
+			return uuid.Nil, fmt.Errorf("%w (cleanup failed removing %s: %v)", err, path, removeErr)
+		}
+		return uuid.Nil, err
 	}
 	return imp.ID, nil
 }

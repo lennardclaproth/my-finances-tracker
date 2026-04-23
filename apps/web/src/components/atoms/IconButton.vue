@@ -29,13 +29,13 @@ const classes = computed(() => {
   const base =
     "inline-flex items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
   const sizeClass =
-    props.size === "fab" ? "h-14 w-14 shadow-lg" : props.size === "sm" ? "h-8 w-8" : "h-9 w-9";
+    props.size === "fab" ? "h-14 w-14 shadow-md" : props.size === "sm" ? "h-8 w-8" : "h-9 w-9";
 
   const toneMap: Record<Tone, string> = {
-    neutral: "border-slate-200 bg-white text-slate-600 hover:bg-slate-100 focus-visible:ring-slate-400",
-    primary: "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 focus-visible:ring-indigo-500",
-    warning: "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 focus-visible:ring-amber-500",
-    info: "border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 focus-visible:ring-cyan-500",
+    neutral: "border-slate-300 bg-white text-slate-600 hover:bg-slate-100 focus-visible:ring-slate-300",
+    primary: "border-blue-300 bg-blue-100 text-blue-800 hover:bg-blue-200 focus-visible:ring-blue-300",
+    warning: "border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-200 focus-visible:ring-amber-300",
+    info: "border-cyan-300 bg-cyan-100 text-cyan-800 hover:bg-cyan-200 focus-visible:ring-cyan-300",
   };
 
   return `${base} ${sizeClass} ${toneMap[props.tone]}`;

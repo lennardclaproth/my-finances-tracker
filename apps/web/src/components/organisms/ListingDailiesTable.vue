@@ -104,11 +104,13 @@ function onLimitChange(rawValue: string): void {
             </tr>
           </thead>
           <tbody>
-            <tr v-if="loading" v-for="index in skeletonRows" :key="`skeleton-${index}`">
-              <td v-for="cell in 6" :key="`skeleton-${index}-${cell}`" class="border-b border-slate-100 px-3 py-3">
-                <div class="h-4 w-full animate-pulse rounded bg-slate-200" />
-              </td>
-            </tr>
+            <template v-if="loading">
+              <tr v-for="index in skeletonRows" :key="`skeleton-${index}`">
+                <td v-for="cell in 6" :key="`skeleton-${index}-${cell}`" class="border-b border-slate-100 px-3 py-3">
+                  <div class="h-4 w-full animate-pulse rounded bg-slate-200" />
+                </td>
+              </tr>
+            </template>
 
             <tr v-else-if="errorMessage">
               <td colspan="6" class="px-3 py-10 text-center">
@@ -123,14 +125,16 @@ function onLimitChange(rawValue: string): void {
               </td>
             </tr>
 
-            <tr v-for="row in rows" v-else :key="row.id" class="hover:bg-slate-50">
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatDate(row.date) }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatPrice(row.open) }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatPrice(row.high) }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatPrice(row.low) }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm font-medium text-slate-900">{{ formatPrice(row.close) }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ row.volume.toLocaleString("en-US") }}</td>
-            </tr>
+            <template v-else>
+              <tr v-for="row in rows" :key="row.id" class="hover:bg-slate-50">
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatDate(row.date) }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatPrice(row.open) }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatPrice(row.high) }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatPrice(row.low) }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm font-medium text-slate-900">{{ formatPrice(row.close) }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ row.volume.toLocaleString("en-US") }}</td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>

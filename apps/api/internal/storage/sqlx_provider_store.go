@@ -10,11 +10,13 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/marketdata"
 )
 
+// SQLXProviderStore persists and queries market-data providers.
 type SQLXProviderStore struct {
 	db        *DB
 	tableName string
 }
 
+// NewSQLXProviderStore creates a provider store backed by SQLX.
 func NewSQLXProviderStore(db *DB) *SQLXProviderStore {
 	return &SQLXProviderStore{
 		db:        db,
@@ -22,6 +24,7 @@ func NewSQLXProviderStore(db *DB) *SQLXProviderStore {
 	}
 }
 
+// Create inserts the provider unless an equivalent row already exists.
 func (s *SQLXProviderStore) Create(ctx context.Context, provider *marketdata.Provider) error {
 	if err := provider.Validate(); err != nil {
 		return err
@@ -65,6 +68,7 @@ func (s *SQLXProviderStore) Create(ctx context.Context, provider *marketdata.Pro
 	return err
 }
 
+// getExisting checks whether an equivalent provider row already exists.
 func (s *SQLXProviderStore) getExisting(ctx context.Context, provider *marketdata.Provider) (bool, error) {
 	if provider == nil {
 		return false, nil
@@ -89,6 +93,7 @@ func (s *SQLXProviderStore) getExisting(ctx context.Context, provider *marketdat
 	return count > 0, nil
 }
 
+// GetByName returns the best provider candidate for the given provider name.
 func (s *SQLXProviderStore) GetByName(ctx context.Context, name marketdata.ProviderName) (*marketdata.Provider, error) {
 	var provider marketdata.Provider
 	query := s.db.Rebind(fmt.Sprintf(`
@@ -117,6 +122,7 @@ func (s *SQLXProviderStore) GetByName(ctx context.Context, name marketdata.Provi
 	return &provider, nil
 }
 
+// UpdateAPIKey rotates the least-used API provider key for the given provider name.
 func (s *SQLXProviderStore) UpdateAPIKey(ctx context.Context, name marketdata.ProviderName, newAPIKey string) error {
 	query := s.db.Rebind(fmt.Sprintf(`
 		UPDATE %s
@@ -146,6 +152,7 @@ func (s *SQLXProviderStore) UpdateAPIKey(ctx context.Context, name marketdata.Pr
 	return nil
 }
 
+// DeductTokens updates provider quota counters after API usage.
 func (s *SQLXProviderStore) DeductTokens(ctx context.Context, name marketdata.ProviderName, count int32) error {
 	if count <= 0 {
 		return nil

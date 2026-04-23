@@ -11,6 +11,15 @@ import (
 )
 
 // GetVendors lists active vendors for import selection.
+//
+// @Summary List vendors
+// @Description Lists active vendors for imports.
+// @Tags vendors
+// @Accept json
+// @Produce json
+// @Success 200 {array} api.VendorResponse
+// @Failure 500 {object} map[string]string
+// @Router /vendors [get]
 func GetVendors(
 	log logging.Logger,
 	lister vendor.ActiveVendorLister,

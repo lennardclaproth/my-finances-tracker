@@ -22,7 +22,7 @@ import (
 // @Produce json
 // @Param file formData file true "CSV file containing transaction data"
 // @Param vendor_id formData string true "UUID of the vendor to import transactions for"
-// @Param account_id formData string false "UUID of the account (required for brokerage vendors)"
+// @Param account_id formData string true "UUID of the account"
 // @Success 200 {object} uuid.UUID "Import ID of the created import job"
 // @Failure 400 {object} map[string]string "Invalid request (missing file, invalid vendor_id, etc.)"
 // @Failure 413 {object} map[string]string "File too large (max 20MB)"
@@ -39,7 +39,11 @@ func ImportCsv(
 ) http.Handler {
 	// Setup the endpoint closure function.
 	endpoint := func(ctx context.Context, req api.ImportCsv) (status int, res any, err error) {
-		defer req.File.Close()
+		defer func() {
+			if closeErr := req.File.Close(); closeErr != nil {
+				log.Warn(ctx, "failed closing import file", "error", closeErr.Error())
+			}
+		}()
 		handler := importer.NewFromCsvHandler(ic, dw, dw, vf, af)
 		res, err = handler.Handle(ctx, req.File, req.VendorID, req.AccountID)
 		if err != nil {
@@ -61,7 +65,7 @@ func ImportCsv(
 		if iq != nil {
 			if err := iq.Enqueue(ctx, importID); err != nil {
 				// Import is already persisted; queue reconciliation will retry pending imports.
-				log.Info(ctx, "import persisted but enqueue failed", "import_id", importID, "error", err.Error())
+				log.Warn(ctx, "import persisted but enqueue failed", "import_id", importID, "error", err.Error())
 			}
 		}
 		return http.StatusOK, importID, nil

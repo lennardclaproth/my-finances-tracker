@@ -1,5 +1,7 @@
 import type {
   CashflowAnalyticsQuery,
+  CreateManualCashflowTransactionInput,
+  CreateManualCashflowTransactionsResponse,
   CashflowMonthlyAnalyticsResponse,
   CashflowTagFilters,
   CashflowTagDistributionResponse,
@@ -93,10 +95,15 @@ export async function tagTransactionsBySelection(
 export async function tagTransactionsByFilter(
   filters: CashflowTagFilters,
   tag: string,
+  accountId?: string,
 ): Promise<TagTransactionsResponse> {
   return requestJson<TagTransactionsResponse>("/cashflow/transactions/tag/filter", {
     method: "POST",
-    body: JSON.stringify({ filters, tag }),
+    body: JSON.stringify({
+      filters,
+      tag,
+      ...(accountId ? { account_id: accountId } : {}),
+    }),
   });
 }
 
@@ -117,5 +124,18 @@ export async function ignoreTransactionsByFilter(
   return requestJson<TagTransactionsResponse>("/cashflow/transactions/ignore/filter", {
     method: "POST",
     body: JSON.stringify({ filters, ignored }),
+  });
+}
+
+export async function createManualCashflowTransactions(
+  accountId: string,
+  transactions: CreateManualCashflowTransactionInput[],
+): Promise<CreateManualCashflowTransactionsResponse> {
+  return requestJson<CreateManualCashflowTransactionsResponse>("/cashflow/transactions/manual", {
+    method: "POST",
+    body: JSON.stringify({
+      account_id: accountId,
+      transactions,
+    }),
   });
 }

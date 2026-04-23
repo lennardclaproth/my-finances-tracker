@@ -182,11 +182,13 @@ const rootClasses = computed(() => {
           </thead>
 
           <tbody>
-            <tr v-if="loading" v-for="index in skeletonRows" :key="`skeleton-${index}`">
-              <td v-for="cell in 9" :key="`skeleton-${index}-${cell}`" class="border-b border-slate-100 px-3 py-3">
-                <div class="h-4 w-full animate-pulse rounded bg-slate-200" />
-              </td>
-            </tr>
+            <template v-if="loading">
+              <tr v-for="index in skeletonRows" :key="`skeleton-${index}`">
+                <td v-for="cell in 9" :key="`skeleton-${index}-${cell}`" class="border-b border-slate-100 px-3 py-3">
+                  <div class="h-4 w-full animate-pulse rounded bg-slate-200" />
+                </td>
+              </tr>
+            </template>
 
             <tr v-else-if="errorMessage">
               <td colspan="9" class="px-3 py-10 text-center">
@@ -201,19 +203,21 @@ const rootClasses = computed(() => {
               </td>
             </tr>
 
-            <tr v-for="row in rows" v-else :key="row.id" class="hover:bg-slate-50">
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatDate(row.occurredAt) }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ row.type }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">
-                <StatusBadge :tone="row.origin === 'MANUAL' ? 'info' : 'neutral'">{{ row.origin }}</StatusBadge>
-              </td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ row.source }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ listingLabel(row) }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm font-medium text-slate-900">{{ formatMoney(row.amount) }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatDecimal(row.quantity) }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatMoney(row.unitPrice) }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ row.description || "-" }}</td>
-            </tr>
+            <template v-else>
+              <tr v-for="row in rows" :key="row.id" class="hover:bg-slate-50">
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatDate(row.occurredAt) }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ row.type }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">
+                  <StatusBadge :tone="row.origin === 'MANUAL' ? 'info' : 'neutral'">{{ row.origin }}</StatusBadge>
+                </td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ row.source }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ listingLabel(row) }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm font-medium text-slate-900">{{ formatMoney(row.amount) }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatDecimal(row.quantity) }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatMoney(row.unitPrice) }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ row.description || "-" }}</td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>

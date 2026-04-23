@@ -156,11 +156,17 @@ func (c *MarketStackClient) fetchEODPage(ctx context.Context, symbols []string, 
 	if err != nil {
 		return marketstackEODResponse{}, fmt.Errorf("fetchEODPage failed to execute request: %w", err)
 	}
-	defer res.Body.Close()
 
 	bodyBytes, err := io.ReadAll(res.Body)
+	closeErr := res.Body.Close()
 	if err != nil {
+		if closeErr != nil {
+			return marketstackEODResponse{}, fmt.Errorf("fetchEODPage failed to read response body: %w (close failed: %v)", err, closeErr)
+		}
 		return marketstackEODResponse{}, fmt.Errorf("fetchEODPage failed to read response body: %w", err)
+	}
+	if closeErr != nil {
+		return marketstackEODResponse{}, fmt.Errorf("fetchEODPage failed to close response body: %w", closeErr)
 	}
 
 	if res.StatusCode >= 300 {

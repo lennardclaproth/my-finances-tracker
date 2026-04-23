@@ -229,7 +229,11 @@ func (f *fakeEODClient) GetEOD(ctx context.Context, symbols []string, from, to *
 
 type fakeLogger struct{}
 
+func (l *fakeLogger) Debug(ctx context.Context, msg string, fields ...any) {}
+
 func (l *fakeLogger) Info(ctx context.Context, msg string, fields ...any) {}
+
+func (l *fakeLogger) Warn(ctx context.Context, msg string, fields ...any) {}
 
 func (l *fakeLogger) Error(ctx context.Context, msg string, err error, fields ...any) {}
 

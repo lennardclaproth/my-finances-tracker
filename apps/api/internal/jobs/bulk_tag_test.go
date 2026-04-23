@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
 	"github.com/lennardclaproth/my-finances-tracker/internal/storage"
 )
@@ -33,7 +34,7 @@ func (s *fakeBulkTagStore) callCount() int {
 func TestNewBulkTagJob_BoundsWorkerPool(t *testing.T) {
 	t.Parallel()
 
-	job := NewBulkTagJob(&fakeBulkTagStore{}, logging.NewSlogLogger(slog.LevelError), 10, 32)
+	job := NewBulkTagJob(&fakeBulkTagStore{}, logging.NewSlogLogger(slog.LevelError), 10, 32, nil)
 	if got := job.WorkerCount(); got != maxBulkTagWorkers {
 		t.Fatalf("expected worker count %d, got %d", maxBulkTagWorkers, got)
 	}
@@ -45,12 +46,13 @@ func TestNewBulkTagJob_BoundsWorkerPool(t *testing.T) {
 func TestBulkTagJob_EnqueueFilter_QueueFull(t *testing.T) {
 	t.Parallel()
 
-	job := NewBulkTagJob(&fakeBulkTagStore{}, logging.NewSlogLogger(slog.LevelError), 1, 1)
+	job := NewBulkTagJob(&fakeBulkTagStore{}, logging.NewSlogLogger(slog.LevelError), 1, 1, nil)
 	ctx := context.Background()
-	if err := job.EnqueueFilter(ctx, storage.CashflowTransactionQuery{}, "food"); err != nil {
+	accountID := uuid.New()
+	if err := job.EnqueueFilter(ctx, accountID, storage.CashflowTransactionQuery{}, "food"); err != nil {
 		t.Fatalf("unexpected first enqueue error: %v", err)
 	}
-	if err := job.EnqueueFilter(ctx, storage.CashflowTransactionQuery{}, "travel"); err == nil {
+	if err := job.EnqueueFilter(ctx, accountID, storage.CashflowTransactionQuery{}, "travel"); err == nil {
 		t.Fatalf("expected queue full error")
 	}
 }
@@ -59,11 +61,11 @@ func TestBulkTagJob_Start_ProcessesQueuedWork(t *testing.T) {
 	t.Parallel()
 
 	store := &fakeBulkTagStore{updated: 3}
-	job := NewBulkTagJob(store, logging.NewSlogLogger(slog.LevelError), 1, 4)
+	job := NewBulkTagJob(store, logging.NewSlogLogger(slog.LevelError), 1, 4, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	if err := job.EnqueueFilter(context.Background(), storage.CashflowTransactionQuery{}, "food"); err != nil {
+	if err := job.EnqueueFilter(context.Background(), uuid.New(), storage.CashflowTransactionQuery{}, "food"); err != nil {
 		t.Fatalf("enqueue failed: %v", err)
 	}
 

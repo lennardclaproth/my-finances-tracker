@@ -52,7 +52,9 @@ func TestCallAgent_ClassifiesHTTPFailures(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tt.status)
-				_, _ = w.Write([]byte("test-response"))
+				if _, err := w.Write([]byte("test-response")); err != nil {
+					t.Errorf("failed writing test response: %v", err)
+				}
 			}))
 			defer srv.Close()
 

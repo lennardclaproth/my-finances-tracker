@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -53,7 +54,11 @@ func TestIntegration_HealthEndpoint_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /health failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", res.StatusCode)
@@ -84,7 +89,9 @@ func TestIntegration_ImportCsvEndpoint_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed creating multipart part: %v", err)
 	}
-	_, _ = part.Write([]byte("Date;Name / Description;Notifications;Amount (EUR);Debit/credit\n20250101;Coffee;Note;1,23;Debit\n"))
+	if _, err := part.Write([]byte("Date;Name / Description;Notifications;Amount (EUR);Debit/credit\n20250101;Coffee;Note;1,23;Debit\n")); err != nil {
+		t.Fatalf("failed writing multipart payload: %v", err)
+	}
 	if err := writer.WriteField("vendor_id", v.ID.String()); err != nil {
 		t.Fatalf("failed writing vendor_id field: %v", err)
 	}
@@ -105,7 +112,11 @@ func TestIntegration_ImportCsvEndpoint_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST /import/csv failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
@@ -161,7 +172,11 @@ func TestIntegration_GetVendorsEndpoint_ReturnsActiveOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /vendors failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
@@ -199,6 +214,127 @@ func TestIntegration_GetVendorsEndpoint_ReturnsActiveOnly(t *testing.T) {
 	}
 }
 
+func TestIntegration_SQLXVendorStore_CreateDuplicateMapsToDomainError(t *testing.T) {
+	app := newIntegrationApp(t)
+	ctx := context.Background()
+
+	store := storage.NewSQLXVendorStore(app.db)
+	first, err := vendor.NewVendor(vendor.VendorING, vendor.VendorTypeBank)
+	if err != nil {
+		t.Fatalf("failed creating first vendor: %v", err)
+	}
+	if err := store.Create(ctx, first); err != nil {
+		t.Fatalf("failed storing first vendor: %v", err)
+	}
+
+	duplicate, err := vendor.NewVendor(vendor.VendorING, vendor.VendorTypeBank)
+	if err != nil {
+		t.Fatalf("failed creating duplicate vendor: %v", err)
+	}
+	err = store.Create(ctx, duplicate)
+	if !errors.Is(err, vendor.ErrVendorAlreadyExists) {
+		t.Fatalf("expected ErrVendorAlreadyExists, got %v", err)
+	}
+}
+
+func TestIntegration_CreateAccountEndpoint_ValidationAndDuplicate(t *testing.T) {
+	app := newIntegrationApp(t)
+
+	res, body := createAccountRequest(t, app.server.URL, map[string]any{"name": "   "})
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected status 400 for blank name, got %d body=%s", res.StatusCode, string(body))
+	}
+
+	res, body = createAccountRequest(t, app.server.URL, map[string]any{"name": "Checking"})
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d body=%s", res.StatusCode, string(body))
+	}
+	var created struct {
+		ID   uuid.UUID `json:"id"`
+		Name string    `json:"name"`
+	}
+	if err := json.Unmarshal(body, &created); err != nil {
+		t.Fatalf("failed decoding account create response: %v", err)
+	}
+	if created.ID == uuid.Nil {
+		t.Fatalf("expected non-nil account id")
+	}
+	if created.Name != "Checking" {
+		t.Fatalf("expected account name Checking, got %s", created.Name)
+	}
+
+	res, body = createAccountRequest(t, app.server.URL, map[string]any{"name": "Checking"})
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
+	if res.StatusCode != http.StatusConflict {
+		t.Fatalf("expected status 409 for duplicate name, got %d body=%s", res.StatusCode, string(body))
+	}
+}
+
+func TestIntegration_GetAccountsEndpoint_ReturnsSortedByName(t *testing.T) {
+	app := newIntegrationApp(t)
+
+	res, body := createAccountRequest(t, app.server.URL, map[string]any{"name": "Zulu"})
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("failed creating first account: status=%d body=%s", res.StatusCode, string(body))
+	}
+	res, body = createAccountRequest(t, app.server.URL, map[string]any{"name": "Alpha"})
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("failed creating second account: status=%d body=%s", res.StatusCode, string(body))
+	}
+
+	listRes, err := http.Get(app.server.URL + "/accounts")
+	if err != nil {
+		t.Fatalf("GET /accounts failed: %v", err)
+	}
+	defer func() {
+		if err := listRes.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
+	if listRes.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(listRes.Body)
+		t.Fatalf("expected status 200, got %d body=%s", listRes.StatusCode, string(body))
+	}
+
+	var payload []struct {
+		ID   uuid.UUID `json:"id"`
+		Name string    `json:"name"`
+	}
+	if err := json.NewDecoder(listRes.Body).Decode(&payload); err != nil {
+		t.Fatalf("failed decoding /accounts response: %v", err)
+	}
+	if len(payload) != 2 {
+		t.Fatalf("expected 2 accounts, got %d", len(payload))
+	}
+	if payload[0].Name != "Alpha" || payload[1].Name != "Zulu" {
+		t.Fatalf("expected alphabetical ordering [Alpha, Zulu], got [%s, %s]", payload[0].Name, payload[1].Name)
+	}
+}
+
 func TestIntegration_CreateListingEndpoint_HappyPath(t *testing.T) {
 	app := newIntegrationApp(t)
 	ctx := context.Background()
@@ -226,7 +362,11 @@ func TestIntegration_CreateListingEndpoint_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST /marketdata/listing failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
@@ -312,7 +452,11 @@ func TestIntegration_UpdateListingEndpoint_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PATCH /listing failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
@@ -367,7 +511,11 @@ func TestIntegration_GetListingsEndpoint_ReturnsSortedRows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /marketdata/listings failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
@@ -386,7 +534,7 @@ func TestIntegration_GetListingsEndpoint_ReturnsSortedRows(t *testing.T) {
 		t.Fatalf("expected at least two listings in response, got %d", len(payload))
 	}
 
-	var idxA, idxZ int = -1, -1
+	var idxA, idxZ = -1, -1
 	for i, row := range payload {
 		if row.Symbol == "AAA.AS" {
 			idxA = i
@@ -429,7 +577,11 @@ func TestIntegration_GetDailiesEndpoint_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST /listing failed: %v", err)
 	}
-	defer createRes.Body.Close()
+	defer func() {
+		if err := createRes.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if createRes.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(createRes.Body)
 		t.Fatalf("expected status 200 from POST /marketdata/listing, got %d body=%s", createRes.StatusCode, string(body))
@@ -468,7 +620,11 @@ func TestIntegration_GetDailiesEndpoint_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /marketdata/dailies failed: %v", err)
 	}
-	defer getRes.Body.Close()
+	defer func() {
+		if err := getRes.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if getRes.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(getRes.Body)
@@ -546,7 +702,11 @@ func TestIntegration_TagTransactionEndpoint_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST /cashflow/transactions/tag failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
@@ -612,7 +772,11 @@ func TestIntegration_TagTransactionsBySelectionEndpoint_HappyPath(t *testing.T) 
 	if err != nil {
 		t.Fatalf("POST /cashflow/transactions/tag/selection failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
 		t.Fatalf("expected status 200, got %d body=%s", res.StatusCode, string(body))
@@ -699,7 +863,11 @@ func TestIntegration_TagTransactionsByFilterEndpoint_SyncAndAsync(t *testing.T) 
 		if err != nil {
 			t.Fatalf("POST /cashflow/transactions/tag/filter failed: %v", err)
 		}
-		defer res.Body.Close()
+		defer func() {
+			if err := res.Body.Close(); err != nil {
+				t.Fatalf("failed closing response body: %v", err)
+			}
+		}()
 		if res.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(res.Body)
 			t.Fatalf("expected status 200, got %d body=%s", res.StatusCode, string(body))
@@ -749,7 +917,8 @@ func TestIntegration_TagTransactionsByFilterEndpoint_SyncAndAsync(t *testing.T) 
 		}
 
 		payload := map[string]any{
-			"tag": "bulk",
+			"tag":        "bulk",
+			"account_id": uuid.NewString(),
 			"filters": map[string]any{
 				"source": "ing",
 			},
@@ -769,7 +938,11 @@ func TestIntegration_TagTransactionsByFilterEndpoint_SyncAndAsync(t *testing.T) 
 		if err != nil {
 			t.Fatalf("POST /cashflow/transactions/tag/filter failed: %v", err)
 		}
-		defer res.Body.Close()
+		defer func() {
+			if err := res.Body.Close(); err != nil {
+				t.Fatalf("failed closing response body: %v", err)
+			}
+		}()
 		if res.StatusCode != http.StatusAccepted {
 			body, _ := io.ReadAll(res.Body)
 			t.Fatalf("expected status 202, got %d body=%s", res.StatusCode, string(body))
@@ -842,7 +1015,11 @@ func TestIntegration_IgnoreTransactionsBySelectionEndpoint_HappyPath(t *testing.
 	if err != nil {
 		t.Fatalf("POST /cashflow/transactions/ignore/selection failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
 		t.Fatalf("expected status 200, got %d body=%s", res.StatusCode, string(body))
@@ -928,7 +1105,11 @@ func TestIntegration_IgnoreTransactionsByFilterEndpoint_HappyPath(t *testing.T) 
 	if err != nil {
 		t.Fatalf("POST /cashflow/transactions/ignore/filter failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
 		t.Fatalf("expected status 200, got %d body=%s", res.StatusCode, string(body))
@@ -1050,7 +1231,11 @@ func TestIntegration_GetCashflowTransactionsEndpoint_SearchSortFilterPaginate(t 
 	if err != nil {
 		t.Fatalf("GET /cashflow/transactions failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
@@ -1103,7 +1288,11 @@ func TestIntegration_GetCashflowTransactionsEndpoint_SearchSortFilterPaginate(t 
 	if err != nil {
 		t.Fatalf("GET /cashflow/transactions pagination failed: %v", err)
 	}
-	defer pageRes.Body.Close()
+	defer func() {
+		if err := pageRes.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if pageRes.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(pageRes.Body)
 		t.Fatalf("expected status 200, got %d body=%s", pageRes.StatusCode, string(body))
@@ -1145,7 +1334,11 @@ func TestIntegration_GetCashflowTransactionsEndpoint_SearchSortFilterPaginate(t 
 	if err != nil {
 		t.Fatalf("GET /cashflow/transactions hide_ignored failed: %v", err)
 	}
-	defer hideIgnoredRes.Body.Close()
+	defer func() {
+		if err := hideIgnoredRes.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if hideIgnoredRes.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(hideIgnoredRes.Body)
 		t.Fatalf("expected status 200, got %d body=%s", hideIgnoredRes.StatusCode, string(body))
@@ -1201,7 +1394,11 @@ func TestIntegration_GetCashflowTransactionsEndpoint_SearchSortFilterPaginate(t 
 	if err != nil {
 		t.Fatalf("GET /cashflow/transactions amount sort failed: %v", err)
 	}
-	defer amountSortRes.Body.Close()
+	defer func() {
+		if err := amountSortRes.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if amountSortRes.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(amountSortRes.Body)
 		t.Fatalf("expected status 200, got %d body=%s", amountSortRes.StatusCode, string(body))
@@ -1243,7 +1440,11 @@ func TestIntegration_GetCashflowTransactionsEndpoint_SearchSortFilterPaginate(t 
 	if err != nil {
 		t.Fatalf("GET /cashflow/transactions direction filter failed: %v", err)
 	}
-	defer directionRes.Body.Close()
+	defer func() {
+		if err := directionRes.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if directionRes.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(directionRes.Body)
 		t.Fatalf("expected status 200, got %d body=%s", directionRes.StatusCode, string(body))
@@ -1288,7 +1489,11 @@ func TestIntegration_GetCashflowTransactionsEndpoint_SearchSortFilterPaginate(t 
 	if err != nil {
 		t.Fatalf("GET /cashflow/transactions invalid direction failed: %v", err)
 	}
-	defer invalidDirectionRes.Body.Close()
+	defer func() {
+		if err := invalidDirectionRes.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if invalidDirectionRes.StatusCode != http.StatusBadRequest {
 		body, _ := io.ReadAll(invalidDirectionRes.Body)
 		t.Fatalf("expected status 400, got %d body=%s", invalidDirectionRes.StatusCode, string(body))
@@ -1348,7 +1553,11 @@ func TestIntegration_GetCashflowMonthlyAnalyticsEndpoint_HappyPath(t *testing.T)
 	if err != nil {
 		t.Fatalf("GET /cashflow/analytics/monthly failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
 		t.Fatalf("expected status 200, got %d body=%s", res.StatusCode, string(body))
@@ -1394,7 +1603,11 @@ func TestIntegration_GetCashflowMonthlyAnalyticsEndpoint_HappyPath(t *testing.T)
 	if err != nil {
 		t.Fatalf("GET /cashflow/analytics/monthly include_ignored failed: %v", err)
 	}
-	defer includeIgnoredRes.Body.Close()
+	defer func() {
+		if err := includeIgnoredRes.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if includeIgnoredRes.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(includeIgnoredRes.Body)
 		t.Fatalf("expected status 200, got %d body=%s", includeIgnoredRes.StatusCode, string(body))
@@ -1490,7 +1703,11 @@ func TestIntegration_GetCashflowTagDistributionEndpoint_HappyPath(t *testing.T) 
 	if err != nil {
 		t.Fatalf("GET /cashflow/analytics/tags failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
 		t.Fatalf("expected status 200, got %d body=%s", res.StatusCode, string(body))
@@ -1561,7 +1778,9 @@ func newIntegrationApp(t *testing.T) *integrationApp {
 
 	t.Cleanup(func() {
 		server.Close()
-		_ = db.Close()
+		if err := db.Close(); err != nil {
+			t.Errorf("failed closing integration db: %v", err)
+		}
 	})
 
 	return &integrationApp{
@@ -1589,7 +1808,9 @@ func newIntegrationAppWithBulkTagEnqueuer(t *testing.T, enqueuer jobs.BulkTagEnq
 
 	t.Cleanup(func() {
 		server.Close()
-		_ = db.Close()
+		if err := db.Close(); err != nil {
+			t.Errorf("failed closing integration db: %v", err)
+		}
 	})
 
 	return &integrationApp{
@@ -1604,7 +1825,7 @@ type fakeBulkTagEnqueuer struct {
 	n  int
 }
 
-func (f *fakeBulkTagEnqueuer) EnqueueFilter(_ context.Context, _ storage.CashflowTransactionQuery, _ string) error {
+func (f *fakeBulkTagEnqueuer) EnqueueFilter(_ context.Context, _ uuid.UUID, _ storage.CashflowTransactionQuery, _ string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.n++
@@ -1740,6 +1961,30 @@ func seedImportAccount(t *testing.T, db *storage.DB) *importer.Account {
 	return importAcc
 }
 
+func createAccountRequest(t *testing.T, baseURL string, payload map[string]any) (*http.Response, []byte) {
+	t.Helper()
+
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("failed marshalling account payload: %v", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, baseURL+"/accounts", bytes.NewReader(raw))
+	if err != nil {
+		t.Fatalf("failed creating account request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST /accounts failed: %v", err)
+	}
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("failed reading account response body: %v", err)
+	}
+	return res, body
+}
+
 func seedMarketStackProvider(t *testing.T, db *storage.DB, baseURI, apiKey string) {
 	t.Helper()
 	provider, err := marketdata.NewAPIProviderWithAPIKey(marketdata.ProviderMarketStack, baseURI, apiKey)
@@ -1777,10 +2022,14 @@ func newMarketStackFixtureServer(t *testing.T) (*httptest.Server, *int64) {
 		w.Header().Set("Content-Type", "application/json")
 
 		if r.URL.Query().Get("offset") == "0" {
-			_, _ = w.Write(fixture)
+			if _, err := w.Write(fixture); err != nil {
+				t.Errorf("failed writing fixture response: %v", err)
+			}
 			return
 		}
-		_, _ = w.Write([]byte(`{"pagination":{"limit":1000,"offset":1000,"count":0,"total":211},"data":[]}`))
+		if _, err := w.Write([]byte(`{"pagination":{"limit":1000,"offset":1000,"count":0,"total":211},"data":[]}`)); err != nil {
+			t.Errorf("failed writing empty page response: %v", err)
+		}
 	})
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)

@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/google/uuid"
+	"github.com/lennardclaproth/my-finances-tracker/api"
+	"github.com/lennardclaproth/my-finances-tracker/internal/bus"
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
 	"github.com/lennardclaproth/my-finances-tracker/internal/observability"
 	"github.com/lennardclaproth/my-finances-tracker/internal/storage"
@@ -22,7 +25,7 @@ var (
 )
 
 type BulkTagEnqueuer interface {
-	EnqueueFilter(ctx context.Context, query storage.CashflowTransactionQuery, tag string) error
+	EnqueueFilter(ctx context.Context, accountID uuid.UUID, query storage.CashflowTransactionQuery, tag string) error
 }
 
 type bulkTagStore interface {
@@ -30,19 +33,21 @@ type bulkTagStore interface {
 }
 
 type bulkTagTask struct {
-	query   storage.CashflowTransactionQuery
-	tag     string
-	headers map[string]string
+	accountID uuid.UUID
+	query     storage.CashflowTransactionQuery
+	tag       string
+	headers   map[string]string
 }
 
 type BulkTagJob struct {
 	store   bulkTagStore
 	log     logging.Logger
+	b       bus.Bus
 	queue   chan bulkTagTask
 	workers int
 }
 
-func NewBulkTagJob(store bulkTagStore, log logging.Logger, workers, queueSize int) *BulkTagJob {
+func NewBulkTagJob(store bulkTagStore, log logging.Logger, workers, queueSize int, b bus.Bus) *BulkTagJob {
 	if workers <= 0 {
 		workers = 1
 	}
@@ -55,6 +60,7 @@ func NewBulkTagJob(store bulkTagStore, log logging.Logger, workers, queueSize in
 	return &BulkTagJob{
 		store:   store,
 		log:     log,
+		b:       b,
 		queue:   make(chan bulkTagTask, queueSize),
 		workers: workers,
 	}
@@ -64,11 +70,16 @@ func (j *BulkTagJob) Name() string {
 	return "BulkTagJob"
 }
 
-func (j *BulkTagJob) EnqueueFilter(ctx context.Context, query storage.CashflowTransactionQuery, tag string) error {
+func (j *BulkTagJob) EnqueueFilter(ctx context.Context, accountID uuid.UUID, query storage.CashflowTransactionQuery, tag string) error {
+	if accountID == uuid.Nil {
+		return fmt.Errorf("cannot enqueue bulk tag without account id")
+	}
+
 	task := bulkTagTask{
-		query:   query,
-		tag:     tag,
-		headers: observability.PropagationHeadersFromContext(ctx),
+		accountID: accountID,
+		query:     query,
+		tag:       tag,
+		headers:   observability.PropagationHeadersFromContext(ctx),
 	}
 	select {
 	case <-ctx.Done():
@@ -130,6 +141,7 @@ func (j *BulkTagJob) runWorker(ctx context.Context, workerID int) {
 				apmTx.End()
 				continue
 			}
+			j.publishBulkTagCompleted(txCtx, task.accountID, updated)
 			j.log.Info(txCtx, "bulk tag job completed", "worker_id", workerID, "updated_count", updated)
 			apmTx.End()
 		}
@@ -150,4 +162,22 @@ func (j *BulkTagJob) QueueLength() int {
 
 func (j *BulkTagJob) String() string {
 	return fmt.Sprintf("%s(workers=%d,queue=%d)", j.Name(), j.workers, cap(j.queue))
+}
+
+func (j *BulkTagJob) publishBulkTagCompleted(ctx context.Context, accountID uuid.UUID, updated int) {
+	if accountID == uuid.Nil || j.b == nil {
+		return
+	}
+
+	msg, err := bus.NewJSONEnvelopeFromContext(ctx, api.BulkTagCompleted{
+		AccID:        accountID,
+		UpdatedCount: updated,
+	})
+	if err != nil {
+		j.log.Error(ctx, "failed to encode bulk tag completed event", err, "account_id", accountID.String())
+		return
+	}
+	if err := j.b.Publish(ctx, msg); err != nil {
+		j.log.Error(ctx, "failed to publish bulk tag completed event", err, "account_id", accountID.String())
+	}
 }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  BuildingOffice2Icon,
   Bars3Icon,
   CalendarDaysIcon,
   ChartBarSquareIcon,
@@ -37,7 +38,7 @@ interface ModalActionItem {
 
 type ActionItem = RouteActionItem | ModalActionItem;
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   disabled: false,
 });
 
@@ -67,6 +68,14 @@ const userActions: ActionItem[] = [
     description: "View positions and portfolio growth.",
     to: "/portfolio",
     icon: ChartBarSquareIcon,
+  },
+  {
+    id: "assets",
+    kind: "route",
+    label: "Assets",
+    description: "Track asset classes and growth.",
+    to: "/assets",
+    icon: BuildingOffice2Icon,
   },
   {
     id: "import",
@@ -158,7 +167,7 @@ onBeforeUnmount(() => {
       <template #trigger>
         <button
           type="button"
-          class="group inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white/90 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+          class="group inline-flex items-center gap-3 rounded-full border border-slate-300 bg-white/90 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
           :aria-expanded="isOpen"
           aria-haspopup="menu"
           title="Open actions"
@@ -177,7 +186,7 @@ onBeforeUnmount(() => {
 
       <template #default="{ close }">
         <section
-          class="menu-panel translate-y-2 overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-xl backdrop-blur"
+          class="menu-panel translate-y-2 overflow-hidden rounded-2xl border border-slate-300 bg-white/95 shadow-xl backdrop-blur"
           @mouseenter="openOnHover"
           @mouseleave="scheduleCloseOnLeave"
         >
@@ -202,7 +211,7 @@ onBeforeUnmount(() => {
             >
               <span
                 class="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border"
-                :class="isActiveAction(item) ? 'border-indigo-200 bg-indigo-100 text-indigo-700' : 'border-slate-200 bg-white text-slate-500'"
+                :class="isActiveAction(item) ? 'border-indigo-200 bg-indigo-100 text-indigo-700' : 'border-slate-300 bg-white text-slate-500'"
               >
                 <component :is="item.icon" class="h-4 w-4" />
               </span>
@@ -261,5 +270,9 @@ onBeforeUnmount(() => {
 
 .menu-item:nth-child(3) {
   animation-delay: 130ms;
+}
+
+.menu-item:nth-child(4) {
+  animation-delay: 170ms;
 }
 </style>

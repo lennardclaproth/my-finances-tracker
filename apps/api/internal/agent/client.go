@@ -105,10 +105,16 @@ func (c *Client) CallAgent(ctx context.Context, ID uuid.UUID, msg string) error 
 	if err != nil {
 		return &CallError{Kind: CallErrorUnreachable, Err: err}
 	}
-	defer res.Body.Close()
 	bodyBytes, err := io.ReadAll(res.Body)
+	closeErr := res.Body.Close()
 	if err != nil {
+		if closeErr != nil {
+			return &CallError{Kind: CallErrorUnknown, Err: fmt.Errorf("read response body: %w (close failed: %v)", err, closeErr)}
+		}
 		return &CallError{Kind: CallErrorUnknown, Err: err}
+	}
+	if closeErr != nil {
+		return &CallError{Kind: CallErrorUnknown, Err: fmt.Errorf("close response body: %w", closeErr)}
 	}
 	bodyString := strings.TrimSpace(string(bodyBytes))
 	switch {

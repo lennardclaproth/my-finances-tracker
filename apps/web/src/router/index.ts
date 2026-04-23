@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import CashflowTransactionsPage from "../pages/CashflowTransactionsPage.vue";
 import PortfolioPage from "../pages/PortfolioPage.vue";
+import AssetsPage from "../pages/AssetsPage.vue";
 import AdminListingsPage from "../pages/AdminListingsPage.vue";
 import AdminDailiesPage from "../pages/AdminDailiesPage.vue";
 import { useAppSession } from "../composables/useAppSession";
@@ -31,6 +32,10 @@ export const router = createRouter({
     {
       path: "/portfolio",
       component: PortfolioPage,
+    },
+    {
+      path: "/assets",
+      component: AssetsPage,
     },
     {
       path: "/admin/listings",

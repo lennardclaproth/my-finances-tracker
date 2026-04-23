@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// ProviderIngestionMode defines how provider data is ingested.
 type ProviderIngestionMode string
 
 const (
@@ -13,6 +14,7 @@ const (
 	ProviderIngestionModeManual ProviderIngestionMode = "MANUAL"
 )
 
+// Provider stores provider connection metadata and token state.
 type Provider struct {
 	ID            uuid.UUID             `db:"id"`
 	Name          ProviderName          `db:"name"`
@@ -26,16 +28,25 @@ type Provider struct {
 }
 
 var (
-	ErrProviderNameEmpty           = fmt.Errorf("provider name cannot be empty")
-	ErrProviderBaseURIEmpty        = fmt.Errorf("provider base URI cannot be empty")
-	ErrProviderAPIKeyEmpty         = fmt.Errorf("provider API key cannot be empty")
-	ErrProviderIngestionModeEmpty  = fmt.Errorf("provider ingestion mode cannot be empty")
-	ErrProviderNotFound            = fmt.Errorf("provider not found")
-	ErrProviderSourceNotMapped     = fmt.Errorf("provider source not mapped")
-	ErrProviderManualNotSupported  = fmt.Errorf("provider does not support manual ingestion")
+	// ErrProviderNameEmpty indicates missing provider name.
+	ErrProviderNameEmpty = fmt.Errorf("provider name cannot be empty")
+	// ErrProviderBaseURIEmpty indicates missing provider base URI for API providers.
+	ErrProviderBaseURIEmpty = fmt.Errorf("provider base URI cannot be empty")
+	// ErrProviderAPIKeyEmpty indicates missing provider API key for API providers.
+	ErrProviderAPIKeyEmpty = fmt.Errorf("provider API key cannot be empty")
+	// ErrProviderIngestionModeEmpty indicates missing ingestion mode.
+	ErrProviderIngestionModeEmpty = fmt.Errorf("provider ingestion mode cannot be empty")
+	// ErrProviderNotFound indicates that the provider does not exist.
+	ErrProviderNotFound = fmt.Errorf("provider not found")
+	// ErrProviderSourceNotMapped indicates unknown listing source to provider mapping.
+	ErrProviderSourceNotMapped = fmt.Errorf("provider source not mapped")
+	// ErrProviderManualNotSupported indicates invalid manual-provider field population.
+	ErrProviderManualNotSupported = fmt.Errorf("provider does not support manual ingestion")
+	// ErrProviderAutomaticNotAllowed indicates invalid API-provider field population.
 	ErrProviderAutomaticNotAllowed = fmt.Errorf("provider does not support automatic ingestion")
 )
 
+// ProviderName is the canonical provider identifier.
 type ProviderName string
 
 const (
@@ -44,6 +55,7 @@ const (
 	ProviderBrandNewDay  ProviderName = "brandnewday"
 )
 
+// NewAPIProviderWithAPIKey builds an API-ingestion provider.
 func NewAPIProviderWithAPIKey(name ProviderName, baseURI, apiKey string) (*Provider, error) {
 	if name == "" {
 		return nil, ErrProviderNameEmpty
@@ -66,6 +78,7 @@ func NewAPIProviderWithAPIKey(name ProviderName, baseURI, apiKey string) (*Provi
 	}, nil
 }
 
+// NewManualProvider builds a manual-ingestion provider.
 func NewManualProvider(name ProviderName) (*Provider, error) {
 	if name == "" {
 		return nil, ErrProviderNameEmpty
@@ -81,6 +94,7 @@ func NewManualProvider(name ProviderName) (*Provider, error) {
 	}, nil
 }
 
+// ProviderNameFromSource maps a listing source to its provider name.
 func ProviderNameFromSource(source Source) (ProviderName, error) {
 	switch source {
 	case SourceMarketStack:
@@ -94,14 +108,17 @@ func ProviderNameFromSource(source Source) (ProviderName, error) {
 	}
 }
 
+// IsManualIngestion reports whether the provider uses manual ingestion.
 func (p *Provider) IsManualIngestion() bool {
 	return p != nil && p.IngestionMode == ProviderIngestionModeManual
 }
 
+// IsAPIIngestion reports whether the provider uses API ingestion.
 func (p *Provider) IsAPIIngestion() bool {
 	return p != nil && p.IngestionMode == ProviderIngestionModeAPI
 }
 
+// Validate checks provider fields for ingestion-mode compatibility.
 func (p *Provider) Validate() error {
 	if p == nil {
 		return fmt.Errorf("provider cannot be nil")

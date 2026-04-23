@@ -21,6 +21,7 @@ type ImportSummary struct {
 	RowErrors []RowError `json:"rowErrors"`
 }
 
+// Transaction represents a cashflow transaction in API responses.
 type Transaction struct {
 	ID          uuid.UUID `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Description string    `json:"description" example:"Grocery shopping"`
@@ -33,6 +34,7 @@ type Transaction struct {
 	Ignored     bool      `json:"ignored" example:"false"`
 }
 
+// Pagination describes offset/limit paging metadata.
 type Pagination struct {
 	Limit  int `json:"limit"`
 	Offset int `json:"offset"`
@@ -40,11 +42,69 @@ type Pagination struct {
 	Total  int `json:"total"`
 }
 
+// CashflowTransactionsResponse returns paginated cashflow transactions.
 type CashflowTransactionsResponse struct {
 	Pagination Pagination    `json:"pagination"`
 	Data       []Transaction `json:"data"`
 }
 
+// ManualCashflowTransactionsResponse returns the result of manual cashflow transaction creation.
+type ManualCashflowTransactionsResponse struct {
+	CreatedCount int           `json:"created_count"`
+	Data         []Transaction `json:"data"`
+}
+
+// AssetClassResponse represents one asset class row.
+type AssetClassResponse struct {
+	ID           uuid.UUID  `json:"id"`
+	Name         string     `json:"name"`
+	Source       string     `json:"source"`
+	Archived     bool       `json:"archived"`
+	CurrentWorth string     `json:"current_worth"`
+	LastChangeAt *time.Time `json:"last_change_at,omitempty"`
+	GrowthPct    *float64   `json:"growth_pct,omitempty"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
+// AssetItemResponse represents one tracked item in a class.
+type AssetItemResponse struct {
+	ID           uuid.UUID `json:"id"`
+	Name         string    `json:"name"`
+	CurrentWorth string    `json:"current_worth"`
+	Archived     bool      `json:"archived"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// AssetGrowthPointResponse represents class total worth on a date.
+type AssetGrowthPointResponse struct {
+	Date       string `json:"date"`
+	TotalWorth string `json:"total_worth"`
+}
+
+// AssetHistoryResponse represents one class history entry.
+type AssetHistoryResponse struct {
+	ID              uuid.UUID `json:"id"`
+	ItemID          uuid.UUID `json:"item_id"`
+	ChangeType      string    `json:"change_type"`
+	Direction       *string   `json:"direction,omitempty"`
+	Amount          string    `json:"amount"`
+	PreviousWorth   string    `json:"previous_worth"`
+	NewWorth        string    `json:"new_worth"`
+	ClassTotalWorth string    `json:"class_total_worth"`
+	EffectiveDate   string    `json:"effective_date"`
+	Note            string    `json:"note"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+// AssetClassDetailsResponse returns slider data for one class.
+type AssetClassDetailsResponse struct {
+	Class   AssetClassResponse         `json:"class"`
+	Items   []AssetItemResponse        `json:"items"`
+	Growth  []AssetGrowthPointResponse `json:"growth"`
+	History []AssetHistoryResponse     `json:"history"`
+}
+
+// CashflowMonthlyAnalyticsPoint represents one month of aggregated cashflow metrics.
 type CashflowMonthlyAnalyticsPoint struct {
 	Month         string `json:"month" example:"2025-01-01"`
 	IncomingCents int64  `json:"incomingCents" example:"250000"`
@@ -52,26 +112,31 @@ type CashflowMonthlyAnalyticsPoint struct {
 	NetCents      int64  `json:"netCents" example:"130000"`
 }
 
+// CashflowMonthlyAnalyticsResponse returns monthly analytics time-series data.
 type CashflowMonthlyAnalyticsResponse struct {
 	Data []CashflowMonthlyAnalyticsPoint `json:"data"`
 }
 
+// CashflowTagDistributionEntry represents one tag aggregate bucket.
 type CashflowTagDistributionEntry struct {
 	Tag        string `json:"tag" example:"food"`
 	TotalCents int64  `json:"totalCents" example:"4200"`
 }
 
+// CashflowTagDistributionResponse returns tag aggregates across combined/incoming/outgoing sets.
 type CashflowTagDistributionResponse struct {
 	Combined []CashflowTagDistributionEntry `json:"combined"`
 	Incoming []CashflowTagDistributionEntry `json:"incoming"`
 	Outgoing []CashflowTagDistributionEntry `json:"outgoing"`
 }
 
+// TagTransactionsResponse returns the result of a tag mutation operation.
 type TagTransactionsResponse struct {
 	UpdatedCount int    `json:"updated_count"`
 	Status       string `json:"status"`
 }
 
+// VendorResponse represents one vendor record.
 type VendorResponse struct {
 	ID             uuid.UUID `json:"id"`
 	Name           string    `json:"name"`
@@ -82,6 +147,7 @@ type VendorResponse struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 
+// AccountResponse represents one account record.
 type AccountResponse struct {
 	ID         uuid.UUID  `json:"id"`
 	ExternalID *uuid.UUID `json:"external_id,omitempty"`
@@ -90,6 +156,7 @@ type AccountResponse struct {
 	UpdatedAt  time.Time  `json:"updated_at"`
 }
 
+// ListingResponse represents one market listing record.
 type ListingResponse struct {
 	ID          uuid.UUID `json:"id"`
 	Symbol      string    `json:"symbol"`
@@ -106,21 +173,25 @@ type ListingResponse struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+// ListingsSearchResponse returns paginated listing search results.
 type ListingsSearchResponse struct {
 	Pagination Pagination        `json:"pagination"`
 	Data       []ListingResponse `json:"data"`
 }
 
+// DailyUploadAcceptedResponse confirms daily upload enqueue acceptance.
 type DailyUploadAcceptedResponse struct {
 	UploadID uuid.UUID `json:"upload_id"`
 	Status   string    `json:"status"`
 }
 
+// DailyUploadRowErrorResponse represents a row-level daily upload parsing/validation error.
 type DailyUploadRowErrorResponse struct {
 	RowNumber int    `json:"row_number"`
 	Reason    string `json:"reason"`
 }
 
+// DailyUploadStatusResponse represents the current processing state of a daily upload.
 type DailyUploadStatusResponse struct {
 	ID            uuid.UUID                     `json:"id"`
 	ListingID     uuid.UUID                     `json:"listing_id"`
@@ -138,6 +209,7 @@ type DailyUploadStatusResponse struct {
 	UpdatedAt     time.Time                     `json:"updated_at"`
 }
 
+// ManualPortfolioTransactionResponse represents a created manual portfolio transaction.
 type ManualPortfolioTransactionResponse struct {
 	ID          uuid.UUID  `json:"id"`
 	AccountID   uuid.UUID  `json:"account_id"`
@@ -156,6 +228,7 @@ type ManualPortfolioTransactionResponse struct {
 	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
+// PortfolioTransactionResponse represents one portfolio transaction in read APIs.
 type PortfolioTransactionResponse struct {
 	ID          uuid.UUID  `json:"id"`
 	AccountID   uuid.UUID  `json:"account_id"`
@@ -174,17 +247,20 @@ type PortfolioTransactionResponse struct {
 	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
+// PortfolioTransactionsResponse returns paginated portfolio transactions.
 type PortfolioTransactionsResponse struct {
 	Pagination Pagination                     `json:"pagination"`
 	Data       []PortfolioTransactionResponse `json:"data"`
 }
 
+// AsyncEventAcceptedResponse confirms asynchronous event publication for client polling flows.
 type AsyncEventAcceptedResponse struct {
 	MessageID uuid.UUID `json:"message_id"`
 	Topic     string    `json:"topic"`
 	AccountID uuid.UUID `json:"account_id"`
 }
 
+// PortfolioSnapshotPointResponse represents one snapshot point in the portfolio timeline.
 type PortfolioSnapshotPointResponse struct {
 	OccurredAt            time.Time `json:"occurred_at"`
 	MarketValue           int64     `json:"market_value"`
@@ -197,6 +273,7 @@ type PortfolioSnapshotPointResponse struct {
 	ValueIndex            float64   `json:"value_index"`
 }
 
+// PortfolioPositionResponse represents one current or closed position for an account.
 type PortfolioPositionResponse struct {
 	ID               uuid.UUID  `json:"id"`
 	Symbol           *string    `json:"symbol,omitempty"`
@@ -212,6 +289,7 @@ type PortfolioPositionResponse struct {
 	IsClosed         bool       `json:"is_closed"`
 }
 
+// PortfolioPositionsResponse returns account position rows with include-closed metadata.
 type PortfolioPositionsResponse struct {
 	IncludeClosed bool                        `json:"include_closed"`
 	Data          []PortfolioPositionResponse `json:"data"`

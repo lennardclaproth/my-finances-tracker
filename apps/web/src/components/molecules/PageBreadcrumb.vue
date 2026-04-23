@@ -13,6 +13,7 @@ const segmentLabelMap: Record<string, string> = {
   dailies: "Dailies",
   cashflow: "Cashflow",
   portfolio: "Portfolio",
+  assets: "Assets",
 };
 
 const crumbs = computed(() => {

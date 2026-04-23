@@ -47,7 +47,11 @@ func TestIntegration_SearchListingsEndpoint_ReturnsFilteredPagination(t *testing
 	if err != nil {
 		t.Fatalf("GET /marketdata/listings/search failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
@@ -97,7 +101,9 @@ func TestIntegration_ImportCsvEndpoint_RejectsImportDisabledVendor(t *testing.T)
 	if err != nil {
 		t.Fatalf("failed creating multipart part: %v", err)
 	}
-	_, _ = part.Write([]byte("Date;Name / Description;Notifications;Amount (EUR);Debit/credit\n20250101;Coffee;Note;1,23;Debit\n"))
+	if _, err := part.Write([]byte("Date;Name / Description;Notifications;Amount (EUR);Debit/credit\n20250101;Coffee;Note;1,23;Debit\n")); err != nil {
+		t.Fatalf("failed writing multipart payload: %v", err)
+	}
 	if err := writer.WriteField("vendor_id", v.ID.String()); err != nil {
 		t.Fatalf("failed writing vendor_id field: %v", err)
 	}
@@ -118,7 +124,11 @@ func TestIntegration_ImportCsvEndpoint_RejectsImportDisabledVendor(t *testing.T)
 	if err != nil {
 		t.Fatalf("POST /import/csv failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusBadRequest {
 		body, _ := io.ReadAll(res.Body)
@@ -191,7 +201,11 @@ func TestIntegration_CreateManualPortfolioTransaction_PersistsManualOriginWithou
 	if err != nil {
 		t.Fatalf("POST /portfolio/transactions/manual failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(res.Body)
@@ -293,7 +307,11 @@ func TestIntegration_GetPortfolioTransactionsEndpoint_ReturnsDateFilteredRows(t 
 		if err != nil {
 			t.Fatalf("POST /portfolio/transactions/manual failed: %v", err)
 		}
-		defer res.Body.Close()
+		defer func() {
+			if err := res.Body.Close(); err != nil {
+				t.Fatalf("failed closing response body: %v", err)
+			}
+		}()
 		if res.StatusCode != http.StatusCreated {
 			body, _ := io.ReadAll(res.Body)
 			t.Fatalf("expected 201, got %d body=%s", res.StatusCode, string(body))
@@ -311,7 +329,11 @@ func TestIntegration_GetPortfolioTransactionsEndpoint_ReturnsDateFilteredRows(t 
 	if err != nil {
 		t.Fatalf("GET /portfolio/transactions failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
@@ -341,7 +363,11 @@ func TestIntegration_GetPortfolioTransactionsEndpoint_UnknownAccountReturns404(t
 	if err != nil {
 		t.Fatalf("GET /portfolio/transactions failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusNotFound {
 		body, _ := io.ReadAll(res.Body)
@@ -418,7 +444,11 @@ func TestIntegration_GetPortfolioTransactionsEndpoint_PaginationSortingAndFilter
 		if err != nil {
 			t.Fatalf("POST /portfolio/transactions/manual failed: %v", err)
 		}
-		defer res.Body.Close()
+		defer func() {
+			if err := res.Body.Close(); err != nil {
+				t.Fatalf("failed closing response body: %v", err)
+			}
+		}()
 		if res.StatusCode != http.StatusCreated {
 			body, _ := io.ReadAll(res.Body)
 			t.Fatalf("expected 201, got %d body=%s", res.StatusCode, string(body))
@@ -443,7 +473,11 @@ func TestIntegration_GetPortfolioTransactionsEndpoint_PaginationSortingAndFilter
 	if err != nil {
 		t.Fatalf("GET /portfolio/transactions filtered request failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
@@ -475,7 +509,11 @@ func TestIntegration_GetPortfolioTransactionsEndpoint_PaginationSortingAndFilter
 	if err != nil {
 		t.Fatalf("GET /portfolio/transactions paged request failed: %v", err)
 	}
-	defer res2.Body.Close()
+	defer func() {
+		if err := res2.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res2.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res2.Body)

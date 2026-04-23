@@ -8,11 +8,13 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/bus"
 )
 
+// CreateService creates accounts and publishes AccountCreated events.
 type CreateService struct {
 	creator   Creator
 	publisher bus.Bus
 }
 
+// NewCreateService returns a create service with persistence and optional event publisher.
 func NewCreateService(creator Creator, publisher bus.Bus) *CreateService {
 	return &CreateService{
 		creator:   creator,
@@ -20,6 +22,7 @@ func NewCreateService(creator Creator, publisher bus.Bus) *CreateService {
 	}
 }
 
+// Create persists the account and publishes an AccountCreated event when a publisher is configured.
 func (s *CreateService) Create(ctx context.Context, acc *Account) error {
 	if err := s.creator.Create(ctx, acc); err != nil {
 		return err

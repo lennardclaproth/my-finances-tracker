@@ -15,10 +15,11 @@ import (
 // TaggerJob is responsible for automatically tagging transactions based on predefined rules.
 // when there are no untagged transactions, it should sleep with exponential backoff until new transactions are imported.
 type TaggerJob struct {
-	ar  *agent.Runner
-	ts  *storage.SQLXBankTransactionStore
-	df  time.Duration
-	log logging.Logger
+	ar        *agent.Runner
+	ts        *storage.SQLXBankTransactionStore
+	processor *cashflow.AutoTagProcessor
+	df        time.Duration
+	log       logging.Logger
 }
 
 const (
@@ -27,7 +28,13 @@ const (
 )
 
 func NewTaggerJob(ar *agent.Runner, ts *storage.SQLXBankTransactionStore, df time.Duration, log logging.Logger) *TaggerJob {
-	return &TaggerJob{ar: ar, ts: ts, df: df, log: log}
+	return &TaggerJob{
+		ar:        ar,
+		ts:        ts,
+		processor: cashflow.NewAutoTagProcessor(ar, ts, agent.IsClientError),
+		df:        df,
+		log:       log,
+	}
 }
 
 func (j *TaggerJob) Name() string {
@@ -59,25 +66,15 @@ func (j *TaggerJob) Start(ctx context.Context) error {
 				continue
 			}
 			tx := untagged[0]
-			if err := j.process(ctx, tx); err != nil {
-				if agent.IsClientError(err) {
-					j.log.Error(ctx, "agent returned client error; applying fallback tag", err, "transaction_id", tx.ID)
-					if tagErr := j.ts.Tag(ctx, tx.ID, "unk"); tagErr != nil {
-						j.log.Error(ctx, "failed to apply fallback tag", tagErr, "transaction_id", tx.ID)
-						interval, backoff = nextBackoff(backoff)
-						ticker.Reset(interval)
-						continue
-					}
-					interval = j.defaultInterval()
-					backoff = initialTaggerBackoff
-					ticker.Reset(interval)
-					continue
-				}
-
-				j.log.Error(ctx, "agent unavailable or server failed; skipping fallback tag and retrying with backoff", err, "transaction_id", tx.ID)
+			outcome, err := j.process(ctx, tx)
+			if err != nil {
+				j.log.Error(ctx, "auto-tag processing failed; retrying with backoff", err, "transaction_id", tx.ID)
 				interval, backoff = nextBackoff(backoff)
 				ticker.Reset(interval)
 				continue
+			}
+			if outcome == cashflow.AutoTagOutcomeFallbackTagged {
+				j.log.Warn(ctx, "auto-tag fallback applied", "transaction_id", tx.ID, "tag", cashflow.AutoTagFallbackTag)
 			}
 
 			interval = j.defaultInterval()
@@ -87,7 +84,7 @@ func (j *TaggerJob) Start(ctx context.Context) error {
 	}
 }
 
-func (j *TaggerJob) process(ctx context.Context, tx *cashflow.Transaction) error {
+func (j *TaggerJob) process(ctx context.Context, tx *cashflow.Transaction) (cashflow.AutoTagOutcome, error) {
 	apmTx := apm.DefaultTracer().StartTransaction(observability.JobOperation("tagger"), "job")
 	defer apmTx.End()
 
@@ -104,13 +101,17 @@ func (j *TaggerJob) process(ctx context.Context, tx *cashflow.Transaction) error
 	span, ctx := apm.StartSpan(ctx, "agent_call", "job")
 	defer span.End()
 
-	err := j.ar.RunTagAgent(ctx, tx)
+	processor := j.processor
+	if processor == nil {
+		processor = cashflow.NewAutoTagProcessor(j.ar, j.ts, agent.IsClientError)
+	}
+	outcome, err := processor.Process(ctx, tx)
 	if err != nil {
 		apmTx.Result = "error"
 		apmTx.Outcome = "failure"
 		apm.CaptureError(ctx, err).Send()
 	}
-	return err
+	return outcome, err
 }
 
 func (j *TaggerJob) defaultInterval() time.Duration {

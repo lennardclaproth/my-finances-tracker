@@ -2,6 +2,7 @@ package parsers
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"iter"
@@ -72,9 +73,15 @@ func NewN26Parser() *N26Parser {
 
 func (p *N26Parser) ParseAll(rc io.ReadCloser) (iter.Seq2[int, cashflow.TransactionData], error) {
 	raw, err := io.ReadAll(rc)
-	_ = rc.Close()
+	closeErr := rc.Close()
 	if err != nil {
+		if closeErr != nil {
+			return nil, errors.Join(err, closeErr)
+		}
 		return nil, err
+	}
+	if closeErr != nil {
+		return nil, closeErr
 	}
 
 	decoded := decodeN26Text(raw)

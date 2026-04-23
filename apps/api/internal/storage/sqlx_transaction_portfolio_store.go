@@ -176,15 +176,26 @@ func (s *SQLXPortfolioTransactionStore) FetchForAccount(
 	if err != nil {
 		return nil, fmt.Errorf("sqlx_portfolio_transaction_store: fetch transactions: %w", err)
 	}
-	defer rows.Close()
 
 	txs := make([]portfolio.TransactionWithListingID, 0)
 	for rows.Next() {
 		var tx portfolio.TransactionWithListingID
 		if err := rows.StructScan(&tx); err != nil {
+			if closeErr := rows.Close(); closeErr != nil {
+				return nil, fmt.Errorf("sqlx_portfolio_transaction_store: scan transactions: %w (close failed: %v)", err, closeErr)
+			}
 			return nil, fmt.Errorf("sqlx_portfolio_transaction_store: scan transactions: %w", err)
 		}
 		txs = append(txs, tx)
+	}
+	if err := rows.Err(); err != nil {
+		if closeErr := rows.Close(); closeErr != nil {
+			return nil, fmt.Errorf("sqlx_portfolio_transaction_store: iterate transactions: %w (close failed: %v)", err, closeErr)
+		}
+		return nil, fmt.Errorf("sqlx_portfolio_transaction_store: iterate transactions: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("sqlx_portfolio_transaction_store: close transaction rows: %w", err)
 	}
 	return &portfolio.TransactionListResult{
 		Total:        total,

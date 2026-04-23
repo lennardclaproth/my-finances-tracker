@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -12,11 +13,13 @@ import (
 	"github.com/lib/pq"
 )
 
+// SQLXVendorStore persists and reads vendor records.
 type SQLXVendorStore struct {
 	db        *DB
 	tableName string
 }
 
+// NewSQLXVendorStore creates a vendor store backed by SQLX.
 func NewSQLXVendorStore(db *DB) *SQLXVendorStore {
 	return &SQLXVendorStore{
 		db:        db,
@@ -24,25 +27,28 @@ func NewSQLXVendorStore(db *DB) *SQLXVendorStore {
 	}
 }
 
+// Create inserts a new vendor.
 func (s *SQLXVendorStore) Create(ctx context.Context, v *vendor.Vendor) error {
 	query := fmt.Sprintf(`
 		INSERT INTO %s (id, name, type, active, import_disabled, created_at, updated_at)
 		VALUES (:id, :name, :type, :active, :import_disabled, :created_at, :updated_at)
 	`, s.tableName)
 	_, err := s.db.NamedExecContext(ctx, query, v)
+	if err == nil {
+		return nil
+	}
 	var pqErr *pq.Error
-	if errors.As(err, &pqErr) {
-		// 23505 = unique_violation
-		if pqErr.Code == "23505" {
-			// optional: check constraint name if you have multiple uniques
-			if pqErr.Constraint == "vendors_name_key" {
-				return vendor.ErrVendorAlreadyExists
-			}
-		}
+	if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+		return vendor.ErrVendorAlreadyExists
+	}
+	msg := strings.ToLower(err.Error())
+	if strings.Contains(msg, "unique") && strings.Contains(msg, "name") {
+		return vendor.ErrVendorAlreadyExists
 	}
 	return err
 }
 
+// FetchByName returns a vendor by vendor name.
 func (s *SQLXVendorStore) FetchByName(ctx context.Context, name vendor.VendorID) (*vendor.Vendor, error) {
 	var v vendor.Vendor
 	query := s.db.Rebind(fmt.Sprintf(`SELECT id, name, type, active, import_disabled, created_at, updated_at FROM %s WHERE name = ?`, s.tableName))
@@ -57,6 +63,7 @@ func (s *SQLXVendorStore) FetchByName(ctx context.Context, name vendor.VendorID)
 	return &v, nil
 }
 
+// FetchById returns a vendor by UUID.
 func (s *SQLXVendorStore) FetchById(ctx context.Context, id uuid.UUID) (*vendor.Vendor, error) {
 	var v vendor.Vendor
 	query := s.db.Rebind(fmt.Sprintf(`SELECT id, name, type, active, import_disabled, created_at, updated_at FROM %s WHERE id = ?`, s.tableName))
@@ -71,6 +78,7 @@ func (s *SQLXVendorStore) FetchById(ctx context.Context, id uuid.UUID) (*vendor.
 	return &v, nil
 }
 
+// ListActive returns all active vendors sorted by name.
 func (s *SQLXVendorStore) ListActive(ctx context.Context) ([]*vendor.Vendor, error) {
 	var vendors []*vendor.Vendor
 	query := fmt.Sprintf(`

@@ -13,13 +13,13 @@ const props = withDefaults(defineProps<Props>(), {
 
 const classes = computed(() => {
   const mapping: Record<Tone, string> = {
-    neutral: "bg-slate-100 text-slate-700",
-    success: "bg-emerald-100 text-emerald-800",
-    warning: "bg-amber-100 text-amber-800",
-    info: "bg-cyan-100 text-cyan-800",
+    neutral: "border-slate-200 bg-slate-50 text-slate-700",
+    success: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    warning: "border-amber-200 bg-amber-50 text-amber-700",
+    info: "border-cyan-200 bg-cyan-50 text-cyan-700",
   };
 
-  return `inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${mapping[props.tone]}`;
+  return `inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${mapping[props.tone]}`;
 });
 </script>
 

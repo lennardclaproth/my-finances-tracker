@@ -115,10 +115,16 @@ func (s *SQLXBankTransactionStore) FetchUntagged(ctx context.Context, page, page
 	if err != nil {
 		return nil, fmt.Errorf("sqlx_transaction_store: failed to fetch untagged transactions: %w", err)
 	}
-	defer rows.Close()
 	transactions, err := parseRows(rows)
+	closeErr := rows.Close()
 	if err != nil {
+		if closeErr != nil {
+			return nil, fmt.Errorf("sqlx_transaction_store: failed to parse transaction rows: %w (close failed: %v)", err, closeErr)
+		}
 		return nil, fmt.Errorf("sqlx_transaction_store: failed to parse transaction rows: %w", err)
+	}
+	if closeErr != nil {
+		return nil, fmt.Errorf("sqlx_transaction_store: failed to close transaction rows: %w", closeErr)
 	}
 	return transactions, nil
 }
@@ -162,11 +168,17 @@ func (s *SQLXBankTransactionStore) Fetch(ctx context.Context, query CashflowTran
 	if err != nil {
 		return nil, fmt.Errorf("sqlx_transaction_store: failed to fetch transactions: %w", err)
 	}
-	defer rows.Close()
 
 	transactions, err := parseRows(rows)
+	closeErr := rows.Close()
 	if err != nil {
+		if closeErr != nil {
+			return nil, fmt.Errorf("sqlx_transaction_store: failed to parse transaction rows: %w (close failed: %v)", err, closeErr)
+		}
 		return nil, fmt.Errorf("sqlx_transaction_store: failed to parse transaction rows: %w", err)
+	}
+	if closeErr != nil {
+		return nil, fmt.Errorf("sqlx_transaction_store: failed to close transaction rows: %w", closeErr)
 	}
 
 	return &CashflowTransactionResult{

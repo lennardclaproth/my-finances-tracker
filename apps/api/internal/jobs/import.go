@@ -5,12 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lennardclaproth/my-finances-tracker/api"
 	"github.com/lennardclaproth/my-finances-tracker/internal/bus"
 	"github.com/lennardclaproth/my-finances-tracker/internal/cashflow"
 	cashflowParsers "github.com/lennardclaproth/my-finances-tracker/internal/cashflow/parsers"
@@ -20,7 +18,6 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/portfolio"
 	portfolioParsers "github.com/lennardclaproth/my-finances-tracker/internal/portfolio/parsers"
 	"github.com/lennardclaproth/my-finances-tracker/internal/vendor"
-	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -30,6 +27,7 @@ const (
 )
 
 var (
+	// ErrImportQueueFull indicates the in-memory import queue is at capacity.
 	ErrImportQueueFull = errors.New("import queue is full")
 )
 
@@ -56,9 +54,6 @@ type importFileReader interface {
 	ReadCsv(path string) (io.ReadCloser, error)
 }
 
-type cashflowParserFactory func(id vendor.VendorID) (cashflow.CsvParser, error)
-type portfolioParserFactory func(id vendor.VendorID) (portfolio.CsvParser, error)
-
 // ImportJob consumes import IDs from a bounded queue and reconciles with DB pending imports.
 type ImportJob struct {
 	vendorStore     importVendorStore
@@ -74,11 +69,12 @@ type ImportJob struct {
 	inFlight        map[uuid.UUID]struct{}
 	queueHeaders    map[uuid.UUID]map[string]string
 	mu              sync.Mutex
-	cashflowParser  cashflowParserFactory
-	portfolioParser portfolioParserFactory
+	cashflowParser  importer.CashflowParserFactory
+	portfolioParser importer.PortfolioParserFactory
 	b               bus.Bus
 }
 
+// NewImportJob constructs the asynchronous CSV import worker with queue reconciliation.
 func NewImportJob(
 	vendorStore importVendorStore,
 	importStore importStore,
@@ -115,10 +111,12 @@ func NewImportJob(
 	}
 }
 
+// Name returns the worker name used by the job manager.
 func (j *ImportJob) Name() string {
 	return "ImportJob"
 }
 
+// Enqueue schedules an import ID for processing when it is not already queued or in-flight.
 func (j *ImportJob) Enqueue(ctx context.Context, importID uuid.UUID) error {
 	if importID == uuid.Nil {
 		return fmt.Errorf("cannot enqueue nil import id")
@@ -155,6 +153,7 @@ func (j *ImportJob) Enqueue(ctx context.Context, importID uuid.UUID) error {
 	}
 }
 
+// Start runs the import worker loop until the context is canceled.
 func (j *ImportJob) Start(ctx context.Context) error {
 	if err := j.syncQueueFromDB(ctx); err != nil {
 		j.log.Error(ctx, "failed initial import queue reconciliation", err)
@@ -228,201 +227,16 @@ func (j *ImportJob) markDone(importID uuid.UUID) {
 }
 
 func (j *ImportJob) processByID(ctx context.Context, importID uuid.UUID, headers map[string]string) (err error) {
-	ctx = observability.ContextWithPropagationHeaders(ctx, headers)
-
-	apmTx, txCtx, txErr := observability.StartTransactionFromHeaders(
-		ctx,
-		observability.JobOperation("import"),
-		"job",
-		headers,
+	processor := importer.NewAsyncProcessor(
+		j.vendorStore,
+		j.importStore,
+		j.cashflowStore,
+		j.portfolioStore,
+		j.fileReader,
+		j.cashflowParser,
+		j.portfolioParser,
+		j.log,
+		j.b,
 	)
-	if txErr != nil {
-		j.log.Error(ctx, "failed to parse incoming trace headers for import job", txErr, "import_id", importID)
-	}
-	ctx = txCtx
-	observability.SetSafeTransactionLabels(apmTx, map[string]any{
-		"operation": observability.JobOperation("import"),
-		"component": "job",
-		"import_id": importID.String(),
-		"stage":     "process",
-	})
-	apmTx.Result = "success"
-	apmTx.Outcome = "success"
-	defer func() {
-		if err != nil {
-			apmTx.Result = "error"
-			apmTx.Outcome = "failure"
-			apm.CaptureError(ctx, err).Send()
-		}
-		apmTx.End()
-	}()
-
-	imp, err := j.importStore.FetchByID(ctx, importID)
-	if err != nil {
-		if errors.Is(err, importer.ErrNoImportsPending) {
-			return nil
-		}
-		return err
-	}
-	claimed, err := j.importStore.TryMarkInProgress(ctx, imp.ID)
-	if err != nil {
-		return err
-	}
-	if !claimed {
-		return nil
-	}
-
-	v, err := j.vendorStore.FetchById(ctx, imp.VendorID)
-	if err != nil {
-		j.markImportFailed(ctx, imp, fmt.Errorf("fetch vendor: %w", err))
-		return err
-	}
-
-	totalRows, duplicates, importedCount, failedCount, err := j.processCashflow(ctx, imp, v)
-	if err != nil {
-		j.markImportFailed(ctx, imp, fmt.Errorf("process cashflow rows: %w", err))
-		return err
-	}
-
-	if v.Type == vendor.VendorTypeBrokerage {
-		pDuplicates, pFailed, pErr := j.processPortfolio(ctx, imp, v)
-		duplicates += pDuplicates
-		failedCount += pFailed
-		if pErr != nil {
-			// Keep import as completed with failures so users can recover manually.
-			failedCount += totalRows
-			j.log.Error(ctx, "portfolio processing failed; import will be completed with failures", pErr, "import_id", imp.ID)
-		}
-	}
-
-	imp.MarkCompleted(duplicates, totalRows, importedCount, failedCount)
-	if err := j.importStore.UpdateState(ctx, imp); err != nil {
-		j.log.Error(ctx, "failed to mark import as completed", err, "import_id", imp.ID)
-		return err
-	}
-	return nil
-}
-
-func (j *ImportJob) processCashflow(ctx context.Context, imp *importer.Import, v *vendor.Vendor) (totalRows, duplicates, importedCount, failedCount int, err error) {
-	parser, err := j.cashflowParser(v.Name)
-	if err != nil {
-		return 0, 0, 0, 0, err
-	}
-	rc, err := j.fileReader.ReadCsv(imp.Path)
-	if err != nil {
-		return 0, 0, 0, 0, err
-	}
-	parseSpan, parseCtx := apm.StartSpan(ctx, "parse", "job")
-	seq, err := parser.ParseAll(rc)
-	parseSpan.End()
-	if err != nil {
-		return 0, 0, 0, 0, err
-	}
-
-	persistSpan, persistCtx := apm.StartSpan(parseCtx, "persist", "job")
-	defer persistSpan.End()
-
-	for rowNumber, txd := range seq {
-		totalRows++
-		amount := math.Abs(txd.Amount)
-		tx, err := cashflow.NewTransaction(
-			txd.Description,
-			txd.Note,
-			string(v.Name),
-			txd.Direction,
-			amount,
-			txd.Date,
-			rowNumber,
-			imp.ID,
-			txd.AccountType,
-			imp.AccountID,
-		)
-		if err != nil {
-			failedCount++
-			j.log.Error(persistCtx, "failed creating cashflow transaction", err, "import_id", imp.ID, "row_number", rowNumber)
-			continue
-		}
-
-		if err := j.cashflowStore.Create(persistCtx, tx); err != nil {
-			if errors.Is(err, cashflow.ErrDuplicateTransaction) {
-				duplicates++
-				continue
-			}
-			failedCount++
-			j.log.Error(persistCtx, "failed persisting cashflow transaction", err, "import_id", imp.ID, "row_number", rowNumber)
-			continue
-		}
-		importedCount++
-	}
-
-	return totalRows, duplicates, importedCount, failedCount, nil
-}
-
-func (j *ImportJob) processPortfolio(ctx context.Context, imp *importer.Import, v *vendor.Vendor) (duplicates, failedCount int, err error) {
-	parser, err := j.portfolioParser(v.Name)
-	if err != nil {
-		return 0, 0, err
-	}
-	rc, err := j.fileReader.ReadCsv(imp.Path)
-	if err != nil {
-		return 0, 0, err
-	}
-	parseSpan, parseCtx := apm.StartSpan(ctx, "parse", "job")
-	seq, err := parser.ParseAll(rc)
-	parseSpan.End()
-	if err != nil {
-		return 0, 0, err
-	}
-
-	persistSpan, persistCtx := apm.StartSpan(parseCtx, "persist", "job")
-	defer persistSpan.End()
-
-	for rowNumber, txd := range seq {
-		ptx, err := portfolio.NewTransaction(txd, rowNumber, imp.ID, imp.AccountID, nil)
-		if err != nil {
-			failedCount++
-			j.log.Error(persistCtx, "failed creating portfolio transaction", err, "import_id", imp.ID, "row_number", rowNumber)
-			continue
-		}
-		if err := j.portfolioStore.Create(persistCtx, ptx); err != nil {
-			if errors.Is(err, portfolio.ErrDuplicateTransaction) {
-				duplicates++
-				continue
-			}
-			failedCount++
-			j.log.Error(persistCtx, "failed persisting portfolio transaction", err, "import_id", imp.ID, "row_number", rowNumber)
-			continue
-		}
-	}
-	// publish TransactionsCreated event
-	if imp.AccountID == nil {
-		j.log.Info(ctx, "skip transactions created event: import has no account id", "import_id", imp.ID)
-		return duplicates, failedCount, nil
-	}
-	if j.b == nil {
-		j.log.Info(ctx, "skip transactions created event: bus not configured", "import_id", imp.ID, "account_id", imp.AccountID.String())
-		return duplicates, failedCount, nil
-	}
-	publishSpan, publishCtx := apm.StartSpan(ctx, "publish", "job")
-	defer publishSpan.End()
-
-	msg, err := bus.NewJSONEnvelopeFromContext(publishCtx, api.TransactionsCreated{AccID: *imp.AccountID})
-	if err != nil {
-		j.log.Error(ctx, "failed to encode transactions created event", err, "import_id", imp.ID, "account_id", imp.AccountID.String())
-		return duplicates, failedCount, nil
-	}
-	if err := j.b.Publish(publishCtx, msg); err != nil {
-		j.log.Error(ctx, "failed to publish transactions created event", err, "import_id", imp.ID, "account_id", imp.AccountID.String())
-	}
-	return duplicates, failedCount, nil
-}
-
-func (j *ImportJob) markImportFailed(ctx context.Context, imp *importer.Import, reason error) {
-	if imp == nil {
-		return
-	}
-	imp.MarkFailed(reason.Error())
-	if err := j.importStore.UpdateState(ctx, imp); err != nil {
-		j.log.Error(ctx, "failed to mark import as failed", err, "import_id", imp.ID)
-	}
+	return processor.ProcessByID(ctx, importID, headers)
 }

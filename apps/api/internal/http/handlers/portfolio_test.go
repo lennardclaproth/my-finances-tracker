@@ -20,7 +20,11 @@ import (
 
 type testLogger struct{}
 
+func (l *testLogger) Debug(ctx context.Context, msg string, fields ...any) {}
+
 func (l *testLogger) Info(ctx context.Context, msg string, fields ...any) {}
+
+func (l *testLogger) Warn(ctx context.Context, msg string, fields ...any) {}
 
 func (l *testLogger) Error(ctx context.Context, msg string, err error, fields ...any) {}
 
@@ -149,7 +153,7 @@ func TestRebuildPortfolio_PublishesRequestedEvent(t *testing.T) {
 	}
 }
 
-func TestRebuildPortfolio_UnknownAccountReturns400(t *testing.T) {
+func TestRebuildPortfolio_UnknownAccountReturns404(t *testing.T) {
 	b := &fakeBus{}
 	fetcher := &fakeAccountFetcher{
 		fetchFn: func(ctx context.Context, id uuid.UUID) (*account.Account, error) {
@@ -163,8 +167,15 @@ func TestRebuildPortfolio_UnknownAccountReturns400(t *testing.T) {
 
 	h.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var payload map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed decoding payload: %v", err)
+	}
+	if payload["account_id"] == "" {
+		t.Fatalf("expected account_id problem, got %+v", payload)
 	}
 	if b.publishCall != 0 {
 		t.Fatalf("expected no publish call for unknown account")
@@ -214,7 +225,7 @@ func TestRebuildPortfolio_InvalidRequestValidation(t *testing.T) {
 	}
 }
 
-func TestGetPortfolioSnapshots_UnknownAccountReturns400(t *testing.T) {
+func TestGetPortfolioSnapshots_UnknownAccountReturns404(t *testing.T) {
 	fetcher := &fakeAccountFetcher{
 		fetchFn: func(ctx context.Context, id uuid.UUID) (*account.Account, error) {
 			return nil, account.ErrAccountNotFound
@@ -227,8 +238,15 @@ func TestGetPortfolioSnapshots_UnknownAccountReturns400(t *testing.T) {
 
 	h.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var payload map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed decoding payload: %v", err)
+	}
+	if payload["account_id"] == "" {
+		t.Fatalf("expected account_id problem, got %+v", payload)
 	}
 }
 
@@ -251,7 +269,7 @@ func TestGetPortfolioSnapshots_InvalidDateRangeReturns400(t *testing.T) {
 	}
 }
 
-func TestGetPortfolioPositions_UnknownAccountReturns400(t *testing.T) {
+func TestGetPortfolioPositions_UnknownAccountReturns404(t *testing.T) {
 	fetcher := &fakeAccountFetcher{
 		fetchFn: func(ctx context.Context, id uuid.UUID) (*account.Account, error) {
 			return nil, account.ErrAccountNotFound
@@ -264,8 +282,15 @@ func TestGetPortfolioPositions_UnknownAccountReturns400(t *testing.T) {
 
 	h.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var payload map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed decoding payload: %v", err)
+	}
+	if payload["account_id"] == "" {
+		t.Fatalf("expected account_id problem, got %+v", payload)
 	}
 }
 
@@ -344,6 +369,13 @@ func TestGetPortfolioTransactions_UnknownAccountReturns404(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var payload map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed decoding payload: %v", err)
+	}
+	if payload["account_id"] == "" {
+		t.Fatalf("expected account_id problem, got %+v", payload)
 	}
 }
 
@@ -532,9 +564,5 @@ func TestGetPortfolioTransactions_InvalidDateRangeReturns400(t *testing.T) {
 }
 
 func ptrString(v string) *string {
-	return &v
-}
-
-func ptrTime(v time.Time) *time.Time {
 	return &v
 }

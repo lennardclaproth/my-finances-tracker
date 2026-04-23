@@ -8,7 +8,10 @@ import (
 	"github.com/google/uuid"
 )
 
+// VendorID is the symbolic vendor identifier used in supported-vendor definitions.
 type VendorID string
+
+// VendorType classifies a vendor as bank or brokerage.
 type VendorType string
 
 const (
@@ -23,6 +26,7 @@ const (
 	VendorBND    VendorID = "BrandNewDay"
 )
 
+// SupportedVendors defines the allowed vendor/type combinations.
 var SupportedVendors = map[VendorID]VendorType{
 	VendorING:    VendorTypeBank,
 	VendorDEGIRO: VendorTypeBrokerage,
@@ -30,6 +34,7 @@ var SupportedVendors = map[VendorID]VendorType{
 	VendorBND:    VendorTypeBrokerage,
 }
 
+// Vendor represents an import-capable financial data provider.
 type Vendor struct {
 	ID             uuid.UUID  `db:"id"`
 	Name           VendorID   `db:"name"`
@@ -41,27 +46,33 @@ type Vendor struct {
 }
 
 var (
-	ErrUnsupportedVendor     = fmt.Errorf("unsupported vendor")
+	// ErrUnsupportedVendor indicates the requested vendor is not in SupportedVendors.
+	ErrUnsupportedVendor = fmt.Errorf("unsupported vendor")
+	// ErrUnsupportedVendorType indicates vendor/type combination mismatch.
 	ErrUnsupportedVendorType = fmt.Errorf("unsupported vendor type for the given vendor")
-	ErrVendorAlreadyExists   = fmt.Errorf("vendor already exists with the given name")
-	ErrVendorNotFound        = fmt.Errorf("vendor not found")
+	// ErrVendorAlreadyExists indicates a uniqueness conflict on vendor creation.
+	ErrVendorAlreadyExists = fmt.Errorf("vendor already exists with the given name")
+	// ErrVendorNotFound indicates the requested vendor does not exist.
+	ErrVendorNotFound = fmt.Errorf("vendor not found")
 )
 
-// Shared interfaces used by multiple use cases
-
+// VendorCreator persists vendors.
 type VendorCreator interface {
 	Create(ctx context.Context, vendor *Vendor) error
 }
 
+// VendorFetcher retrieves vendors by ID or name.
 type VendorFetcher interface {
 	FetchById(ctx context.Context, id uuid.UUID) (*Vendor, error)
 	FetchByName(ctx context.Context, name VendorID) (*Vendor, error)
 }
 
+// ActiveVendorLister returns active vendors.
 type ActiveVendorLister interface {
 	ListActive(ctx context.Context) ([]*Vendor, error)
 }
 
+// NewVendor validates the vendor identity/type pair and returns an active vendor.
 func NewVendor(name VendorID, vendorType VendorType) (*Vendor, error) {
 	supportedType, supported := SupportedVendors[name]
 	if !supported {

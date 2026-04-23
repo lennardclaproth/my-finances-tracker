@@ -2,14 +2,17 @@ package http
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
 	"github.com/lennardclaproth/my-finances-tracker/internal/observability"
 )
 
+// EndpointFunc is the typed business function signature wrapped by Endpoint.
 type EndpointFunc[T any, R any] func(ctx context.Context, req T) (status int, res R, err error)
 
+// Validator is implemented by decoded request types that support semantic validation.
 type Validator interface {
 	Valid(ctx context.Context) map[string]string
 }
@@ -29,15 +32,23 @@ func Endpoint[T any, R any](decode DecoderFunc[T], log logging.Logger, fn Endpoi
 		// function passed into the handle func
 		req, err := decode(r)
 		if err != nil {
-			// if the decoding of the request fails we return an error of a
-			// internal server error to the client
+			status, payload := decodeErrorResponse(err)
 			log.Error(r.Context(), "handle: a decode error occurred", err,
 				"operation", operation,
 				"component", "http",
 				"outcome", "failure",
-				"error_class", "internal",
+				"error_class", "decode",
+				"status", status,
 			)
-			_ = encode(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+			if encErr := encode(w, status, payload); encErr != nil {
+				log.Error(r.Context(), "handle: failed to encode decode error response", encErr,
+					"operation", operation,
+					"component", "http",
+					"outcome", "failure",
+					"error_class", "encode",
+					"status", status,
+				)
+			}
 			return
 		}
 		// if the request implements the Validator interface we execute the
@@ -53,7 +64,15 @@ func Endpoint[T any, R any](decode DecoderFunc[T], log logging.Logger, fn Endpoi
 					"error_class", "validation",
 					"status", http.StatusBadRequest,
 				)
-				_ = encode(w, http.StatusBadRequest, problems)
+				if encErr := encode(w, http.StatusBadRequest, problems); encErr != nil {
+					log.Error(r.Context(), "handle: failed to encode validation response", encErr,
+						"operation", operation,
+						"component", "http",
+						"outcome", "failure",
+						"error_class", "encode",
+						"status", http.StatusBadRequest,
+					)
+				}
 				return
 			}
 		}
@@ -68,10 +87,48 @@ func Endpoint[T any, R any](decode DecoderFunc[T], log logging.Logger, fn Endpoi
 				"error_class", "internal",
 				"status", http.StatusInternalServerError,
 			)
-			_ = encode(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+			if encErr := encode(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"}); encErr != nil {
+				log.Error(r.Context(), "handle: failed to encode internal error response", encErr,
+					"operation", operation,
+					"component", "http",
+					"outcome", "failure",
+					"error_class", "encode",
+					"status", http.StatusInternalServerError,
+				)
+			}
 			return
 		}
 
-		_ = encode(w, status, res)
+		if encErr := encode(w, status, res); encErr != nil {
+			log.Error(r.Context(), "handle: failed to encode success response", encErr,
+				"operation", operation,
+				"component", "http",
+				"outcome", "failure",
+				"error_class", "encode",
+				"status", status,
+			)
+		}
 	}
+}
+
+func decodeErrorResponse(err error) (int, map[string]string) {
+	status := http.StatusBadRequest
+	payload := map[string]string{"error": "invalid request"}
+
+	var decErr *DecodeError
+	if !errors.As(err, &decErr) {
+		return status, payload
+	}
+
+	if decErr.Status != 0 {
+		status = decErr.Status
+	}
+	if decErr.Field != "" && decErr.Message != "" {
+		payload = map[string]string{decErr.Field: decErr.Message}
+		return status, payload
+	}
+	if decErr.Message != "" {
+		payload = map[string]string{"error": decErr.Message}
+	}
+	return status, payload
 }

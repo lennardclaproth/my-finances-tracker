@@ -275,7 +275,7 @@ func TestPortfolioBuilder_Build_NoPositionSnapshots_NoPanic_NoCreate(t *testing.
 	}
 }
 
-func TestPortfolioBuilder_Build_DailyPnL_UsesPrevMarketValue(t *testing.T) {
+func TestPortfolioBuilder_Build_DailyPnL_UsesPrevTotalPnL(t *testing.T) {
 	accID := uuid.New()
 	today := date.StartOfDayUTC(time.Now())
 	day1 := today.AddDate(0, 0, -2)
@@ -286,8 +286,8 @@ func TestPortfolioBuilder_Build_DailyPnL_UsesPrevMarketValue(t *testing.T) {
 		},
 		getSnapshotsForAcctFn: func(ctx context.Context, id uuid.UUID) ([]*PositionSnapshot, error) {
 			return []*PositionSnapshot{
-				{OccurredAt: day1, MarketValue: mustPrice(t, 100), UnrealizedPnL: mustPrice(t, 100)},
-				{OccurredAt: day2, MarketValue: mustPrice(t, 110), UnrealizedPnL: mustPrice(t, 110)},
+				{OccurredAt: day1, MarketValue: mustPrice(t, 100), TotalPnL: mustPrice(t, 100)},
+				{OccurredAt: day2, MarketValue: mustPrice(t, 110), TotalPnL: mustPrice(t, 110)},
 			}, nil
 		},
 	}
@@ -303,6 +303,9 @@ func TestPortfolioBuilder_Build_DailyPnL_UsesPrevMarketValue(t *testing.T) {
 	}
 	if pst.created[1].DailyDeltaPnL != mustPrice(t, 10) {
 		t.Fatalf("expected day2 DailyPnL 10.000000, got %s", pst.created[1].DailyDeltaPnL)
+	}
+	if math.Abs(pst.created[1].DailyDeltaPnLPct-10) > 1e-9 {
+		t.Fatalf("expected day2 DailyDeltaPnLPct 10%%, got %f", pst.created[1].DailyDeltaPnLPct)
 	}
 }
 
@@ -333,39 +336,24 @@ func TestPortfolioBuilder_Build_CarriesForwardAfterLastSnapshotDay(t *testing.T)
 	}
 }
 
-func TestPortfolioBuilder_Build_CashFlowNeutralReturn_UsesTxCash(t *testing.T) {
+func TestPortfolioBuilder_Build_CashFlowNeutralReturn_UsesSnapshotDerivedNetCashflow(t *testing.T) {
 	accID := uuid.New()
 	today := date.StartOfDayUTC(time.Now())
 	day1 := today.AddDate(0, 0, -2)
 	day2 := today.AddDate(0, 0, -1)
-
-	ts := &fakeTransactionStore{
-		getASCFn: func(ctx context.Context, gotAccID uuid.UUID) ([]Transaction, error) {
-			return []Transaction{
-				{
-					ID:          uuid.New(),
-					AccountID:   &gotAccID,
-					OccurredAt:  day2.Add(10 * time.Hour),
-					Type:        TxCash,
-					Quantity:    1,
-					AmountCents: mustPrice(t, 50),
-				},
-			}, nil
-		},
-	}
 	pf := &fakePositionFetcher{
 		getForAccountFn: func(ctx context.Context, id uuid.UUID) ([]*Position, error) {
 			return []*Position{}, nil
 		},
 		getSnapshotsForAcctFn: func(ctx context.Context, id uuid.UUID) ([]*PositionSnapshot, error) {
 			return []*PositionSnapshot{
-				{OccurredAt: day1, CostBasis: mustPrice(t, 100), MarketValue: mustPrice(t, 100)},
-				{OccurredAt: day2, CostBasis: mustPrice(t, 150), MarketValue: mustPrice(t, 150)},
+				{OccurredAt: day1, MarketValue: mustPrice(t, 100), TotalPnL: mustPrice(t, 20)},
+				{OccurredAt: day2, MarketValue: mustPrice(t, 150), TotalPnL: mustPrice(t, 20)},
 			}, nil
 		},
 	}
 	pst := &fakePortfolioStore{}
-	pb := newTestBuilder(&fakePositionStore{}, ts, &fakeListingStore{}, &fakeMarketDataService{}, pf, &fakeAccountStore{}, pst)
+	pb := newTestBuilder(&fakePositionStore{}, &fakeTransactionStore{}, &fakeListingStore{}, &fakeMarketDataService{}, pf, &fakeAccountStore{}, pst)
 
 	err := pb.Build(context.Background(), accID)
 	if err != nil {
@@ -375,8 +363,11 @@ func TestPortfolioBuilder_Build_CashFlowNeutralReturn_UsesTxCash(t *testing.T) {
 		t.Fatalf("expected 2 snapshots, got %d", pst.createCalls)
 	}
 	day2Snap := pst.created[1]
-	if math.Abs(day2Snap.DailyDeltaPnLPct-50) > 1e-9 {
-		t.Fatalf("expected day2 simple daily return 50%%, got %f", day2Snap.DailyDeltaPnLPct)
+	if day2Snap.NetCashflow != mustPrice(t, 50) {
+		t.Fatalf("expected day2 net cashflow 50.000000, got %s", day2Snap.NetCashflow)
+	}
+	if math.Abs(day2Snap.DailyDeltaPnLPct) > 1e-9 {
+		t.Fatalf("expected day2 DailyDeltaPnLPct 0%%, got %f", day2Snap.DailyDeltaPnLPct)
 	}
 	if math.Abs(day2Snap.TimeWeightedReturnPct) > 1e-9 {
 		t.Fatalf("expected day2 flow-neutral return 0%%, got %f", day2Snap.TimeWeightedReturnPct)

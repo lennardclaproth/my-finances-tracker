@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ArrowsPointingOutIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import { ArrowsPointingOutIcon, PlusIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import IconButton from "../components/atoms/IconButton.vue";
+import CreateCashflowTransactionsModal from "../components/molecules/CreateCashflowTransactionsModal.vue";
 import ToastMessage from "../components/molecules/ToastMessage.vue";
 import TagDonutChart from "../components/molecules/charts/TagDonutChart.vue";
 import TrendLineChart from "../components/molecules/charts/TrendLineChart.vue";
@@ -10,6 +12,7 @@ import TopNavbar from "../components/organisms/TopNavbar.vue";
 import TransactionsFooterBar from "../components/organisms/TransactionsFooterBar.vue";
 import TransactionsTable from "../components/organisms/TransactionsTable.vue";
 import AppShellTemplate from "../components/templates/AppShellTemplate.vue";
+import { useAppSession } from "../composables/useAppSession";
 import {
   fetchCashflowMonthlyAnalytics,
   fetchCashflowTagDistribution,
@@ -21,6 +24,7 @@ import {
   tagTransactionsBySelection,
 } from "../services/cashflowTransactions";
 import { ApiError } from "../services/http";
+import { getRealtimeClient, type DataChangedMessage } from "../services/realtime";
 import type {
   CashflowTagDistributionEntry,
   CashflowTransaction,
@@ -57,6 +61,8 @@ type ExpandedChart = "trend" | "incoming" | "outgoing" | null;
 
 const route = useRoute();
 const router = useRouter();
+const session = useAppSession();
+const realtimeClient = getRealtimeClient();
 
 const rows = ref<CashflowTransaction[]>([]);
 const monthlyTrend = ref<CashflowMonthlyAnalyticsPoint[]>([]);
@@ -85,12 +91,15 @@ const columnFilterDraft = ref<ColumnFilterDraft>({
   untagged: false,
 });
 const tagModalOpen = ref(false);
+const createModalOpen = ref(false);
 const expandedChart = ref<ExpandedChart>(null);
 
 let activeRequestId = 0;
 let activeAnalyticsRequestId = 0;
 let columnFilterDebounceHandle: ReturnType<typeof setTimeout> | null = null;
 let toastTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+let realtimeRefreshHandle: ReturnType<typeof setTimeout> | null = null;
+let unsubscribeRealtime: (() => void) | null = null;
 let toastIdCounter = 0;
 
 const queryState = computed(() => parseCashflowTransactionsQuery(route.query));
@@ -133,6 +142,8 @@ onMounted(() => {
       query: normalizedQuery,
     });
   }
+  realtimeClient.setAccountId(session.activeAccountId.value);
+  unsubscribeRealtime = realtimeClient.subscribe(onRealtimeMessage);
 });
 
 onBeforeUnmount(() => {
@@ -142,7 +153,28 @@ onBeforeUnmount(() => {
   if (toastTimeoutHandle) {
     clearTimeout(toastTimeoutHandle);
   }
+  if (realtimeRefreshHandle) {
+    clearTimeout(realtimeRefreshHandle);
+    realtimeRefreshHandle = null;
+  }
+  if (unsubscribeRealtime) {
+    unsubscribeRealtime();
+    unsubscribeRealtime = null;
+  }
 });
+
+watch(
+  () => session.activeAccountId.value,
+  (accountID, prevAccountID) => {
+    if (accountID === prevAccountID) {
+      return;
+    }
+    realtimeClient.setAccountId(accountID);
+    const query = queryState.value;
+    void loadTransactions(query);
+    void loadAnalytics(query);
+  },
+);
 
 watch(
   () => queryState.value,
@@ -304,6 +336,28 @@ async function updateRouteQuery(
     path: "/cashflow",
     query: nextQuery,
   });
+}
+
+function onRealtimeMessage(message: DataChangedMessage): void {
+  if (message.account_id !== session.activeAccountId.value) {
+    return;
+  }
+  if (message.event !== "import.completed" && message.event !== "bulk_tag.completed") {
+    return;
+  }
+  scheduleRealtimeRefresh();
+}
+
+function scheduleRealtimeRefresh(): void {
+  if (realtimeRefreshHandle) {
+    return;
+  }
+  realtimeRefreshHandle = setTimeout(() => {
+    realtimeRefreshHandle = null;
+    const query = queryState.value;
+    void loadTransactions(query);
+    void loadAnalytics(query);
+  }, 250);
 }
 
 function normalizeDraftValue(value: string): string {
@@ -558,7 +612,7 @@ async function submitTag(tag: string): Promise<void> {
     const response =
       selectedIds.value.length > 0
         ? await tagTransactionsBySelection(selectedIds.value, tag)
-        : await tagTransactionsByFilter(actionFiltersFromDrafts(), tag);
+        : await tagTransactionsByFilter(actionFiltersFromDrafts(), tag, session.activeAccountId.value);
 
     showMutationStatus(response.status, "Tag update completed.");
     clearSelection();
@@ -596,6 +650,12 @@ async function applyIgnore(ignored: boolean): Promise<void> {
     mutating.value = false;
   }
 }
+
+async function onManualTransactionsCreated(payload: { createdCount: number }): Promise<void> {
+  const suffix = payload.createdCount === 1 ? "" : "s";
+  showAlert("success", `Created ${payload.createdCount} transaction${suffix}.`);
+  await Promise.all([loadTransactions(queryState.value), loadAnalytics(queryState.value)]);
+}
 </script>
 
 <template>
@@ -617,7 +677,7 @@ async function applyIgnore(ignored: boolean): Promise<void> {
       <div class="grid shrink-0 grid-cols-1 gap-3 lg:grid-cols-4">
         <section class="rounded-3xl border border-slate-300 bg-white p-4 shadow-sm lg:col-span-2">
           <div class="mb-3 flex items-center justify-between gap-2">
-            <h2 class="font-secondary text-lg font-semibold text-slate-700 md:text-xl">Cashflow</h2>
+            <h2 class="font-secondary text-xl font-semibold text-slate-700 md:text-2xl">Cashflow</h2>
             <button
               type="button"
               class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
@@ -638,7 +698,7 @@ async function applyIgnore(ignored: boolean): Promise<void> {
 
         <section class="rounded-3xl border border-slate-300 bg-white p-4 shadow-sm lg:col-span-1">
           <div class="mb-3 flex items-center justify-between gap-2">
-            <h2 class="font-secondary text-lg font-semibold text-slate-700 md:text-xl">Incoming Tags</h2>
+            <h2 class="font-secondary text-xl font-semibold text-slate-700 md:text-2xl">Incoming Tags</h2>
             <button
               type="button"
               class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
@@ -660,7 +720,7 @@ async function applyIgnore(ignored: boolean): Promise<void> {
 
         <section class="rounded-3xl border border-slate-300 bg-white p-4 shadow-sm lg:col-span-1">
           <div class="mb-3 flex items-center justify-between gap-2">
-            <h2 class="font-secondary text-lg font-semibold text-slate-700 md:text-xl">Outgoing Tags</h2>
+            <h2 class="font-secondary text-xl font-semibold text-slate-700 md:text-2xl">Outgoing Tags</h2>
             <button
               type="button"
               class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
@@ -682,46 +742,60 @@ async function applyIgnore(ignored: boolean): Promise<void> {
       </div>
 
       <div class="min-h-0 flex-1">
-        <TransactionsTable
-          class="h-full"
-          :rows="rows"
-          :selected-ids="selectedIds"
-          :all-matching-selected="allMatchingSelected"
-          :sort-by="queryState.sortBy"
-          :sort-order="queryState.sortOrder"
-          :column-filters="columnFilterDraft"
-          :show-hidden="!queryState.hideIgnored"
-          :loading="loading"
-          @sort="onSort"
-          @toggle-row="onToggleRow"
-          @toggle-visible="onToggleVisible"
-          @update-filter="onColumnFilterChange"
-          @update-untagged-filter="onUntaggedFilterChange"
-          @update-show-hidden="onShowHiddenChange"
-        >
-          <template #footer>
-            <TransactionsFooterBar
-              :limit="pagination.limit"
-              :offset="pagination.offset"
-              :count="pagination.count"
-              :total="pagination.total"
-              :selected-count="selectedCount"
-              :all-matching-selected="allMatchingSelected"
-              :actions-enabled="actionsEnabled"
-              :loading="isBusy"
-              @change-limit="onLimitChange"
-              @go-first="goToFirstPage"
-              @go-prev="goToPreviousPage"
-              @go-next="goToNextPage"
-              @go-last="goToLastPage"
-              @open-tag="openTagModal"
-              @ignore="applyIgnore(true)"
-              @unignore="applyIgnore(false)"
-              @clear-selection="clearSelection"
-              @toggle-all-matching="toggleAllMatchingSelection"
-            />
-          </template>
-        </TransactionsTable>
+        <section class="relative h-full">
+          <TransactionsTable
+            class="h-full"
+            :rows="rows"
+            :selected-ids="selectedIds"
+            :all-matching-selected="allMatchingSelected"
+            :sort-by="queryState.sortBy"
+            :sort-order="queryState.sortOrder"
+            :column-filters="columnFilterDraft"
+            :show-hidden="!queryState.hideIgnored"
+            :loading="loading"
+            @sort="onSort"
+            @toggle-row="onToggleRow"
+            @toggle-visible="onToggleVisible"
+            @update-filter="onColumnFilterChange"
+            @update-untagged-filter="onUntaggedFilterChange"
+            @update-show-hidden="onShowHiddenChange"
+          >
+            <template #footer>
+              <TransactionsFooterBar
+                :limit="pagination.limit"
+                :offset="pagination.offset"
+                :count="pagination.count"
+                :total="pagination.total"
+                :selected-count="selectedCount"
+                :all-matching-selected="allMatchingSelected"
+                :actions-enabled="actionsEnabled"
+                :loading="isBusy"
+                @change-limit="onLimitChange"
+                @go-first="goToFirstPage"
+                @go-prev="goToPreviousPage"
+                @go-next="goToNextPage"
+                @go-last="goToLastPage"
+                @open-tag="openTagModal"
+                @ignore="applyIgnore(true)"
+                @unignore="applyIgnore(false)"
+                @clear-selection="clearSelection"
+                @toggle-all-matching="toggleAllMatchingSelection"
+              />
+            </template>
+          </TransactionsTable>
+
+          <div class="absolute bottom-6 right-6 z-40">
+            <IconButton
+              tone="primary"
+              size="fab"
+              title="Add cashflow transactions"
+              :disabled="mutating"
+              @click="createModalOpen = true"
+            >
+              <PlusIcon class="h-6 w-6" />
+            </IconButton>
+          </div>
+        </section>
       </div>
     </div>
 
@@ -732,7 +806,7 @@ async function applyIgnore(ignored: boolean): Promise<void> {
     >
       <section class="w-full max-w-6xl rounded-3xl border border-slate-300 bg-white shadow-2xl">
         <header class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h3 class="font-secondary text-lg font-semibold text-slate-900 md:text-xl">{{ expandedChartTitle }}</h3>
+          <h3 class="font-secondary text-xl font-semibold text-slate-900 md:text-2xl">{{ expandedChartTitle }}</h3>
           <button
             type="button"
             class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
@@ -795,5 +869,13 @@ async function applyIgnore(ignored: boolean): Promise<void> {
       @close="closeTagModal"
       @confirm="submitTag"
     />
+
+    <CreateCashflowTransactionsModal
+      :open="createModalOpen"
+      :account-id="session.activeAccountId.value"
+      @close="createModalOpen = false"
+      @created="void onManualTransactionsCreated($event)"
+    />
   </AppShellTemplate>
 </template>
+

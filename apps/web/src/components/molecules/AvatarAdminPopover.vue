@@ -85,7 +85,7 @@ onBeforeUnmount(() => {
       <template #trigger>
         <button
           type="button"
-          class="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-2 py-1.5 text-sm text-slate-700 shadow-sm transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+          class="group inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white/90 px-2 py-1.5 text-sm text-slate-700 shadow-sm transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
           :aria-expanded="isOpen"
           aria-haspopup="menu"
           title="Open account menu"
@@ -100,7 +100,7 @@ onBeforeUnmount(() => {
 
       <template #default="{ close }">
         <section
-          class="menu-panel translate-y-2 overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-xl backdrop-blur"
+          class="menu-panel translate-y-2 overflow-hidden rounded-2xl border border-slate-300 bg-white/95 shadow-xl backdrop-blur"
           @mouseenter="openOnHover"
           @mouseleave="scheduleCloseOnLeave"
         >

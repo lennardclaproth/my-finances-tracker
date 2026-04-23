@@ -12,6 +12,7 @@ import BaseInput from "../atoms/BaseInput.vue";
 import BaseSelect from "../atoms/BaseSelect.vue";
 import BaseToggle from "../atoms/BaseToggle.vue";
 import ListingSearchSelect from "./ListingSearchSelect.vue";
+import SingleDatePopover from "./SingleDatePopover.vue";
 
 type ManualTransactionType = "BUY" | "SELL" | "DIVIDEND" | "TAX" | "FEE" | "CASH";
 
@@ -342,9 +343,8 @@ async function submit(): Promise<void> {
 
         <label class="block space-y-1">
           <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Occurred at *</span>
-          <BaseInput
+          <SingleDatePopover
             :model-value="occurredAt"
-            type="date"
             :disabled="submitting"
             @update:model-value="occurredAt = $event"
           />

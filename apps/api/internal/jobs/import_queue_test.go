@@ -131,7 +131,9 @@ func (r *fakeReader) ReadCsv(_ string) (io.ReadCloser, error) {
 type stubCashflowParser struct{}
 
 func (p *stubCashflowParser) ParseAll(rc io.ReadCloser) (iter.Seq2[int, cashflow.TransactionData], error) {
-	_ = rc.Close()
+	if err := rc.Close(); err != nil {
+		return nil, err
+	}
 	seq := func(yield func(int, cashflow.TransactionData) bool) {
 		yield(1, cashflow.TransactionData{
 			Description: "test",

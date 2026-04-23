@@ -304,13 +304,13 @@ function nextMonth(): void {
   <BasePopover
     v-model:open="isOpen"
     :disabled="disabled"
-    panel-class="w-[44rem] max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-4 shadow-2xl"
+    panel-class="w-[44rem] max-w-[calc(100vw-2rem)] rounded-xl border border-slate-300 bg-white p-4 shadow-2xl"
     z-index-class="z-40"
   >
     <template #trigger="{ open, close }">
       <BaseButton
         unstyled
-        class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-60"
+        class="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white/90 px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-60"
         :disabled="disabled"
         :title="displayLabel"
         @click="onTriggerClick(open, close)"
@@ -326,7 +326,7 @@ function nextMonth(): void {
         <div class="flex items-center gap-2">
           <IconButton
             unstyled
-            class="rounded-full border border-slate-200 p-1 text-slate-600 hover:bg-slate-100"
+            class="rounded-full border border-slate-300 p-1 text-slate-600 hover:bg-slate-100"
             title="Previous month"
             @click="prevMonth"
           >
@@ -334,7 +334,7 @@ function nextMonth(): void {
           </IconButton>
           <IconButton
             unstyled
-            class="rounded-full border border-slate-200 p-1 text-slate-600 hover:bg-slate-100"
+            class="rounded-full border border-slate-300 p-1 text-slate-600 hover:bg-slate-100"
             title="Next month"
             @click="nextMonth"
           >
@@ -353,7 +353,7 @@ function nextMonth(): void {
           class="rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide transition"
           :class="activePreset === preset.key
             ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'"
+            : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'"
           @click="selectPreset(preset.key)"
         >
           {{ preset.label }}
@@ -361,7 +361,7 @@ function nextMonth(): void {
       </div>
 
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <article class="rounded-lg border border-slate-200 p-3">
+        <article class="rounded-lg border border-slate-300 p-3">
           <h3 class="mb-2 text-sm font-semibold text-slate-800">{{ monthLabelFormatter.format(leftMonth) }}</h3>
           <div class="mb-1 grid grid-cols-7 text-center text-xs font-semibold uppercase text-slate-400">
             <span v-for="label in weekLabels" :key="`left-${label}`">{{ label }}</span>
@@ -380,7 +380,7 @@ function nextMonth(): void {
           </div>
         </article>
 
-        <article class="rounded-lg border border-slate-200 p-3">
+        <article class="rounded-lg border border-slate-300 p-3">
           <h3 class="mb-2 text-sm font-semibold text-slate-800">{{ monthLabelFormatter.format(rightMonth) }}</h3>
           <div class="mb-1 grid grid-cols-7 text-center text-xs font-semibold uppercase text-slate-400">
             <span v-for="label in weekLabels" :key="`right-${label}`">{{ label }}</span>

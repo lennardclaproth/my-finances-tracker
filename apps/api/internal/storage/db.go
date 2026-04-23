@@ -27,6 +27,7 @@ const (
 	SchemaAccount    = "account"
 	SchemaImports    = "import"
 	SchemaMarketData = "marketdata"
+	SchemaAssets     = "assets"
 )
 
 const (
@@ -41,11 +42,19 @@ const (
 	TablePositions     = "positions"
 	TablePosSnapshots  = "position_snapshots"
 	TablePortSnapshots = "portfolio_snapshots"
+	TableAssetClasses  = "classes"
+	TableAssetItems    = "items"
+	TableAssetHistory  = "histories"
+	TableAssetSnapshot = "snapshots"
 )
 
 type DB struct {
 	*sqlx.DB
 }
+
+type txContextKey struct{}
+
+var transactionContextKey = txContextKey{}
 
 func NewDB(connStr string, connType ConnectionType) *DB {
 	var (
@@ -74,9 +83,30 @@ func qualifyTable(db *DB, schema, table string) string {
 }
 
 func (db *DB) GetExecutor(ctx context.Context) sqlx.ExtContext {
-	tx, ok := ctx.Value("tx").(*sqlx.Tx)
+	tx, ok := ctx.Value(transactionContextKey).(*sqlx.Tx)
 	if ok {
 		return tx
 	}
 	return db
+}
+
+// WithTx executes fn in a database transaction and commits when fn returns nil.
+func (db *DB) WithTx(ctx context.Context, fn func(ctx context.Context) error) error {
+	tx, err := db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("db: begin tx: %w", err)
+	}
+
+	ctxTx := context.WithValue(ctx, transactionContextKey, tx)
+	if err := fn(ctxTx); err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return fmt.Errorf("db: rollback tx: %w (original error: %v)", rollbackErr, err)
+		}
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("db: commit tx: %w", err)
+	}
+	return nil
 }

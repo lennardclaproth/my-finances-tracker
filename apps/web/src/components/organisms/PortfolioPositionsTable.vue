@@ -105,11 +105,13 @@ const rootClasses = computed(() => {
             </tr>
           </thead>
           <tbody>
-            <tr v-if="loading" v-for="index in skeletonRows" :key="`skeleton-${index}`">
-              <td v-for="cell in 8" :key="`skeleton-${index}-${cell}`" class="border-b border-slate-100 px-3 py-3">
-                <div class="h-4 w-full animate-pulse rounded bg-slate-200" />
-              </td>
-            </tr>
+            <template v-if="loading">
+              <tr v-for="index in skeletonRows" :key="`skeleton-${index}`">
+                <td v-for="cell in 8" :key="`skeleton-${index}-${cell}`" class="border-b border-slate-100 px-3 py-3">
+                  <div class="h-4 w-full animate-pulse rounded bg-slate-200" />
+                </td>
+              </tr>
+            </template>
 
             <tr v-else-if="errorMessage">
               <td colspan="8" class="px-3 py-10 text-center">
@@ -124,22 +126,24 @@ const rootClasses = computed(() => {
               </td>
             </tr>
 
-            <tr v-for="row in rows" v-else :key="row.id" class="hover:bg-slate-50">
-              <td class="border-b border-slate-100 px-3 py-2 text-sm font-semibold text-slate-900">{{ row.name || "-" }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatQuantity(row.quantity) }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatMoney(averageCost(row)) }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatMoney(row.marketValue) }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">
-                <UnrealizedPnLBadge :value="row.realizedPnL" mode="currency" />
-              </td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">
-                <UnrealizedPnLBadge :value="row.unrealizedPnLPct" />
-              </td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatDate(row.lastSnapshotAt) }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">
-                <StatusBadge :tone="row.isClosed ? 'neutral' : 'success'">{{ row.isClosed ? "Closed" : "Open" }}</StatusBadge>
-              </td>
-            </tr>
+            <template v-else>
+              <tr v-for="row in rows" :key="row.id" class="hover:bg-slate-50">
+                <td class="border-b border-slate-100 px-3 py-2 text-sm font-semibold text-slate-900">{{ row.name || "-" }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatQuantity(row.quantity) }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatMoney(averageCost(row)) }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatMoney(row.marketValue) }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">
+                  <UnrealizedPnLBadge :value="row.realizedPnL" mode="currency" />
+                </td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">
+                  <UnrealizedPnLBadge :value="row.unrealizedPnLPct" />
+                </td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatDate(row.lastSnapshotAt) }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">
+                  <StatusBadge :tone="row.isClosed ? 'neutral' : 'success'">{{ row.isClosed ? "Closed" : "Open" }}</StatusBadge>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>

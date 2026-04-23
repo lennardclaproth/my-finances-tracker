@@ -210,14 +210,16 @@ function directionTone(value: string): "success" | "warning" | "neutral" {
         </thead>
 
         <tbody>
-          <tr v-if="loading" v-for="index in skeletonRows" :key="`skeleton-${index}`" class="border-b border-slate-100">
-            <td class="border-b border-slate-100 px-3 py-3">
-              <div class="h-4 w-4 animate-pulse rounded bg-slate-200" />
-            </td>
-            <td v-for="cell in 8" :key="`skeleton-${index}-cell-${cell}`" class="border-b border-slate-100 px-3 py-3">
-              <div class="h-4 w-full animate-pulse rounded bg-slate-200" />
-            </td>
-          </tr>
+          <template v-if="loading">
+            <tr v-for="index in skeletonRows" :key="`skeleton-${index}`" class="border-b border-slate-100">
+              <td class="border-b border-slate-100 px-3 py-3">
+                <div class="h-4 w-4 animate-pulse rounded bg-slate-200" />
+              </td>
+              <td v-for="cell in 8" :key="`skeleton-${index}-cell-${cell}`" class="border-b border-slate-100 px-3 py-3">
+                <div class="h-4 w-full animate-pulse rounded bg-slate-200" />
+              </td>
+            </tr>
+          </template>
 
           <tr v-else-if="rows.length === 0">
             <td colspan="9" class="px-3 py-12 text-center text-sm text-slate-500">
@@ -225,29 +227,31 @@ function directionTone(value: string): "success" | "warning" | "neutral" {
             </td>
           </tr>
 
-          <tr v-for="row in rows" :key="row.id" class="border-b border-slate-100 hover:bg-slate-50">
-            <td class="border-b border-slate-100 px-3 py-2">
-              <BaseCheckbox
-                :checked="allMatchingSelected || selectedIdSet.has(row.id)"
-                :disabled="loading"
-                @update:checked="emit('toggle-row', row.id, $event)"
-              />
-            </td>
-            <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-800">{{ row.description }}</td>
-            <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ row.note || "-" }}</td>
-            <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ row.source }}</td>
-            <td class="border-b border-slate-100 px-3 py-2 text-sm font-medium text-slate-900">
-              {{ formatAmountCents(row.amountCents, row.direction) }}
-            </td>
-            <td class="border-b border-slate-100 px-3 py-2">
-              <StatusBadge :tone="directionTone(row.direction)">{{ normalizeDirection(row.direction) }}</StatusBadge>
-            </td>
-            <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatLocalDate(row.date) }}</td>
-            <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ row.tag || "-" }}</td>
-            <td class="border-b border-slate-100 px-3 py-2">
-              <VisibilityIndicator :visible="!row.ignored" />
-            </td>
-          </tr>
+          <template v-else>
+            <tr v-for="row in rows" :key="row.id" class="border-b border-slate-100 hover:bg-slate-50">
+              <td class="border-b border-slate-100 px-3 py-2">
+                <BaseCheckbox
+                  :checked="allMatchingSelected || selectedIdSet.has(row.id)"
+                  :disabled="loading"
+                  @update:checked="emit('toggle-row', row.id, $event)"
+                />
+              </td>
+              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-800">{{ row.description }}</td>
+              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ row.note || "-" }}</td>
+              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ row.source }}</td>
+              <td class="border-b border-slate-100 px-3 py-2 text-sm font-medium text-slate-900">
+                {{ formatAmountCents(row.amountCents, row.direction) }}
+              </td>
+              <td class="border-b border-slate-100 px-3 py-2">
+                <StatusBadge :tone="directionTone(row.direction)">{{ normalizeDirection(row.direction) }}</StatusBadge>
+              </td>
+              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatLocalDate(row.date) }}</td>
+              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ row.tag || "-" }}</td>
+              <td class="border-b border-slate-100 px-3 py-2">
+                <VisibilityIndicator :visible="!row.ignored" />
+              </td>
+            </tr>
+          </template>
         </tbody>
         </table>
       </div>

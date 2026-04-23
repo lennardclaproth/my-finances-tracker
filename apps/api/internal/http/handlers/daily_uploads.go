@@ -81,8 +81,20 @@ func UploadDailiesFile(
 	fileRemover dailyUploadFileRemover,
 	enqueuer dailyUploadEnqueuer,
 ) http.Handler {
+	policy := marketdata.NewManualUploadPolicy(
+		listingStore,
+		providerStore,
+		func(source marketdata.Source) error {
+			_, err := marketdataParsers.CreateDailyParser(source)
+			return err
+		},
+	)
 	endpoint := func(ctx context.Context, req uploadDailiesMultipartRequest) (status int, res any, err error) {
-		defer req.File.Close()
+		defer func() {
+			if closeErr := req.File.Close(); closeErr != nil {
+				log.Warn(ctx, "failed closing daily upload file", "error", closeErr.Error())
+			}
+		}()
 
 		if !isAllowedDailyUploadFilename(req.Filename) {
 			return http.StatusBadRequest, map[string]string{"file": "file must have .csv or .txt extension"}, nil
@@ -93,31 +105,20 @@ func UploadDailiesFile(
 			return http.StatusBadRequest, map[string]string{"listing_id": "listing_id must be a valid UUID"}, nil
 		}
 
-		listing, err := listingStore.FetchByID(ctx, listingID)
+		listing, err := policy.ValidateListing(ctx, listingID)
 		if err != nil {
-			return http.StatusInternalServerError, struct{}{}, err
-		}
-		if listing == nil {
-			return http.StatusNotFound, map[string]string{"listing_id": "listing not found"}, nil
-		}
-
-		providerName, err := marketdata.ProviderNameFromSource(listing.Source)
-		if err != nil {
-			return http.StatusUnprocessableEntity, map[string]string{"listing_id": "no provider for listing source"}, nil
-		}
-		provider, err := providerStore.GetByName(ctx, providerName)
-		if err != nil {
-			if errors.Is(err, marketdata.ErrProviderNotFound) {
+			switch {
+			case errors.Is(err, marketdata.ErrManualUploadListingNotFound):
+				return http.StatusNotFound, map[string]string{"listing_id": "listing not found"}, nil
+			case errors.Is(err, marketdata.ErrManualUploadProviderUnavailable):
 				return http.StatusUnprocessableEntity, map[string]string{"listing_id": "provider unavailable for listing source"}, nil
+			case errors.Is(err, marketdata.ErrManualUploadProviderNotManual):
+				return http.StatusUnprocessableEntity, map[string]string{"listing_id": "provider does not support manual daily uploads"}, nil
+			case errors.Is(err, marketdata.ErrManualUploadParserUnavailable):
+				return http.StatusUnprocessableEntity, map[string]string{"listing_id": "no parser for listing source"}, nil
+			default:
+				return http.StatusInternalServerError, struct{}{}, err
 			}
-			return http.StatusInternalServerError, struct{}{}, err
-		}
-		if provider == nil || !provider.IsManualIngestion() {
-			return http.StatusUnprocessableEntity, map[string]string{"listing_id": "provider does not support manual daily uploads"}, nil
-		}
-
-		if _, err := marketdataParsers.CreateDailyParser(listing.Source); err != nil {
-			return http.StatusUnprocessableEntity, map[string]string{"listing_id": "no parser for listing source"}, nil
 		}
 
 		head := make([]byte, 1)
@@ -137,11 +138,15 @@ func UploadDailiesFile(
 
 		upload, err := marketdata.NewDailyUpload(listingID, listing.Source, storedFilename, req.Filename)
 		if err != nil {
-			_ = fileRemover.Remove(storedFilename)
+			if removeErr := fileRemover.Remove(storedFilename); removeErr != nil {
+				log.Warn(ctx, "failed removing stored upload file after invalid upload", "path", storedFilename, "error", removeErr.Error())
+			}
 			return http.StatusBadRequest, map[string]string{"upload": err.Error()}, nil
 		}
 		if err := uploadStore.Create(ctx, upload); err != nil {
-			_ = fileRemover.Remove(storedFilename)
+			if removeErr := fileRemover.Remove(storedFilename); removeErr != nil {
+				log.Warn(ctx, "failed removing stored upload file after persist failure", "path", storedFilename, "error", removeErr.Error())
+			}
 			return http.StatusInternalServerError, struct{}{}, err
 		}
 		if enqueuer != nil {

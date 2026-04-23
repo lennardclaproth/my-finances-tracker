@@ -62,7 +62,6 @@ func (s *PositionBuilder) BuildPositionSnapshots(
 	accID uuid.UUID,
 	positionID uuid.UUID,
 ) error {
-	_ = accID
 	// Determine start date from when on we want the snapshots to be built.
 	var startDate time.Time
 	pos, err := s.ps.GetByID(ctx, positionID)
@@ -156,8 +155,17 @@ func (s *PositionBuilder) BuildPositionSnapshots(
 			dIdx++
 		}
 		if dIdx < len(dailies.Data) && date.SameDayUTC(dailies.Data[dIdx].Date, d) {
-			unitPrice = dailies.Data[dIdx].Close
-			unitPriceSet = true
+			// We prioritize the close price for the day for market value calculation, if available. If
+			// not, we fallback to the open price. If there is no open and close price available, we keep
+			// the previous market value (if any) to avoid having a gap in the market value for this day.
+			if dailies.Data[dIdx].Close > 0 {
+				unitPrice = dailies.Data[dIdx].Close
+				unitPriceSet = true
+			}
+			if !unitPriceSet && dailies.Data[dIdx].Open > 0 {
+				unitPrice = dailies.Data[dIdx].Open
+				unitPriceSet = true
+			}
 		}
 		// If we don't have daily data for this day, we carry forward the previous market value.
 		// If a buy or sell transaction occurred on this day we can calculate the market value based on the
@@ -305,7 +313,9 @@ func applyTxToCycle(
 			return nil, false, err
 		}
 		mergePositionIdentity(pos, *tx)
-		pos.ApplyTx(*tx)
+		if err := pos.ApplyTx(*tx); err != nil {
+			return nil, false, fmt.Errorf("apply buy transaction to position: %w", err)
+		}
 		tx.PositionID = &pos.ID
 		return pos, created, nil
 	case TxSell:
@@ -314,7 +324,9 @@ func applyTxToCycle(
 			return nil, false, nil
 		}
 		mergePositionIdentity(pos, *tx)
-		pos.ApplyTx(*tx)
+		if err := pos.ApplyTx(*tx); err != nil {
+			return nil, false, fmt.Errorf("apply sell transaction to position: %w", err)
+		}
 		tx.PositionID = &pos.ID
 		// Close the cycle when quantity reaches zero.
 		if pos.Quantity == 0 {
@@ -328,7 +340,9 @@ func applyTxToCycle(
 			return nil, false, err
 		}
 		mergePositionIdentity(pos, *tx)
-		pos.ApplyTx(*tx)
+		if err := pos.ApplyTx(*tx); err != nil {
+			return nil, false, fmt.Errorf("apply non-trade transaction to position: %w", err)
+		}
 		tx.PositionID = &pos.ID
 		return pos, created, nil
 	default:

@@ -3,6 +3,7 @@ package memorybus
 import (
 	"context"
 	"errors"
+	"fmt"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -228,7 +229,9 @@ func (b *MemoryBus) worker() {
 			continue
 		}
 		// TODO: implement a timeout to prevent goroutine exhaustion
-		_ = s.handler(context.Background(), envelope)
+		if err := s.handler(context.Background(), envelope); err != nil {
+			apm.CaptureError(context.Background(), err).Send()
+		}
 		if len(s.queue) > 0 && !s.closed.Load() {
 			// keep scheduled=1, requeue
 			b.ready <- s
@@ -247,7 +250,11 @@ func (b *MemoryBus) schedule(s *subscriber) {
 	if s.scheduled.CompareAndSwap(0, 1) {
 		// we only want to recover when scheduling a subscriber fails, hence the defer is
 		// in this if statement.
-		defer func() { _ = recover() }()
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				apm.CaptureError(context.Background(), fmt.Errorf("memory bus schedule panic: %v", recovered)).Send()
+			}
+		}()
 		// add subscriber to ready queue to be handled
 		b.ready <- s
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// DailyUploadStatus tracks async daily-upload processing state.
 type DailyUploadStatus string
 
 const (
@@ -18,11 +19,13 @@ const (
 	DailyUploadStatusFailed     DailyUploadStatus = "FAILED"
 )
 
+// DailyUploadRowError contains one failed row reason.
 type DailyUploadRowError struct {
 	RowNumber int    `json:"row_number"`
 	Reason    string `json:"reason"`
 }
 
+// DailyUpload is the persisted aggregate for an async daily file upload.
 type DailyUpload struct {
 	ID               uuid.UUID         `db:"id"`
 	ListingID        uuid.UUID         `db:"listing_id"`
@@ -45,13 +48,19 @@ type DailyUpload struct {
 }
 
 var (
-	ErrDailyUploadNotFound            = fmt.Errorf("daily upload not found")
-	ErrDailyUploadListingIDEmpty      = fmt.Errorf("daily upload listing id cannot be empty")
-	ErrDailyUploadSourceEmpty         = fmt.Errorf("daily upload source cannot be empty")
+	// ErrDailyUploadNotFound indicates missing upload record.
+	ErrDailyUploadNotFound = fmt.Errorf("daily upload not found")
+	// ErrDailyUploadListingIDEmpty indicates missing listing identifier.
+	ErrDailyUploadListingIDEmpty = fmt.Errorf("daily upload listing id cannot be empty")
+	// ErrDailyUploadSourceEmpty indicates missing upload source.
+	ErrDailyUploadSourceEmpty = fmt.Errorf("daily upload source cannot be empty")
+	// ErrDailyUploadStoredFilenameEmpty indicates missing persisted filename.
 	ErrDailyUploadStoredFilenameEmpty = fmt.Errorf("daily upload stored filename cannot be empty")
-	ErrDailyUploadOriginalNameEmpty   = fmt.Errorf("daily upload original filename cannot be empty")
+	// ErrDailyUploadOriginalNameEmpty indicates missing original filename.
+	ErrDailyUploadOriginalNameEmpty = fmt.Errorf("daily upload original filename cannot be empty")
 )
 
+// NewDailyUpload constructs a new upload aggregate in pending state.
 func NewDailyUpload(listingID uuid.UUID, source Source, storedFilename, originalFilename string) (*DailyUpload, error) {
 	if listingID == uuid.Nil {
 		return nil, ErrDailyUploadListingIDEmpty
@@ -84,6 +93,7 @@ func NewDailyUpload(listingID uuid.UUID, source Source, storedFilename, original
 	return upload, nil
 }
 
+// MarkProcessing transitions the upload into processing state.
 func (u *DailyUpload) MarkProcessing() {
 	now := time.Now().UTC()
 	u.Status = DailyUploadStatusProcessing
@@ -91,6 +101,7 @@ func (u *DailyUpload) MarkProcessing() {
 	u.UpdatedAt = now
 }
 
+// MarkCompleted stores counters and terminal status for a processed upload.
 func (u *DailyUpload) MarkCompleted(totalRows, insertedRows, duplicateRows, errorRows int, rowErrors []DailyUploadRowError, statusMsg string) error {
 	now := time.Now().UTC()
 	u.TotalRows = totalRows
@@ -110,6 +121,7 @@ func (u *DailyUpload) MarkCompleted(totalRows, insertedRows, duplicateRows, erro
 	return u.SetRowErrors(rowErrors, 50)
 }
 
+// MarkFailed marks the upload as failed and persists sampled row errors.
 func (u *DailyUpload) MarkFailed(statusMsg string) error {
 	now := time.Now().UTC()
 	u.Status = DailyUploadStatusFailed
@@ -119,6 +131,7 @@ func (u *DailyUpload) MarkFailed(statusMsg string) error {
 	return u.SetRowErrors(u.RowErrors, 50)
 }
 
+// SetRowErrors stores row errors with optional sampling limit.
 func (u *DailyUpload) SetRowErrors(rowErrors []DailyUploadRowError, sampleLimit int) error {
 	out := rowErrors
 	if out == nil {
@@ -136,6 +149,7 @@ func (u *DailyUpload) SetRowErrors(rowErrors []DailyUploadRowError, sampleLimit 
 	return nil
 }
 
+// DecodeRowErrors parses persisted row error JSON into RowErrors.
 func (u *DailyUpload) DecodeRowErrors() error {
 	if u.RowErrorsJSON == "" {
 		u.RowErrors = []DailyUploadRowError{}

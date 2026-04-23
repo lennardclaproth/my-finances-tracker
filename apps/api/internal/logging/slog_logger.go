@@ -19,10 +19,22 @@ func NewSlogLogger(level slog.Leveler) *SlogLogger {
 	return &SlogLogger{logger: slog.New(handler)}
 }
 
+func (l *SlogLogger) Debug(ctx context.Context, msg string, args ...any) {
+	fields := observability.AppendContextFields(ctx, args...)
+	fields = observability.FilterFields(fields...)
+	l.logger.DebugContext(ctx, msg, fields...)
+}
+
 func (l *SlogLogger) Info(ctx context.Context, msg string, args ...any) {
 	fields := observability.AppendContextFields(ctx, args...)
 	fields = observability.FilterFields(fields...)
 	l.logger.InfoContext(ctx, msg, fields...)
+}
+
+func (l *SlogLogger) Warn(ctx context.Context, msg string, args ...any) {
+	fields := observability.AppendContextFields(ctx, args...)
+	fields = observability.FilterFields(fields...)
+	l.logger.WarnContext(ctx, msg, fields...)
 }
 
 func (l *SlogLogger) Error(ctx context.Context, msg string, err error, args ...any) {

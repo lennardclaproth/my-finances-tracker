@@ -2,6 +2,7 @@ package parsers
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -20,9 +21,15 @@ func NewBrandNewDayParser() *BrandNewDayParser {
 
 func (p *BrandNewDayParser) ParseAll(rc io.ReadCloser) (ParseResult, error) {
 	raw, err := io.ReadAll(rc)
-	_ = rc.Close()
+	closeErr := rc.Close()
 	if err != nil {
+		if closeErr != nil {
+			return ParseResult{}, errors.Join(err, closeErr)
+		}
 		return ParseResult{}, err
+	}
+	if closeErr != nil {
+		return ParseResult{}, closeErr
 	}
 
 	text := decodeText(raw)

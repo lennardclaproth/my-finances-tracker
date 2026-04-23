@@ -90,7 +90,7 @@ func (s *fakeDailyUploadListingStore) FetchByID(_ context.Context, id uuid.UUID)
 }
 
 type fakeDailyPersistStore struct {
-	mu      sync.Mutex
+	mu       sync.Mutex
 	inserted map[string]bool
 }
 

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -23,6 +24,7 @@ type Config struct {
 }
 
 type AgentConfig struct {
+	Enabled           bool   `yaml:"enabled"`
 	AgentBaseURL      string `yaml:"agent_base_url"`
 	DefaultTagAgentID string `yaml:"default_tag_agent_id"`
 }
@@ -93,11 +95,16 @@ func (c *Config) Validate() error {
 	if c.DiskStorage.BasePath == "" {
 		return fmt.Errorf("disk storage base path cannot be empty")
 	}
-	if c.Agent.AgentBaseURL == "" {
-		return fmt.Errorf("agent base URL cannot be empty")
-	}
-	if c.Agent.DefaultTagAgentID == "" {
-		return fmt.Errorf("default tag agent ID cannot be empty")
+	if c.Agent.Enabled {
+		if strings.TrimSpace(c.Agent.AgentBaseURL) == "" {
+			return fmt.Errorf("agent base URL cannot be empty when agent is enabled")
+		}
+		if strings.TrimSpace(c.Agent.DefaultTagAgentID) == "" {
+			return fmt.Errorf("default tag agent ID cannot be empty when agent is enabled")
+		}
+		if _, err := uuid.Parse(c.Agent.DefaultTagAgentID); err != nil {
+			return fmt.Errorf("default tag agent ID must be a valid UUID when agent is enabled: %w", err)
+		}
 	}
 	return nil
 }
@@ -110,6 +117,7 @@ func ReadConfig() (*Config, error) {
 	}
 
 	var cfg Config
+	cfg.Agent.Enabled = true
 
 	err = yaml.Unmarshal(f, &cfg)
 
@@ -120,13 +128,27 @@ func ReadConfig() (*Config, error) {
 	cfg.hydrateProviderEnv()
 	cfg.applyAPMDefaults()
 
-	os.Setenv("ELASTIC_APM_SERVER_URL", cfg.APM.ServerURL)
-	os.Setenv("ELASTIC_APM_SERVICE_NAME", cfg.APM.ServiceName)
-	os.Setenv("ELASTIC_APM_ENVIRONMENT", cfg.APM.Environment)
-	os.Setenv("ELASTIC_APM_SECRET_TOKEN", cfg.APM.SecretToken)
-	os.Setenv("ELASTIC_APM_VERIFY_SERVER_CERT", fmt.Sprintf("%t", cfg.APM.VerifyServerCert))
-	os.Setenv("ELASTIC_APM_LOG_LEVEL", cfg.APM.LogLevel)
-	os.Setenv("ELASTIC_APM_TRANSACTION_SAMPLE_RATE", strconv.FormatFloat(cfg.APM.TransactionSampleRate, 'f', 2, 64))
+	if err := os.Setenv("ELASTIC_APM_SERVER_URL", cfg.APM.ServerURL); err != nil {
+		return nil, fmt.Errorf("config: failed setting ELASTIC_APM_SERVER_URL: %w", err)
+	}
+	if err := os.Setenv("ELASTIC_APM_SERVICE_NAME", cfg.APM.ServiceName); err != nil {
+		return nil, fmt.Errorf("config: failed setting ELASTIC_APM_SERVICE_NAME: %w", err)
+	}
+	if err := os.Setenv("ELASTIC_APM_ENVIRONMENT", cfg.APM.Environment); err != nil {
+		return nil, fmt.Errorf("config: failed setting ELASTIC_APM_ENVIRONMENT: %w", err)
+	}
+	if err := os.Setenv("ELASTIC_APM_SECRET_TOKEN", cfg.APM.SecretToken); err != nil {
+		return nil, fmt.Errorf("config: failed setting ELASTIC_APM_SECRET_TOKEN: %w", err)
+	}
+	if err := os.Setenv("ELASTIC_APM_VERIFY_SERVER_CERT", fmt.Sprintf("%t", cfg.APM.VerifyServerCert)); err != nil {
+		return nil, fmt.Errorf("config: failed setting ELASTIC_APM_VERIFY_SERVER_CERT: %w", err)
+	}
+	if err := os.Setenv("ELASTIC_APM_LOG_LEVEL", cfg.APM.LogLevel); err != nil {
+		return nil, fmt.Errorf("config: failed setting ELASTIC_APM_LOG_LEVEL: %w", err)
+	}
+	if err := os.Setenv("ELASTIC_APM_TRANSACTION_SAMPLE_RATE", strconv.FormatFloat(cfg.APM.TransactionSampleRate, 'f', 2, 64)); err != nil {
+		return nil, fmt.Errorf("config: failed setting ELASTIC_APM_TRANSACTION_SAMPLE_RATE: %w", err)
+	}
 
 	if err := cfg.Validate(); err != nil {
 		return nil, err

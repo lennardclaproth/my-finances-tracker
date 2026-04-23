@@ -2,6 +2,7 @@ package storage
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -10,15 +11,18 @@ import (
 
 const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
+// Disk provides filesystem persistence for uploaded CSV files.
 type Disk struct {
 	basePath string
 }
 
+// NewDisk creates a disk-backed storage helper rooted at basePath.
 func NewDisk(basePath string) *Disk {
 	return &Disk{basePath: basePath}
 }
 
-func (dw *Disk) WriteCsv(r io.Reader) (string, error) {
+// WriteCsv writes CSV contents to a generated filename and returns the absolute path.
+func (dw *Disk) WriteCsv(r io.Reader) (path string, err error) {
 	// Ensure base path exists
 	if err := os.MkdirAll(dw.basePath, 0o755); err != nil {
 		return "", fmt.Errorf("create base dir: %w", err)
@@ -35,26 +39,40 @@ func (dw *Disk) WriteCsv(r io.Reader) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("create file: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil {
+			if err == nil {
+				err = fmt.Errorf("close file: %w", closeErr)
+			} else {
+				err = errors.Join(err, fmt.Errorf("close file: %w", closeErr))
+			}
+		}
+	}()
 
 	if _, err := io.Copy(f, r); err != nil {
-		_ = os.Remove(fullPath) // cleanup partial file
+		if removeErr := os.Remove(fullPath); removeErr != nil {
+			return "", fmt.Errorf("write file: %w (cleanup remove failed: %v)", err, removeErr)
+		}
 		return "", fmt.Errorf("write file: %w", err)
 	}
 
 	// Optional: ensure it's flushed to disk
 	if err := f.Sync(); err != nil {
-		_ = os.Remove(fullPath)
+		if removeErr := os.Remove(fullPath); removeErr != nil {
+			return "", fmt.Errorf("sync file: %w (cleanup remove failed: %v)", err, removeErr)
+		}
 		return "", fmt.Errorf("sync file: %w", err)
 	}
 
 	return fullPath, nil
 }
 
+// Remove removes a file at the given path.
 func (dw *Disk) Remove(path string) error {
 	return os.Remove(path)
 }
 
+// ReadCsv opens a CSV file for reading.
 func (dw *Disk) ReadCsv(path string) (io.ReadCloser, error) {
 	return os.Open(path)
 }

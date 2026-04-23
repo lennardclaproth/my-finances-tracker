@@ -12,17 +12,32 @@ import (
 )
 
 // CreateAccount creates an account used to map imports and portfolio builds.
+//
+// @Summary Create account
+// @Description Creates a new account.
+// @Tags accounts
+// @Accept json
+// @Produce json
+// @Param request body api.CreateAccountRequest true "Create account payload"
+// @Success 200 {object} api.AccountResponse
+// @Failure 400 {object} map[string]string
+// @Failure 409 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /accounts [post]
 func CreateAccount(log logging.Logger, creator account.Creator) http.Handler {
-	endpoint := func(ctx context.Context, req api.CreateAccountRequest) (status int, res api.AccountResponse, err error) {
+	endpoint := func(ctx context.Context, req api.CreateAccountRequest) (status int, res any, err error) {
 		acc, err := account.NewAccount(req.Name, req.ExternalID)
 		if err != nil {
-			return http.StatusBadRequest, api.AccountResponse{}, nil
+			if errors.Is(err, account.ErrAccountNameRequired) {
+				return http.StatusBadRequest, map[string]string{"name": account.ErrAccountNameRequired.Error()}, nil
+			}
+			return http.StatusBadRequest, map[string]string{"account": err.Error()}, nil
 		}
 		if err := creator.Create(ctx, acc); err != nil {
 			if errors.Is(err, account.ErrAccountAlreadyExists) {
-				return http.StatusBadRequest, api.AccountResponse{}, nil
+				return http.StatusConflict, map[string]string{"account": account.ErrAccountAlreadyExists.Error()}, nil
 			}
-			return http.StatusInternalServerError, api.AccountResponse{}, err
+			return http.StatusInternalServerError, struct{}{}, err
 		}
 		return http.StatusOK, api.AccountResponse{
 			ID:         acc.ID,
@@ -41,6 +56,15 @@ func CreateAccount(log logging.Logger, creator account.Creator) http.Handler {
 }
 
 // GetAccounts lists all available accounts.
+//
+// @Summary List accounts
+// @Description Lists all available accounts.
+// @Tags accounts
+// @Accept json
+// @Produce json
+// @Success 200 {array} api.AccountResponse
+// @Failure 500 {object} map[string]string
+// @Router /accounts [get]
 func GetAccounts(log logging.Logger, lister account.Lister) http.Handler {
 	endpoint := func(ctx context.Context, _ struct{}) (status int, res []api.AccountResponse, err error) {
 		accounts, err := lister.List(ctx)

@@ -45,7 +45,9 @@ func TestIntegration_UploadDailiesFile_AcceptsAndProcessesAsync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed creating multipart part: %v", err)
 	}
-	_, _ = part.Write([]byte("Date\tNAV\tAsk\tBid\tDividend\n28/02/2026\t38,286191\t38,286191\t38,286191\t-\n27/02/2026\t38,286065\t38,286065\t38,286065\t-\n"))
+	if _, err := part.Write([]byte("Date\tNAV\tAsk\tBid\tDividend\n28/02/2026\t38,286191\t38,286191\t38,286191\t-\n27/02/2026\t38,286065\t38,286065\t38,286065\t-\n")); err != nil {
+		t.Fatalf("failed writing multipart payload: %v", err)
+	}
 	if err := writer.WriteField("listing_id", listing.ID.String()); err != nil {
 		t.Fatalf("failed writing listing_id field: %v", err)
 	}
@@ -63,7 +65,11 @@ func TestIntegration_UploadDailiesFile_AcceptsAndProcessesAsync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST /marketdata/dailies/upload failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if res.StatusCode != http.StatusAccepted {
 		body, _ := io.ReadAll(res.Body)
 		t.Fatalf("expected 202, got %d body=%s", res.StatusCode, string(body))
@@ -112,15 +118,21 @@ func TestIntegration_UploadDailiesFile_AcceptsAndProcessesAsync(t *testing.T) {
 		}
 		if statusRes.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(statusRes.Body)
-			statusRes.Body.Close()
+			if closeErr := statusRes.Body.Close(); closeErr != nil {
+				t.Fatalf("failed closing status response body: %v", closeErr)
+			}
 			t.Fatalf("expected 200 for status endpoint, got %d body=%s", statusRes.StatusCode, string(body))
 		}
 		var status api.DailyUploadStatusResponse
 		if err := json.NewDecoder(statusRes.Body).Decode(&status); err != nil {
-			statusRes.Body.Close()
+			if closeErr := statusRes.Body.Close(); closeErr != nil {
+				t.Fatalf("failed closing status response body: %v", closeErr)
+			}
 			t.Fatalf("failed decoding status response: %v", err)
 		}
-		statusRes.Body.Close()
+		if closeErr := statusRes.Body.Close(); closeErr != nil {
+			t.Fatalf("failed closing status response body: %v", closeErr)
+		}
 
 		if status.Status == string(marketdata.DailyUploadStatusSucceeded) || status.Status == string(marketdata.DailyUploadStatusPartial) {
 			if status.InsertedRows == 0 {
@@ -173,7 +185,9 @@ func TestIntegration_UploadDailiesFile_UnsupportedSourceReturns422(t *testing.T)
 	if err != nil {
 		t.Fatalf("failed creating multipart part: %v", err)
 	}
-	_, _ = part.Write([]byte("Date\tNAV\tAsk\tBid\tDividend\n28/02/2026\t38,286191\t38,286191\t38,286191\t-\n"))
+	if _, err := part.Write([]byte("Date\tNAV\tAsk\tBid\tDividend\n28/02/2026\t38,286191\t38,286191\t38,286191\t-\n")); err != nil {
+		t.Fatalf("failed writing multipart payload: %v", err)
+	}
 	if err := writer.WriteField("listing_id", listing.ID.String()); err != nil {
 		t.Fatalf("failed writing listing_id field: %v", err)
 	}
@@ -190,7 +204,11 @@ func TestIntegration_UploadDailiesFile_UnsupportedSourceReturns422(t *testing.T)
 	if err != nil {
 		t.Fatalf("POST /marketdata/dailies/upload failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusUnprocessableEntity {
 		body, _ := io.ReadAll(res.Body)
@@ -200,6 +218,10 @@ func TestIntegration_UploadDailiesFile_UnsupportedSourceReturns422(t *testing.T)
 
 type nilLogger struct{}
 
+func (n nilLogger) Debug(ctx context.Context, msg string, fields ...any) {}
+
 func (n nilLogger) Info(ctx context.Context, msg string, fields ...any) {}
+
+func (n nilLogger) Warn(ctx context.Context, msg string, fields ...any) {}
 
 func (n nilLogger) Error(ctx context.Context, msg string, err error, fields ...any) {}

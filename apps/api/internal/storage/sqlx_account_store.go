@@ -12,11 +12,13 @@ import (
 	"github.com/lib/pq"
 )
 
+// SQLXAccountStore persists and reads account records.
 type SQLXAccountStore struct {
 	db        *DB
 	tableName string
 }
 
+// NewSQLXAccountStore creates an account store backed by SQLX.
 func NewSQLXAccountStore(db *DB) *SQLXAccountStore {
 	return &SQLXAccountStore{
 		db:        db,
@@ -24,6 +26,7 @@ func NewSQLXAccountStore(db *DB) *SQLXAccountStore {
 	}
 }
 
+// Create inserts a new account row.
 func (s *SQLXAccountStore) Create(ctx context.Context, acc *account.Account) error {
 	query := fmt.Sprintf(`
 		INSERT INTO %s (id, external_id, name, created_at, updated_at)
@@ -44,6 +47,7 @@ func (s *SQLXAccountStore) Create(ctx context.Context, acc *account.Account) err
 	return nil
 }
 
+// List returns all accounts sorted by name.
 func (s *SQLXAccountStore) List(ctx context.Context) ([]*account.Account, error) {
 	var accounts []*account.Account
 	query := fmt.Sprintf(`SELECT id, external_id, name, created_at, updated_at FROM %s ORDER BY name ASC`, s.tableName)
@@ -53,6 +57,7 @@ func (s *SQLXAccountStore) List(ctx context.Context) ([]*account.Account, error)
 	return accounts, nil
 }
 
+// FetchByID returns one account by ID.
 func (s *SQLXAccountStore) FetchByID(ctx context.Context, id uuid.UUID) (*account.Account, error) {
 	var acc account.Account
 	query := fmt.Sprintf(`SELECT id, external_id, name, created_at, updated_at FROM %s WHERE id = $1`, s.tableName)

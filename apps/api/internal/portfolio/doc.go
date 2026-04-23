@@ -5,16 +5,16 @@ The portfolio package is responsible for calculating the performance of a portfo
 
 It does a few things:
 
-	- It maintains snapshots of the portfolio and accounts at different points in time.
-	- It calculates the performance of the portfolio and accounts based on those snapshots.
-	- It calculates the performance of the positions in the portfolio based on the snapshots.
+  - It maintains snapshots of the portfolio and accounts at different points in time.
+  - It calculates the performance of the portfolio and accounts based on those snapshots.
+  - It calculates the performance of the positions in the portfolio based on the snapshots.
 
 A snapshot is essentially a freeze-frame of reality at a given moment:
 
-	- How much money has been invested so far
-	- What the portfolio is currently worth on the market
-	- Whether the investor is up or down relative to their cost basis
-	- How the account evolves over time
+  - How much money has been invested so far
+  - What the portfolio is currently worth on the market
+  - Whether the investor is up or down relative to their cost basis
+  - How the account evolves over time
 
 To make performance calculations easier, each snapshot maintains a set of derived fields:
 
@@ -148,6 +148,5 @@ This answers:
 In finance this is closely related to time-weighted return.
 
 If no cash flows occur between snapshots, weighted performance will closely match daily percentage change.
-
 */
 package portfolio

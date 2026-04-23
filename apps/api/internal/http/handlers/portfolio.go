@@ -27,6 +27,7 @@ import (
 // @Param request body api.RebuildPortfolioRequest true "Rebuild request payload"
 // @Success 202 {object} api.AsyncEventAcceptedResponse
 // @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
 // @Failure 503 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /portfolio/rebuild [post]
@@ -41,7 +42,7 @@ func RebuildPortfolio(
 		}
 		if _, err := fetcher.FetchByID(ctx, req.AccountID); err != nil {
 			if errors.Is(err, account.ErrAccountNotFound) {
-				return http.StatusBadRequest, map[string]string{"account_id": "account not found"}, nil
+				return http.StatusNotFound, map[string]string{"account_id": account.ErrAccountNotFound.Error()}, nil
 			}
 			return http.StatusInternalServerError, struct{}{}, err
 		}
@@ -102,6 +103,7 @@ type portfolioTransactionLister interface {
 // @Param to query string false "End date (YYYY-MM-DD)"
 // @Success 200 {array} api.PortfolioSnapshotPointResponse
 // @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /portfolio/snapshots [get]
 func GetPortfolioSnapshots(
@@ -109,22 +111,22 @@ func GetPortfolioSnapshots(
 	fetcher account.Fetcher,
 	lister portfolioSnapshotLister,
 ) http.Handler {
-	endpoint := func(ctx context.Context, req api.GetPortfolioSnapshotsRequest) (status int, res []api.PortfolioSnapshotPointResponse, err error) {
+	endpoint := func(ctx context.Context, req api.GetPortfolioSnapshotsRequest) (status int, res any, err error) {
 		if _, err := fetcher.FetchByID(ctx, req.AccountID); err != nil {
 			if errors.Is(err, account.ErrAccountNotFound) {
-				return http.StatusBadRequest, nil, nil
+				return http.StatusNotFound, map[string]string{"account_id": account.ErrAccountNotFound.Error()}, nil
 			}
-			return http.StatusInternalServerError, nil, err
+			return http.StatusInternalServerError, struct{}{}, err
 		}
 
 		from, to, err := parsePortfolioDateRange(req.From, req.To)
 		if err != nil {
-			return http.StatusBadRequest, nil, nil
+			return http.StatusBadRequest, portfolioDateRangeProblem(err), nil
 		}
 
 		snapshots, err := lister.ListForAccount(ctx, req.AccountID, from, to)
 		if err != nil {
-			return http.StatusInternalServerError, nil, err
+			return http.StatusInternalServerError, struct{}{}, err
 		}
 
 		out := make([]api.PortfolioSnapshotPointResponse, 0, len(snapshots))
@@ -132,21 +134,16 @@ func GetPortfolioSnapshots(
 			if snap == nil {
 				continue
 			}
-			returnVsCostBasisPct := 0.0
-			if snap.CostBasis != 0 {
-				returnVsCostBasisPct = (snap.TotalPnL.Float64() / snap.CostBasis.Float64()) * 100
-			}
-			valueIndex := 100.0 * (1 + (snap.TimeWeightedReturnPct / 100))
 			out = append(out, api.PortfolioSnapshotPointResponse{
 				OccurredAt:            snap.OccurredAt,
 				MarketValue:           int64(snap.MarketValue),
 				TotalPnL:              int64(snap.TotalPnL),
 				TotalPnLPct:           snap.TotalPnLPct,
 				TotalCostBasis:        int64(snap.CostBasis),
-				ReturnVsCostBasisPct:  returnVsCostBasisPct,
+				ReturnVsCostBasisPct:  portfolio.SnapshotReturnVsCostBasisPct(snap),
 				DailyReturnPct:        snap.DailyDeltaPnLPct,
 				TimeWeightedReturnPct: snap.TimeWeightedReturnPct,
-				ValueIndex:            valueIndex,
+				ValueIndex:            portfolio.SnapshotValueIndex(snap),
 			})
 		}
 		return http.StatusOK, out, nil
@@ -200,6 +197,7 @@ func parsePortfolioDateRange(fromRaw, toRaw string) (*time.Time, *time.Time, err
 // @Param include_closed query bool false "Include closed positions"
 // @Success 200 {object} api.PortfolioPositionsResponse
 // @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /portfolio/positions [get]
 func GetPortfolioPositions(
@@ -207,17 +205,17 @@ func GetPortfolioPositions(
 	fetcher account.Fetcher,
 	lister portfolioPositionLister,
 ) http.Handler {
-	endpoint := func(ctx context.Context, req api.GetPortfolioPositionsRequest) (status int, res api.PortfolioPositionsResponse, err error) {
+	endpoint := func(ctx context.Context, req api.GetPortfolioPositionsRequest) (status int, res any, err error) {
 		if _, err := fetcher.FetchByID(ctx, req.AccountID); err != nil {
 			if errors.Is(err, account.ErrAccountNotFound) {
-				return http.StatusBadRequest, api.PortfolioPositionsResponse{}, nil
+				return http.StatusNotFound, map[string]string{"account_id": account.ErrAccountNotFound.Error()}, nil
 			}
-			return http.StatusInternalServerError, api.PortfolioPositionsResponse{}, err
+			return http.StatusInternalServerError, struct{}{}, err
 		}
 
 		positions, err := lister.ListForAccountWithLatestSnapshot(ctx, req.AccountID, req.IncludeClosed)
 		if err != nil {
-			return http.StatusInternalServerError, api.PortfolioPositionsResponse{}, err
+			return http.StatusInternalServerError, struct{}{}, err
 		}
 
 		out := make([]api.PortfolioPositionResponse, 0, len(positions))
@@ -288,7 +286,7 @@ func GetPortfolioTransactions(
 	fetcher account.Fetcher,
 	lister portfolioTransactionLister,
 ) http.Handler {
-	endpoint := func(ctx context.Context, req api.GetPortfolioTransactionsRequest) (status int, res api.PortfolioTransactionsResponse, err error) {
+	endpoint := func(ctx context.Context, req api.GetPortfolioTransactionsRequest) (status int, res any, err error) {
 		limit := req.Limit
 		if limit == 0 {
 			limit = 25
@@ -310,22 +308,14 @@ func GetPortfolioTransactions(
 
 		if _, err := fetcher.FetchByID(ctx, req.AccountID); err != nil {
 			if errors.Is(err, account.ErrAccountNotFound) {
-				return http.StatusNotFound, api.PortfolioTransactionsResponse{}, nil
+				return http.StatusNotFound, map[string]string{"account_id": account.ErrAccountNotFound.Error()}, nil
 			}
-			return http.StatusInternalServerError, api.PortfolioTransactionsResponse{}, err
+			return http.StatusInternalServerError, struct{}{}, err
 		}
 
 		from, to, err := parsePortfolioDateRange(req.From, req.To)
 		if err != nil {
-			msg := err.Error()
-			switch {
-			case msg == "from must be in YYYY-MM-DD format":
-				return http.StatusBadRequest, api.PortfolioTransactionsResponse{}, nil
-			case msg == "to must be in YYYY-MM-DD format":
-				return http.StatusBadRequest, api.PortfolioTransactionsResponse{}, nil
-			default:
-				return http.StatusBadRequest, api.PortfolioTransactionsResponse{}, nil
-			}
+			return http.StatusBadRequest, portfolioDateRangeProblem(err), nil
 		}
 
 		result, err := lister.FetchForAccount(ctx, portfolio.TransactionListQuery{
@@ -343,15 +333,11 @@ func GetPortfolioTransactions(
 			Listing:   strings.TrimSpace(req.Listing),
 		})
 		if err != nil {
-			return http.StatusInternalServerError, api.PortfolioTransactionsResponse{}, err
+			return http.StatusInternalServerError, struct{}{}, err
 		}
 
 		out := make([]api.PortfolioTransactionResponse, 0, len(result.Transactions))
 		for _, tx := range result.Transactions {
-			amount := tx.AmountCents.Float64()
-			if tx.Type == portfolio.TxCash && tx.Quantity < 0 {
-				amount = -amount
-			}
 			accountID := uuid.Nil
 			if tx.AccountID != nil {
 				accountID = *tx.AccountID
@@ -367,7 +353,7 @@ func GetPortfolioTransactions(
 				ISIN:        tx.ISIN,
 				Symbol:      tx.Symbol,
 				Description: tx.Description,
-				Amount:      formatDecimal(amount),
+				Amount:      formatDecimal(portfolio.SignedAmountForRead(tx.Type, tx.Quantity, tx.AmountCents.Float64())),
 				Quantity:    formatDecimal(tx.Quantity),
 				UnitPrice:   formatDecimal(tx.UnitPrice.Float64()),
 				CreatedAt:   tx.CreatedAt,
@@ -395,4 +381,21 @@ func GetPortfolioTransactions(
 	})
 
 	return httpx.Endpoint(decodeFn, log, endpoint)
+}
+
+func portfolioDateRangeProblem(err error) map[string]string {
+	if err == nil {
+		return map[string]string{"date_range": "invalid date range"}
+	}
+
+	switch err.Error() {
+	case "from must be in YYYY-MM-DD format":
+		return map[string]string{"from": "from must be in YYYY-MM-DD format"}
+	case "to must be in YYYY-MM-DD format":
+		return map[string]string{"to": "to must be in YYYY-MM-DD format"}
+	case "from must be before or equal to to":
+		return map[string]string{"from": "from must be before or equal to to"}
+	default:
+		return map[string]string{"date_range": err.Error()}
+	}
 }

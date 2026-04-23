@@ -23,6 +23,7 @@ import {
   requestPortfolioRebuild,
 } from "../services/portfolio";
 import { ApiError } from "../services/http";
+import { getRealtimeClient, type DataChangedMessage } from "../services/realtime";
 import type {
   PortfolioGrowthPoint,
   PortfolioPosition,
@@ -51,6 +52,7 @@ interface TransactionFilterDraft {
 }
 
 const session = useAppSession();
+const realtimeClient = getRealtimeClient();
 const route = useRoute();
 const router = useRouter();
 
@@ -88,6 +90,8 @@ const toast = ref<{ tone: AlertTone; message: string } | null>(null);
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let realtimeRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+let unsubscribeRealtime: (() => void) | null = null;
 let activeTransactionsRequestID = 0;
 
 function firstQueryValue(value: string | string[] | null | undefined): string {
@@ -416,9 +420,44 @@ function onEscKeyDown(event: KeyboardEvent): void {
   }
 }
 
+function onRealtimeMessage(message: DataChangedMessage): void {
+  if (message.account_id !== session.activeAccountId.value) {
+    return;
+  }
+  if (message.event !== "import.completed" && message.event !== "portfolio.rebuilt") {
+    return;
+  }
+  scheduleRealtimeRefresh();
+}
+
+function scheduleRealtimeRefresh(): void {
+  if (realtimeRefreshTimer) {
+    return;
+  }
+  realtimeRefreshTimer = setTimeout(() => {
+    realtimeRefreshTimer = null;
+    void loadSnapshots();
+    void loadPositions();
+    void loadTransactions();
+  }, 250);
+}
+
 watch(includeClosed, () => {
   void loadPositions();
 });
+
+watch(
+  () => session.activeAccountId.value,
+  (accountID, prevAccountID) => {
+    if (accountID === prevAccountID) {
+      return;
+    }
+    realtimeClient.setAccountId(accountID);
+    void loadSnapshots();
+    void loadPositions();
+    void loadTransactions();
+  },
+);
 
 watch(
   () => [from.value, to.value],
@@ -463,6 +502,8 @@ watch(
 );
 
 onMounted(() => {
+  realtimeClient.setAccountId(session.activeAccountId.value);
+  unsubscribeRealtime = realtimeClient.subscribe(onRealtimeMessage);
   void loadPositions();
   window.addEventListener("keydown", onEscKeyDown);
 });
@@ -475,6 +516,14 @@ onBeforeUnmount(() => {
   if (filterDebounceTimer) {
     clearTimeout(filterDebounceTimer);
     filterDebounceTimer = null;
+  }
+  if (realtimeRefreshTimer) {
+    clearTimeout(realtimeRefreshTimer);
+    realtimeRefreshTimer = null;
+  }
+  if (unsubscribeRealtime) {
+    unsubscribeRealtime();
+    unsubscribeRealtime = null;
   }
   window.removeEventListener("keydown", onEscKeyDown);
 });
@@ -501,7 +550,7 @@ onBeforeUnmount(() => {
     <div class="flex h-full min-h-0 flex-col gap-3 px-4 pb-4">
       <section class="rounded-3xl border border-slate-300 bg-white p-4 shadow-sm">
         <header class="mb-3 flex items-center justify-between gap-2">
-          <h2 class="font-secondary text-lg font-semibold text-slate-700 md:text-xl">Portfolio Growth</h2>
+          <h2 class="font-secondary text-xl font-semibold text-slate-700 md:text-2xl">Portfolio Performance</h2>
           <div class="flex items-center gap-2">
             <IconButton
               tone="neutral"
@@ -623,7 +672,7 @@ onBeforeUnmount(() => {
     >
       <section class="flex h-[92vh] w-full max-w-7xl min-h-0 flex-col rounded-3xl border border-slate-300 bg-white shadow-2xl">
         <header class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h3 class="font-secondary text-lg font-semibold text-slate-900 md:text-xl">Portfolio</h3>
+          <h3 class="font-secondary text-xl font-semibold text-slate-900 md:text-2xl">Portfolio</h3>
           <button
             type="button"
             class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
@@ -721,3 +770,4 @@ onBeforeUnmount(() => {
     </div>
   </AppShellTemplate>
 </template>
+

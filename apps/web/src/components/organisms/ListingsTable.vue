@@ -50,11 +50,13 @@ function formatDate(value: string): string {
             </tr>
           </thead>
           <tbody>
-            <tr v-if="loading" v-for="index in skeletonRows" :key="`skeleton-${index}`">
-              <td v-for="cell in 9" :key="`skeleton-${index}-${cell}`" class="border-b border-slate-100 px-3 py-3">
-                <div class="h-4 w-full animate-pulse rounded bg-slate-200" />
-              </td>
-            </tr>
+            <template v-if="loading">
+              <tr v-for="index in skeletonRows" :key="`skeleton-${index}`">
+                <td v-for="cell in 9" :key="`skeleton-${index}-${cell}`" class="border-b border-slate-100 px-3 py-3">
+                  <div class="h-4 w-full animate-pulse rounded bg-slate-200" />
+                </td>
+              </tr>
+            </template>
 
             <tr v-else-if="errorMessage">
               <td colspan="9" class="px-3 py-10 text-center">
@@ -69,17 +71,19 @@ function formatDate(value: string): string {
               </td>
             </tr>
 
-            <tr v-for="listing in rows" v-else :key="listing.id" class="hover:bg-slate-50">
-              <td class="border-b border-slate-100 px-3 py-2 text-sm font-semibold text-slate-900">{{ listing.symbol }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ listing.name }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ listing.source }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ listing.isin || "-" }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ listing.exchange || "-" }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ listing.region || "-" }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ listing.currency || "-" }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ listing.type || "-" }}</td>
-              <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatDate(listing.updatedAt) }}</td>
-            </tr>
+            <template v-else>
+              <tr v-for="listing in rows" :key="listing.id" class="hover:bg-slate-50">
+                <td class="border-b border-slate-100 px-3 py-2 text-sm font-semibold text-slate-900">{{ listing.symbol }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ listing.name }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ listing.source }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ listing.isin || "-" }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ listing.exchange || "-" }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ listing.region || "-" }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ listing.currency || "-" }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ listing.type || "-" }}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{{ formatDate(listing.updatedAt) }}</td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>

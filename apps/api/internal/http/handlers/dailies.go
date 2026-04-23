@@ -31,7 +31,7 @@ import (
 // @Success 200 {object} marketdata.DailyResponse
 // @Failure 400 {object} map[string]string "Bad request"
 // @Failure 500 {object} map[string]string "Internal server error"
-// @Router /dailies [get]
+// @Router /marketdata/dailies [get]
 func GetDailies(
 	log logging.Logger,
 	mds *marketdata.Service,

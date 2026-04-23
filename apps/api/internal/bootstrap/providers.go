@@ -19,6 +19,7 @@ type providerBootstrapConfig struct {
 	apiKeys []string
 }
 
+// Providers bootstraps API and manual market-data providers from configuration.
 func Providers(ctx context.Context, pc providerCreator, cfg config.Providers, logger logging.Logger) {
 	if pc == nil {
 		panic(fmt.Errorf("bootstrap providers: provider creator is required"))

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"mime/multipart"
 	"net/textproto"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// ImportCsv represents a multipart CSV import request payload.
 type ImportCsv struct {
 	File      multipart.File       `multipart:"file"`
 	Filename  string               `multipart:"filename"`
@@ -18,6 +20,7 @@ type ImportCsv struct {
 	AccountID uuid.UUID            `form:"account_id"`
 }
 
+// Valid validates required import identifiers.
 func (r ImportCsv) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if r.VendorID == uuid.Nil {
@@ -29,6 +32,7 @@ func (r ImportCsv) Valid(ctx context.Context) map[string]string {
 	return problems
 }
 
+// UploadDailiesRequest represents a multipart manual daily upload request.
 type UploadDailiesRequest struct {
 	File      multipart.File       `multipart:"file"`
 	Filename  string               `multipart:"filename"`
@@ -37,6 +41,7 @@ type UploadDailiesRequest struct {
 	ListingID uuid.UUID            `form:"listing_id"`
 }
 
+// Valid validates required daily upload identifiers.
 func (r UploadDailiesRequest) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if r.ListingID == uuid.Nil {
@@ -45,11 +50,13 @@ func (r UploadDailiesRequest) Valid(ctx context.Context) map[string]string {
 	return problems
 }
 
+// GetUntaggedTransactionsRequest contains pagination filters for untagged transactions.
 type GetUntaggedTransactionsRequest struct {
 	Page     int `json:"page" query:"page"`
 	PageSize int `json:"page_size" query:"page_size"`
 }
 
+// GetCashflowTransactionsRequest contains filters, sorting, and pagination for cashflow queries.
 type GetCashflowTransactionsRequest struct {
 	Limit       int    `json:"limit,omitempty" query:"limit"`
 	Offset      int    `json:"offset,omitempty" query:"offset"`
@@ -67,6 +74,7 @@ type GetCashflowTransactionsRequest struct {
 	To          string `json:"to,omitempty" query:"to"`
 }
 
+// Valid validates cashflow query pagination and sort filters.
 func (r GetCashflowTransactionsRequest) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if r.Limit < 0 {
@@ -97,12 +105,14 @@ func (r GetCashflowTransactionsRequest) Valid(ctx context.Context) map[string]st
 	return problems
 }
 
+// GetCashflowAnalyticsRequest contains date-range filters for analytics endpoints.
 type GetCashflowAnalyticsRequest struct {
 	From           string `json:"from,omitempty" query:"from"`
 	To             string `json:"to,omitempty" query:"to"`
 	IncludeIgnored bool   `json:"include_ignored,omitempty" query:"include_ignored"`
 }
 
+// GetDailiesRequest contains filters for listing/symbol daily market data retrieval.
 type GetDailiesRequest struct {
 	ListingID string `json:"listing_id,omitempty" query:"listing_id"`
 	Symbol    string `json:"symbol" query:"symbol"`
@@ -113,6 +123,7 @@ type GetDailiesRequest struct {
 	Offset    int    `json:"offset,omitempty" query:"offset"`
 }
 
+// Valid validates daily retrieval query constraints.
 func (r GetDailiesRequest) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if strings.TrimSpace(r.Symbol) == "" && strings.TrimSpace(r.ListingID) == "" {
@@ -133,11 +144,13 @@ func (r GetDailiesRequest) Valid(ctx context.Context) map[string]string {
 	return problems
 }
 
+// TagTransactionRequest tags one transaction with a single tag.
 type TagTransactionRequest struct {
 	Id  uuid.UUID `json:"id"`
 	Tag string    `json:"tag"`
 }
 
+// CashflowTagFilters defines reusable cashflow transaction filters for bulk actions.
 type CashflowTagFilters struct {
 	Q           string `json:"q,omitempty"`
 	Description string `json:"description,omitempty"`
@@ -151,11 +164,13 @@ type CashflowTagFilters struct {
 	To          string `json:"to,omitempty"`
 }
 
+// TagTransactionsBySelectionRequest applies a tag to an explicit selection of transaction IDs.
 type TagTransactionsBySelectionRequest struct {
 	Tag string      `json:"tag"`
 	IDs []uuid.UUID `json:"ids"`
 }
 
+// Valid validates selection-based tag requests.
 func (r TagTransactionsBySelectionRequest) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if len(r.IDs) == 0 {
@@ -164,16 +179,20 @@ func (r TagTransactionsBySelectionRequest) Valid(ctx context.Context) map[string
 	return problems
 }
 
+// TagTransactionsByFilterRequest applies a tag to transactions matching a filter query.
 type TagTransactionsByFilterRequest struct {
-	Tag     string             `json:"tag"`
-	Filters CashflowTagFilters `json:"filters"`
+	Tag       string             `json:"tag"`
+	AccountID *uuid.UUID         `json:"account_id,omitempty"`
+	Filters   CashflowTagFilters `json:"filters"`
 }
 
+// IgnoreTransactionsBySelectionRequest toggles ignored-state for selected transaction IDs.
 type IgnoreTransactionsBySelectionRequest struct {
 	Ignored *bool       `json:"ignored"`
 	IDs     []uuid.UUID `json:"ids"`
 }
 
+// Valid validates selection-based ignore requests.
 func (r IgnoreTransactionsBySelectionRequest) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if len(r.IDs) == 0 {
@@ -182,11 +201,230 @@ func (r IgnoreTransactionsBySelectionRequest) Valid(ctx context.Context) map[str
 	return problems
 }
 
+// IgnoreTransactionsByFilterRequest toggles ignored-state for transactions matching filters.
 type IgnoreTransactionsByFilterRequest struct {
 	Ignored *bool              `json:"ignored"`
 	Filters CashflowTagFilters `json:"filters"`
 }
 
+// GetAssetClassesRequest contains query filters for asset classes.
+type GetAssetClassesRequest struct {
+	AccountID       uuid.UUID `json:"account_id" query:"account_id"`
+	IncludeArchived bool      `json:"include_archived,omitempty" query:"include_archived"`
+}
+
+// Valid validates required asset class query fields.
+func (r GetAssetClassesRequest) Valid(ctx context.Context) map[string]string {
+	problems := make(map[string]string)
+	if r.AccountID == uuid.Nil {
+		problems["account_id"] = "account_id is required"
+	}
+	return problems
+}
+
+// GetAssetSnapshotsRequest contains query filters for account-level asset snapshots.
+type GetAssetSnapshotsRequest struct {
+	AccountID uuid.UUID `json:"account_id" query:"account_id"`
+	From      string    `json:"from,omitempty" query:"from"`
+	To        string    `json:"to,omitempty" query:"to"`
+}
+
+// Valid validates required asset snapshot query fields.
+func (r GetAssetSnapshotsRequest) Valid(ctx context.Context) map[string]string {
+	problems := make(map[string]string)
+	if r.AccountID == uuid.Nil {
+		problems["account_id"] = "account_id is required"
+	}
+	return problems
+}
+
+// CreateAssetClassRequest creates a manual asset class.
+type CreateAssetClassRequest struct {
+	AccountID uuid.UUID `json:"account_id"`
+	Name      string    `json:"name"`
+}
+
+// Valid validates required asset class create fields.
+func (r CreateAssetClassRequest) Valid(ctx context.Context) map[string]string {
+	problems := make(map[string]string)
+	if r.AccountID == uuid.Nil {
+		problems["account_id"] = "account_id is required"
+	}
+	if strings.TrimSpace(r.Name) == "" {
+		problems["name"] = "name is required"
+	}
+	return problems
+}
+
+// UpdateAssetClassRequest updates mutable fields of an asset class.
+type UpdateAssetClassRequest struct {
+	AccountID uuid.UUID `json:"account_id"`
+	ID        uuid.UUID `json:"id"`
+	Name      *string   `json:"name,omitempty"`
+	Archived  *bool     `json:"archived,omitempty"`
+}
+
+// Valid validates required asset class update fields.
+func (r UpdateAssetClassRequest) Valid(ctx context.Context) map[string]string {
+	problems := make(map[string]string)
+	if r.AccountID == uuid.Nil {
+		problems["account_id"] = "account_id is required"
+	}
+	if r.ID == uuid.Nil {
+		problems["id"] = "id is required"
+	}
+	return problems
+}
+
+// CreateAssetItemRequest creates one tracked asset item in a class.
+type CreateAssetItemRequest struct {
+	AccountID     uuid.UUID `json:"account_id"`
+	ClassID       uuid.UUID `json:"class_id"`
+	Name          string    `json:"name"`
+	InitialWorth  string    `json:"initial_worth"`
+	EffectiveDate string    `json:"effective_date"`
+	Note          *string   `json:"note,omitempty"`
+}
+
+// Valid validates required asset item create fields.
+func (r CreateAssetItemRequest) Valid(ctx context.Context) map[string]string {
+	problems := make(map[string]string)
+	if r.AccountID == uuid.Nil {
+		problems["account_id"] = "account_id is required"
+	}
+	if r.ClassID == uuid.Nil {
+		problems["class_id"] = "class_id is required"
+	}
+	if strings.TrimSpace(r.Name) == "" {
+		problems["name"] = "name is required"
+	}
+	if strings.TrimSpace(r.InitialWorth) == "" {
+		problems["initial_worth"] = "initial_worth is required"
+	}
+	if strings.TrimSpace(r.EffectiveDate) == "" {
+		problems["effective_date"] = "effective_date is required"
+	}
+	return problems
+}
+
+// SetAssetItemWorthRequest sets an absolute worth value for an item.
+type SetAssetItemWorthRequest struct {
+	AccountID     uuid.UUID `json:"account_id"`
+	ClassID       uuid.UUID `json:"class_id"`
+	ItemID        uuid.UUID `json:"item_id"`
+	Worth         string    `json:"worth"`
+	EffectiveDate string    `json:"effective_date"`
+	Note          *string   `json:"note,omitempty"`
+}
+
+// Valid validates required set-worth fields.
+func (r SetAssetItemWorthRequest) Valid(ctx context.Context) map[string]string {
+	problems := make(map[string]string)
+	if r.AccountID == uuid.Nil {
+		problems["account_id"] = "account_id is required"
+	}
+	if r.ClassID == uuid.Nil {
+		problems["class_id"] = "class_id is required"
+	}
+	if r.ItemID == uuid.Nil {
+		problems["item_id"] = "item_id is required"
+	}
+	if strings.TrimSpace(r.Worth) == "" {
+		problems["worth"] = "worth is required"
+	}
+	if strings.TrimSpace(r.EffectiveDate) == "" {
+		problems["effective_date"] = "effective_date is required"
+	}
+	return problems
+}
+
+// AdjustAssetItemWorthRequest applies a directional delta to an item worth.
+type AdjustAssetItemWorthRequest struct {
+	AccountID     uuid.UUID `json:"account_id"`
+	ClassID       uuid.UUID `json:"class_id"`
+	ItemID        uuid.UUID `json:"item_id"`
+	Direction     string    `json:"direction"`
+	Amount        string    `json:"amount"`
+	EffectiveDate string    `json:"effective_date"`
+	Note          *string   `json:"note,omitempty"`
+}
+
+// Valid validates required adjust-worth fields.
+func (r AdjustAssetItemWorthRequest) Valid(ctx context.Context) map[string]string {
+	problems := make(map[string]string)
+	if r.AccountID == uuid.Nil {
+		problems["account_id"] = "account_id is required"
+	}
+	if r.ClassID == uuid.Nil {
+		problems["class_id"] = "class_id is required"
+	}
+	if r.ItemID == uuid.Nil {
+		problems["item_id"] = "item_id is required"
+	}
+	if strings.TrimSpace(r.Direction) == "" {
+		problems["direction"] = "direction is required"
+	}
+	if strings.TrimSpace(r.Amount) == "" {
+		problems["amount"] = "amount is required"
+	}
+	if strings.TrimSpace(r.EffectiveDate) == "" {
+		problems["effective_date"] = "effective_date is required"
+	}
+	return problems
+}
+
+// CreateManualCashflowTransactionEntryRequest represents one manual cashflow transaction row.
+type CreateManualCashflowTransactionEntryRequest struct {
+	Date        string `json:"date"`
+	Amount      string `json:"amount"`
+	Type        string `json:"type"`
+	Description string `json:"description"`
+	Note        string `json:"note"`
+	Tag         string `json:"tag"`
+	Vendor      string `json:"vendor,omitempty"`
+}
+
+// CreateManualCashflowTransactionsRequest creates one or more manual cashflow transactions.
+type CreateManualCashflowTransactionsRequest struct {
+	AccountID    uuid.UUID                                     `json:"account_id"`
+	Transactions []CreateManualCashflowTransactionEntryRequest `json:"transactions"`
+}
+
+// Valid validates required manual cashflow transaction create fields.
+func (r CreateManualCashflowTransactionsRequest) Valid(ctx context.Context) map[string]string {
+	problems := make(map[string]string)
+	if r.AccountID == uuid.Nil {
+		problems["account_id"] = "account_id is required"
+	}
+	if len(r.Transactions) == 0 {
+		problems["transactions"] = "transactions is required"
+		return problems
+	}
+	for i, row := range r.Transactions {
+		prefix := fmt.Sprintf("transactions[%d]", i)
+		if strings.TrimSpace(row.Date) == "" {
+			problems[prefix+".date"] = "date is required"
+		}
+		if strings.TrimSpace(row.Amount) == "" {
+			problems[prefix+".amount"] = "amount is required"
+		}
+		if strings.TrimSpace(row.Type) == "" {
+			problems[prefix+".type"] = "type is required"
+		}
+		if strings.TrimSpace(row.Description) == "" {
+			problems[prefix+".description"] = "description is required"
+		}
+		if strings.TrimSpace(row.Note) == "" {
+			problems[prefix+".note"] = "note is required"
+		}
+		if strings.TrimSpace(row.Tag) == "" {
+			problems[prefix+".tag"] = "tag is required"
+		}
+	}
+	return problems
+}
+
+// CreateListingRequest creates a market listing.
 type CreateListingRequest struct {
 	Name   string `json:"name"`
 	Symbol string `json:"symbol"`
@@ -201,6 +439,7 @@ type CreateListingRequest struct {
 	Type        *string `json:"type,omitempty"`
 }
 
+// Valid validates required listing creation fields.
 func (r CreateListingRequest) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if r.Name == "" {
@@ -215,6 +454,7 @@ func (r CreateListingRequest) Valid(ctx context.Context) map[string]string {
 	return problems
 }
 
+// UpdateListingFieldsRequest updates mutable listing metadata fields.
 type UpdateListingFieldsRequest struct {
 	Id uuid.UUID `json:"id"`
 	// Optional fields
@@ -227,6 +467,7 @@ type UpdateListingFieldsRequest struct {
 	Type        *string `json:"type,omitempty"`
 }
 
+// Valid validates required listing update fields.
 func (r UpdateListingFieldsRequest) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if r.Id == uuid.Nil {
@@ -235,12 +476,14 @@ func (r UpdateListingFieldsRequest) Valid(ctx context.Context) map[string]string
 	return problems
 }
 
+// SearchListingsRequest contains search and pagination inputs for listings.
 type SearchListingsRequest struct {
 	Q      string `json:"q" query:"q"`
 	Limit  int    `json:"limit,omitempty" query:"limit"`
 	Offset int    `json:"offset,omitempty" query:"offset"`
 }
 
+// Valid validates listing search query constraints.
 func (r SearchListingsRequest) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if strings.TrimSpace(r.Q) == "" {
@@ -258,6 +501,7 @@ func (r SearchListingsRequest) Valid(ctx context.Context) map[string]string {
 	return problems
 }
 
+// CreateManualPortfolioTransactionRequest creates a manual portfolio transaction.
 type CreateManualPortfolioTransactionRequest struct {
 	AccountID   uuid.UUID  `json:"account_id"`
 	VendorID    uuid.UUID  `json:"vendor_id"`
@@ -269,6 +513,7 @@ type CreateManualPortfolioTransactionRequest struct {
 	Description *string    `json:"description,omitempty"`
 }
 
+// Valid validates required manual portfolio transaction fields.
 func (r CreateManualPortfolioTransactionRequest) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if r.AccountID == uuid.Nil {
@@ -289,11 +534,13 @@ func (r CreateManualPortfolioTransactionRequest) Valid(ctx context.Context) map[
 	return problems
 }
 
+// CreateAccountRequest creates an account record.
 type CreateAccountRequest struct {
 	Name       string     `json:"name"`
 	ExternalID *uuid.UUID `json:"external_id,omitempty"`
 }
 
+// Valid validates required account creation fields.
 func (r CreateAccountRequest) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if strings.TrimSpace(r.Name) == "" {
@@ -302,10 +549,12 @@ func (r CreateAccountRequest) Valid(ctx context.Context) map[string]string {
 	return problems
 }
 
+// RebuildPortfolioRequest requests an asynchronous portfolio rebuild for an account.
 type RebuildPortfolioRequest struct {
 	AccountID uuid.UUID `json:"account_id"`
 }
 
+// Valid validates rebuild request account identity.
 func (r RebuildPortfolioRequest) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if r.AccountID == uuid.Nil {
@@ -314,12 +563,14 @@ func (r RebuildPortfolioRequest) Valid(ctx context.Context) map[string]string {
 	return problems
 }
 
+// GetPortfolioSnapshotsRequest contains query filters for portfolio snapshot history.
 type GetPortfolioSnapshotsRequest struct {
 	AccountID uuid.UUID `json:"account_id" query:"account_id"`
 	From      string    `json:"from,omitempty" query:"from"`
 	To        string    `json:"to,omitempty" query:"to"`
 }
 
+// Valid validates snapshot request account identity.
 func (r GetPortfolioSnapshotsRequest) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if r.AccountID == uuid.Nil {
@@ -328,11 +579,13 @@ func (r GetPortfolioSnapshotsRequest) Valid(ctx context.Context) map[string]stri
 	return problems
 }
 
+// GetPortfolioPositionsRequest contains query filters for current portfolio positions.
 type GetPortfolioPositionsRequest struct {
 	AccountID     uuid.UUID `json:"account_id" query:"account_id"`
 	IncludeClosed bool      `json:"include_closed,omitempty" query:"include_closed"`
 }
 
+// Valid validates positions request account identity.
 func (r GetPortfolioPositionsRequest) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if r.AccountID == uuid.Nil {
@@ -341,6 +594,7 @@ func (r GetPortfolioPositionsRequest) Valid(ctx context.Context) map[string]stri
 	return problems
 }
 
+// GetPortfolioTransactionsRequest contains filters, sorting, and pagination for portfolio transactions.
 type GetPortfolioTransactionsRequest struct {
 	AccountID uuid.UUID `json:"account_id" query:"account_id"`
 	From      string    `json:"from,omitempty" query:"from"`
@@ -356,6 +610,7 @@ type GetPortfolioTransactionsRequest struct {
 	Listing   string    `json:"listing,omitempty" query:"listing"`
 }
 
+// Valid validates portfolio transaction query constraints.
 func (r GetPortfolioTransactionsRequest) Valid(ctx context.Context) map[string]string {
 	problems := make(map[string]string)
 	if r.AccountID == uuid.Nil {

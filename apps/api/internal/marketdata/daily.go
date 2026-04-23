@@ -9,6 +9,7 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/money"
 )
 
+// Daily is one OHLCV history datapoint for a listing/date.
 type Daily struct {
 	ID        uuid.UUID   `db:"id"`
 	ListingID uuid.UUID   `db:"listing_id"`
@@ -24,10 +25,13 @@ type Daily struct {
 }
 
 var (
-	ErrDailySymbolEmpty    = fmt.Errorf("daily symbol cannot be empty")
+	// ErrDailySymbolEmpty indicates missing symbol.
+	ErrDailySymbolEmpty = fmt.Errorf("daily symbol cannot be empty")
+	// ErrDailyListingIDEmpty indicates missing listing identifier.
 	ErrDailyListingIDEmpty = fmt.Errorf("daily listing id cannot be empty")
 )
 
+// DailyDateSortOrder controls date ordering for daily retrieval.
 type DailyDateSortOrder string
 
 const (
@@ -35,6 +39,7 @@ const (
 	DailyDateSortDesc DailyDateSortOrder = "desc"
 )
 
+// NormalizeDailyDateSortOrder normalizes sort-order input and defaults to ascending.
 func NormalizeDailyDateSortOrder(raw string) DailyDateSortOrder {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case string(DailyDateSortDesc):
@@ -44,6 +49,7 @@ func NormalizeDailyDateSortOrder(raw string) DailyDateSortOrder {
 	}
 }
 
+// NewDaily constructs a daily datapoint from decimal prices.
 func NewDaily(symbol string, date time.Time, open, close, high, low float64, volume int64) (Daily, error) {
 	if symbol == "" {
 		return Daily{}, ErrDailySymbolEmpty

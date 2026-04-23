@@ -14,6 +14,28 @@ export interface CashflowTransaction {
   ignored: boolean;
 }
 
+export type ManualCashflowTransactionType = "in" | "out";
+
+export interface CreateManualCashflowTransactionInput {
+  date: string;
+  amount: string;
+  type: ManualCashflowTransactionType;
+  description: string;
+  note: string;
+  tag: string;
+  vendor?: string;
+}
+
+export interface CreateManualCashflowTransactionsPayload {
+  account_id: string;
+  transactions: CreateManualCashflowTransactionInput[];
+}
+
+export interface CreateManualCashflowTransactionsResponse {
+  created_count: number;
+  data: CashflowTransaction[];
+}
+
 export interface Pagination {
   limit: number;
   offset: number;

@@ -8,6 +8,7 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/money"
 )
 
+// Listing is the canonical market instrument record.
 type Listing struct {
 	ID          uuid.UUID `db:"id"`
 	Symbol      string    `db:"symbol"`
@@ -21,9 +22,9 @@ type Listing struct {
 	Active      bool      `db:"active"`
 	CreatedAt   time.Time `db:"created_at"`
 	UpdatedAt   time.Time `db:"updated_at"`
-	// AccumulatedStart is the first history entry date that has been accumulated for this listing. This signifies the available data we have.
+	// AccumulatedStart is the first history entry date that has been accumulated for this listing.
 	AccumulatedStart *time.Time `db:"accumulated_start"`
-	// AccumulatedEnd is the end of the accumulation period. This is the last date for which data has been accumulated.
+	// AccumulatedEnd is the last date for which history accumulation finished.
 	AccumulatedEnd   *time.Time      `db:"accumulated_end"`
 	ShouldAccumulate bool            `db:"should_accumulate"`
 	Syncing          bool            `db:"syncing"`
@@ -31,8 +32,13 @@ type Listing struct {
 	Currency         *money.Currency `db:"currency"`
 }
 
+// MissingField labels listing metadata fields that are currently absent.
 type MissingField string
+
+// Source identifies the upstream source system for listing data.
 type Source string
+
+// ListingOption mutates optional listing fields during construction.
 type ListingOption func(*Listing)
 
 const (
@@ -46,14 +52,22 @@ const (
 )
 
 var (
-	ErrListingSymbolEmpty      = fmt.Errorf("listing symbol cannot be empty")
-	ErrListingNameEmpty        = fmt.Errorf("listing name cannot be empty")
-	ErrListingSourceEmpty      = fmt.Errorf("listing source cannot be empty")
-	ErrListingAlreadyExists    = fmt.Errorf("listing already exists")
-	ErrListingNotFound         = fmt.Errorf("listing not found")
+	// ErrListingSymbolEmpty indicates missing listing symbol.
+	ErrListingSymbolEmpty = fmt.Errorf("listing symbol cannot be empty")
+	// ErrListingNameEmpty indicates missing listing name.
+	ErrListingNameEmpty = fmt.Errorf("listing name cannot be empty")
+	// ErrListingSourceEmpty indicates missing listing source.
+	ErrListingSourceEmpty = fmt.Errorf("listing source cannot be empty")
+	// ErrListingAlreadyExists indicates duplicate symbol/source insert.
+	ErrListingAlreadyExists = fmt.Errorf("listing already exists")
+	// ErrListingNotFound indicates listing lookup misses.
+	ErrListingNotFound = fmt.Errorf("listing not found")
+	// ErrNoListingFieldsToUpdate indicates an empty patch request.
 	ErrNoListingFieldsToUpdate = fmt.Errorf("no listing fields to update")
-	ErrInvalidListingCurrency  = fmt.Errorf("invalid listing currency")
-	ErrSyncInProgress          = fmt.Errorf("sync is already in progress for this listing")
+	// ErrInvalidListingCurrency indicates unsupported listing currency value.
+	ErrInvalidListingCurrency = fmt.Errorf("invalid listing currency")
+	// ErrSyncInProgress indicates a listing sync lock is already held.
+	ErrSyncInProgress = fmt.Errorf("sync is already in progress for this listing")
 )
 
 const (
@@ -62,6 +76,7 @@ const (
 	SourceBrandNewDay  Source = "brandnewday"
 )
 
+// NewListing constructs a validated listing with optional metadata.
 func NewListing(symbol, name string, source Source, options ...ListingOption) (*Listing, error) {
 	if symbol == "" {
 		return nil, ErrListingSymbolEmpty
@@ -90,48 +105,56 @@ func NewListing(symbol, name string, source Source, options ...ListingOption) (*
 	return listing, nil
 }
 
+// ListingWithISIN sets listing ISIN.
 func ListingWithISIN(isin string) ListingOption {
 	return func(l *Listing) {
 		l.ISIN = &isin
 	}
 }
 
+// ListingWithExchange sets listing exchange.
 func ListingWithExchange(exchange string) ListingOption {
 	return func(l *Listing) {
 		l.Exchange = &exchange
 	}
 }
 
+// ListingWithCurrency sets listing currency.
 func ListingWithCurrency(currency money.Currency) ListingOption {
 	return func(l *Listing) {
 		l.Currency = &currency
 	}
 }
 
+// ListingWithDescription sets listing description.
 func ListingWithDescription(desc string) ListingOption {
 	return func(l *Listing) {
 		l.Description = &desc
 	}
 }
 
+// ListingWithRegion sets listing region.
 func ListingWithRegion(region string) ListingOption {
 	return func(l *Listing) {
 		l.Region = &region
 	}
 }
 
+// ListingWithType sets listing type.
 func ListingWithType(typ string) ListingOption {
 	return func(l *Listing) {
 		l.Type = &typ
 	}
 }
 
+// ListingWithTicker sets listing ticker.
 func ListingWithTicker(ticker string) ListingOption {
 	return func(l *Listing) {
 		l.Ticker = &ticker
 	}
 }
 
+// MissingFields reports optional metadata fields that are currently missing.
 func (l *Listing) MissingFields() []MissingField {
 	var missing []MissingField
 	if l.ISIN == nil || *l.ISIN == "" {

@@ -41,8 +41,12 @@ func TestIntegration_TransactionsCreatedEvent_BuildsPortfolio(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		_ = b.Close()
-		_ = db.Close()
+		if err := b.Close(); err != nil {
+			t.Errorf("failed closing bus: %v", err)
+		}
+		if err := db.Close(); err != nil {
+			t.Errorf("failed closing database: %v", err)
+		}
 	})
 
 	ctx := context.Background()
@@ -168,8 +172,12 @@ func TestIntegration_PortfolioRebuildEndpoint_PublishesAndBuilds(t *testing.T) {
 
 	t.Cleanup(func() {
 		server.Close()
-		_ = b.Close()
-		_ = db.Close()
+		if err := b.Close(); err != nil {
+			t.Errorf("failed closing bus: %v", err)
+		}
+		if err := db.Close(); err != nil {
+			t.Errorf("failed closing database: %v", err)
+		}
 	})
 
 	ctx := context.Background()
@@ -189,7 +197,11 @@ func TestIntegration_PortfolioRebuildEndpoint_PublishesAndBuilds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST /portfolio/rebuild failed: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			t.Fatalf("failed closing response body: %v", err)
+		}
+	}()
 	if res.StatusCode != http.StatusAccepted {
 		t.Fatalf("expected status 202, got %d body=%s", res.StatusCode, mustReadBody(t, res))
 	}

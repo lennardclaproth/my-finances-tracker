@@ -72,7 +72,11 @@ func (m *Migrator) EnsureDBExists(ctx context.Context, connStr string) error {
 	if err != nil {
 		return fmt.Errorf("unable to connect to bootstrap DB: %w", err)
 	}
-	defer db.Close()
+	defer func() {
+		if closeErr := db.Close(); closeErr != nil {
+			m.log.Warn(ctx, "failed closing bootstrap database connection", "error", closeErr.Error())
+		}
+	}()
 
 	// Check if DB exists
 	var exists bool
