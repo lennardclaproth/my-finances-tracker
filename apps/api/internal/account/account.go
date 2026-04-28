@@ -42,17 +42,29 @@ type Fetcher interface {
 	FetchByID(ctx context.Context, id uuid.UUID) (*Account, error)
 }
 
+type Publisher interface {
+	Publish(ctx context.Context, env any) error
+}
+
 // NewAccount constructs a validated account instance with generated identity and timestamps.
-func NewAccount(name string, externalID *uuid.UUID) (*Account, error) {
+func NewAccount(name string, id, externalID *uuid.UUID) (*Account, error) {
 	trimmed := strings.TrimSpace(name)
 	if trimmed == "" {
 		return nil, ErrAccountNameRequired
 	}
+
+	resolvedID := uuid.New()
+	if id != nil && *id != uuid.Nil {
+		resolvedID = *id
+	}
+
+	now := time.Now().UTC()
+
 	return &Account{
-		ID:         uuid.New(),
+		ID:         resolvedID,
 		ExternalID: externalID,
 		Name:       trimmed,
-		CreatedAt:  time.Now().UTC(),
-		UpdatedAt:  time.Now().UTC(),
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}, nil
 }

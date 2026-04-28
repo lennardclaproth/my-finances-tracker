@@ -59,6 +59,7 @@ type TransactionData struct {
 	Amount      float64
 	Date        time.Time
 	AccountType *AccountType
+	Tag         string
 }
 
 var (
@@ -68,7 +69,7 @@ var (
 )
 
 // NewTransaction creates a new Transaction instance and generates its checksum.
-func NewTransaction(desc, note, source string, direction CashFlowDirection, amount float64, date time.Time, rowNumber int, importID uuid.UUID, accountType *AccountType, accountID ...*uuid.UUID) (*Transaction, error) {
+func NewTransaction(desc, note, source, tag string, direction CashFlowDirection, amount float64, date time.Time, rowNumber int, importID uuid.UUID, accountType *AccountType, accountID ...*uuid.UUID) (*Transaction, error) {
 	// Guard on domain level against invalid amount values
 	amountCents, err := money.NewPrice(amount)
 	if err != nil {
@@ -92,6 +93,7 @@ func NewTransaction(desc, note, source string, direction CashFlowDirection, amou
 		RowNumber:   rowNumber,
 		ImportID:    importID,
 		AccountType: accountType,
+		Tag:         tag,
 	}
 	t.Checksum = t.generateChecksum()
 	return t, nil

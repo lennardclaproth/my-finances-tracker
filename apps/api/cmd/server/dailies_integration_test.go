@@ -36,7 +36,7 @@ func TestIntegration_GetDailiesEndpoint_TotalCountRespectsFiltersAndPagination(t
 		time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC),
 		time.Date(2026, 2, 4, 0, 0, 0, 0, time.UTC),
 	} {
-		d, err := marketdata.NewDaily(listing.Symbol, day, 10, 10, 10, 10, 0)
+		d, err := marketdata.NewEOD(listing.Symbol, day, 10, 10, 10, 10, 0)
 		if err != nil {
 			t.Fatalf("failed creating daily seed: %v", err)
 		}
@@ -163,7 +163,7 @@ func TestIntegration_GetDailiesEndpoint_ListingIDSelectsCorrectSourceWhenSymbolD
 	}
 
 	dailyStore := storage.NewSQLXDailyStore(app.db)
-	apiDaily, err := marketdata.NewDaily(apiListing.Symbol, time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC), 10, 10, 10, 10, 0)
+	apiDaily, err := marketdata.NewEOD(apiListing.Symbol, time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC), 10, 10, 10, 10, 0)
 	if err != nil {
 		t.Fatalf("failed creating api daily: %v", err)
 	}
@@ -172,7 +172,7 @@ func TestIntegration_GetDailiesEndpoint_ListingIDSelectsCorrectSourceWhenSymbolD
 		t.Fatalf("failed storing api daily: %v", err)
 	}
 
-	manualDaily, err := marketdata.NewDaily(manualListing.Symbol, time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), 20, 20, 20, 20, 0)
+	manualDaily, err := marketdata.NewEOD(manualListing.Symbol, time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), 20, 20, 20, 20, 0)
 	if err != nil {
 		t.Fatalf("failed creating manual daily: %v", err)
 	}
@@ -242,7 +242,7 @@ func TestIntegration_GetDailiesEndpoint_SortOrderByDateDesc(t *testing.T) {
 		time.Date(2026, 2, 2, 0, 0, 0, 0, time.UTC),
 		time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC),
 	} {
-		d, err := marketdata.NewDaily(listing.Symbol, day, 10, 10, 10, 10, 0)
+		d, err := marketdata.NewEOD(listing.Symbol, day, 10, 10, 10, 10, 0)
 		if err != nil {
 			t.Fatalf("failed creating daily seed: %v", err)
 		}

@@ -25,10 +25,12 @@ type Listing struct {
 	// AccumulatedStart is the first history entry date that has been accumulated for this listing.
 	AccumulatedStart *time.Time `db:"accumulated_start"`
 	// AccumulatedEnd is the last date for which history accumulation finished.
-	AccumulatedEnd   *time.Time      `db:"accumulated_end"`
-	ShouldAccumulate bool            `db:"should_accumulate"`
-	Syncing          bool            `db:"syncing"`
-	Source           Source          `db:"source"`
+	AccumulatedEnd   *time.Time `db:"accumulated_end"`
+	ShouldAccumulate bool       `db:"should_accumulate"`
+	Syncing          bool       `db:"syncing"`
+	Source           Source     `db:"source"`
+	ProviderID       *uuid.UUID `db:"provider"`
+	Provider         Provider
 	Currency         *money.Currency `db:"currency"`
 }
 
@@ -75,6 +77,13 @@ const (
 	SourceMarketStack  Source = "market_stack"
 	SourceBrandNewDay  Source = "brandnewday"
 )
+
+// IsManualIngestion returns true if the source is a manual ingestion provider, 
+// which means that data for listings with this source will not be automatically synced 
+// and must be ingested manually by the user.
+func (s Source) IsManualIngestion() bool {
+	return s == SourceBrandNewDay
+}
 
 // NewListing constructs a validated listing with optional metadata.
 func NewListing(symbol, name string, source Source, options ...ListingOption) (*Listing, error) {

@@ -54,12 +54,12 @@ func TestToGrowthPoints_UsesLatestValuePerDay(t *testing.T) {
 	classID := uuid.New()
 	itemID := uuid.New()
 	accountID := uuid.New()
-	entries := []*HistoryEntry{
+	entries := []*Mutation{
 		{
 			ID:              uuid.New(),
 			AccountID:       accountID,
 			ClassID:         classID,
-			ItemID:          itemID,
+			AssetID:         itemID,
 			ClassTotalWorth: 100_000_000_000,
 			EffectiveDate:   time.Date(2026, 3, 1, 9, 0, 0, 0, time.UTC),
 		},
@@ -67,7 +67,7 @@ func TestToGrowthPoints_UsesLatestValuePerDay(t *testing.T) {
 			ID:              uuid.New(),
 			AccountID:       accountID,
 			ClassID:         classID,
-			ItemID:          itemID,
+			AssetID:         itemID,
 			ClassTotalWorth: 120_000_000_000,
 			EffectiveDate:   time.Date(2026, 3, 1, 14, 0, 0, 0, time.UTC),
 		},
@@ -75,7 +75,7 @@ func TestToGrowthPoints_UsesLatestValuePerDay(t *testing.T) {
 			ID:              uuid.New(),
 			AccountID:       accountID,
 			ClassID:         classID,
-			ItemID:          itemID,
+			AssetID:         itemID,
 			ClassTotalWorth: 150_000_000_000,
 			EffectiveDate:   time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC),
 		},
@@ -130,12 +130,12 @@ func TestBuildSnapshotsFromHistory_DenseCarryForwardIncludesToday(t *testing.T) 
 	p120 := mustPrice(t, 120)
 	p80 := mustPrice(t, 80)
 
-	history := []*HistoryEntry{
+	history := []*Mutation{
 		{
 			ID:              uuid.New(),
 			AccountID:       accountID,
 			ClassID:         classA,
-			ItemID:          itemA,
+			AssetID:         itemA,
 			ClassTotalWorth: p90,
 			EffectiveDate:   time.Date(2026, 3, 1, 9, 0, 0, 0, time.UTC),
 		},
@@ -143,7 +143,7 @@ func TestBuildSnapshotsFromHistory_DenseCarryForwardIncludesToday(t *testing.T) 
 			ID:              uuid.New(),
 			AccountID:       accountID,
 			ClassID:         classA,
-			ItemID:          itemA,
+			AssetID:         itemA,
 			ClassTotalWorth: p100,
 			EffectiveDate:   time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
 		},
@@ -151,7 +151,7 @@ func TestBuildSnapshotsFromHistory_DenseCarryForwardIncludesToday(t *testing.T) 
 			ID:              uuid.New(),
 			AccountID:       accountID,
 			ClassID:         classB,
-			ItemID:          itemB,
+			AssetID:         itemB,
 			ClassTotalWorth: p50,
 			EffectiveDate:   time.Date(2026, 3, 2, 11, 0, 0, 0, time.UTC),
 		},
@@ -159,7 +159,7 @@ func TestBuildSnapshotsFromHistory_DenseCarryForwardIncludesToday(t *testing.T) 
 			ID:              uuid.New(),
 			AccountID:       accountID,
 			ClassID:         classA,
-			ItemID:          itemA,
+			AssetID:         itemA,
 			ClassTotalWorth: p120,
 			EffectiveDate:   time.Date(2026, 3, 3, 10, 0, 0, 0, time.UTC),
 		},
@@ -167,7 +167,7 @@ func TestBuildSnapshotsFromHistory_DenseCarryForwardIncludesToday(t *testing.T) 
 			ID:              uuid.New(),
 			AccountID:       accountID,
 			ClassID:         classB,
-			ItemID:          itemB,
+			AssetID:         itemB,
 			ClassTotalWorth: p80,
 			EffectiveDate:   time.Date(2026, 3, 4, 10, 0, 0, 0, time.UTC),
 		},
@@ -296,14 +296,14 @@ func (s *fallbackSnapshotStore) UpdateClass(_ context.Context, _, _ uuid.UUID, _
 func (s *fallbackSnapshotStore) DeleteClass(_ context.Context, _, _ uuid.UUID) (int64, error) {
 	return 0, nil
 }
-func (s *fallbackSnapshotStore) CreateItem(_ context.Context, _ *Item) error { return nil }
-func (s *fallbackSnapshotStore) FetchItemByID(_ context.Context, _, _, _ uuid.UUID) (*Item, error) {
+func (s *fallbackSnapshotStore) CreateItem(_ context.Context, _ *Asset) error { return nil }
+func (s *fallbackSnapshotStore) FetchItemByID(_ context.Context, _, _, _ uuid.UUID) (*Asset, error) {
 	return nil, nil
 }
-func (s *fallbackSnapshotStore) FetchItemByClassAndName(_ context.Context, _, _ uuid.UUID, _ string) (*Item, error) {
+func (s *fallbackSnapshotStore) FetchItemByClassAndName(_ context.Context, _, _ uuid.UUID, _ string) (*Asset, error) {
 	return nil, nil
 }
-func (s *fallbackSnapshotStore) ListItemsByClass(_ context.Context, _, _ uuid.UUID, _ bool) ([]*Item, error) {
+func (s *fallbackSnapshotStore) ListItemsByClass(_ context.Context, _, _ uuid.UUID, _ bool) ([]*Asset, error) {
 	return nil, nil
 }
 func (s *fallbackSnapshotStore) UpdateItemWorth(_ context.Context, _, _, _ uuid.UUID, _ money.Price) error {
@@ -312,14 +312,14 @@ func (s *fallbackSnapshotStore) UpdateItemWorth(_ context.Context, _, _, _ uuid.
 func (s *fallbackSnapshotStore) SumClassWorth(_ context.Context, _, _ uuid.UUID) (money.Price, error) {
 	return 0, nil
 }
-func (s *fallbackSnapshotStore) CreateHistory(_ context.Context, _ *HistoryEntry) error { return nil }
+func (s *fallbackSnapshotStore) CreateHistory(_ context.Context, _ *Mutation) error { return nil }
 func (s *fallbackSnapshotStore) DeleteHistoryByClass(_ context.Context, _, _ uuid.UUID) error {
 	return nil
 }
-func (s *fallbackSnapshotStore) ListHistoryByClass(_ context.Context, _, _ uuid.UUID, _ int, _ bool) ([]*HistoryEntry, error) {
+func (s *fallbackSnapshotStore) ListHistoryByClass(_ context.Context, _, _ uuid.UUID, _ int, _ bool) ([]*Mutation, error) {
 	return nil, nil
 }
-func (s *fallbackSnapshotStore) ListHistoryForAccount(_ context.Context, _ uuid.UUID, _ int, _ bool) ([]*HistoryEntry, error) {
+func (s *fallbackSnapshotStore) ListHistoryForAccount(_ context.Context, _ uuid.UUID, _ int, _ bool) ([]*Mutation, error) {
 	return nil, nil
 }
 func (s *fallbackSnapshotStore) DeleteSnapshotsByAccount(_ context.Context, _ uuid.UUID) error {

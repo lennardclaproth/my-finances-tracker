@@ -2,15 +2,14 @@ package marketdata
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/lennardclaproth/my-finances-tracker/internal/money"
 )
 
-// Daily is one OHLCV history datapoint for a listing/date.
-type Daily struct {
+// EOD is one OHLCV history datapoint for a listing/date.
+type EOD struct {
 	ID        uuid.UUID   `db:"id"`
 	ListingID uuid.UUID   `db:"listing_id"`
 	Symbol    string      `db:"symbol"` // Kept for response readability
@@ -31,46 +30,28 @@ var (
 	ErrDailyListingIDEmpty = fmt.Errorf("daily listing id cannot be empty")
 )
 
-// DailyDateSortOrder controls date ordering for daily retrieval.
-type DailyDateSortOrder string
-
-const (
-	DailyDateSortAsc  DailyDateSortOrder = "asc"
-	DailyDateSortDesc DailyDateSortOrder = "desc"
-)
-
-// NormalizeDailyDateSortOrder normalizes sort-order input and defaults to ascending.
-func NormalizeDailyDateSortOrder(raw string) DailyDateSortOrder {
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case string(DailyDateSortDesc):
-		return DailyDateSortDesc
-	default:
-		return DailyDateSortAsc
-	}
-}
-
-// NewDaily constructs a daily datapoint from decimal prices.
-func NewDaily(symbol string, date time.Time, open, close, high, low float64, volume int64) (Daily, error) {
+// NewEOD constructs a daily datapoint from decimal prices.
+func NewEOD(symbol string, date time.Time, open, close, high, low float64, volume int64) (EOD, error) {
 	if symbol == "" {
-		return Daily{}, ErrDailySymbolEmpty
+		return EOD{}, ErrDailySymbolEmpty
 	}
 	openCents, err := money.NewPrice(open)
 	if err != nil {
-		return Daily{}, fmt.Errorf("NewDaily failed, invalid open price: %w", err)
+		return EOD{}, fmt.Errorf("NewDaily failed, invalid open price: %w", err)
 	}
 	closeCents, err := money.NewPrice(close)
 	if err != nil {
-		return Daily{}, fmt.Errorf("NewDaily failed, invalid close price: %w", err)
+		return EOD{}, fmt.Errorf("NewDaily failed, invalid close price: %w", err)
 	}
 	highCents, err := money.NewPrice(high)
 	if err != nil {
-		return Daily{}, fmt.Errorf("NewDaily failed, invalid high price: %w", err)
+		return EOD{}, fmt.Errorf("NewDaily failed, invalid high price: %w", err)
 	}
 	lowCents, err := money.NewPrice(low)
 	if err != nil {
-		return Daily{}, fmt.Errorf("NewDaily failed, invalid low price: %w", err)
+		return EOD{}, fmt.Errorf("NewDaily failed, invalid low price: %w", err)
 	}
-	return Daily{
+	return EOD{
 		ID:        uuid.New(),
 		Symbol:    symbol,
 		Date:      date,

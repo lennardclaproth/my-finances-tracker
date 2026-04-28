@@ -84,17 +84,17 @@ type assetStore interface {
 	UpdateClass(ctx context.Context, accountID, classID uuid.UUID, name *string, archived *bool) error
 	DeleteClass(ctx context.Context, accountID, classID uuid.UUID) (int64, error)
 
-	CreateItem(ctx context.Context, item *Item) error
-	FetchItemByID(ctx context.Context, accountID, classID, itemID uuid.UUID) (*Item, error)
-	FetchItemByClassAndName(ctx context.Context, accountID, classID uuid.UUID, name string) (*Item, error)
-	ListItemsByClass(ctx context.Context, accountID, classID uuid.UUID, includeArchived bool) ([]*Item, error)
+	CreateItem(ctx context.Context, item *Asset) error
+	FetchItemByID(ctx context.Context, accountID, classID, itemID uuid.UUID) (*Asset, error)
+	FetchItemByClassAndName(ctx context.Context, accountID, classID uuid.UUID, name string) (*Asset, error)
+	ListItemsByClass(ctx context.Context, accountID, classID uuid.UUID, includeArchived bool) ([]*Asset, error)
 	UpdateItemWorth(ctx context.Context, accountID, classID, itemID uuid.UUID, worth money.Price) error
 	SumClassWorth(ctx context.Context, accountID, classID uuid.UUID) (money.Price, error)
 
-	CreateHistory(ctx context.Context, entry *HistoryEntry) error
+	CreateHistory(ctx context.Context, entry *Mutation) error
 	DeleteHistoryByClass(ctx context.Context, accountID, classID uuid.UUID) error
-	ListHistoryByClass(ctx context.Context, accountID, classID uuid.UUID, limit int, ascending bool) ([]*HistoryEntry, error)
-	ListHistoryForAccount(ctx context.Context, accountID uuid.UUID, limit int, ascending bool) ([]*HistoryEntry, error)
+	ListHistoryByClass(ctx context.Context, accountID, classID uuid.UUID, limit int, ascending bool) ([]*Mutation, error)
+	ListHistoryForAccount(ctx context.Context, accountID uuid.UUID, limit int, ascending bool) ([]*Mutation, error)
 
 	DeleteSnapshotsByAccount(ctx context.Context, accountID uuid.UUID) error
 	UpsertSnapshots(ctx context.Context, snapshots []*Snapshot) error
@@ -194,288 +194,288 @@ func (s *Service) EnsureAccountProjection(ctx context.Context, accountID uuid.UU
 	return nil
 }
 
-// CreateClass creates a manual class for an account.
-func (s *Service) CreateClass(ctx context.Context, input CreateClassInput) (*Class, error) {
-	name, err := normalizeClassName(input.Name)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.EnsureAccountProjection(ctx, input.AccountID); err != nil {
-		return nil, err
-	}
+// // CreateClass creates a manual class for an account.
+// func (s *Service) CreateClass(ctx context.Context, input CreateClassInput) (*Class, error) {
+// 	name, err := normalizeClassName(input.Name)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if err := s.EnsureAccountProjection(ctx, input.AccountID); err != nil {
+// 		return nil, err
+// 	}
 
-	now := s.now().UTC()
-	class := &Class{
-		ID:        uuid.New(),
-		AccountID: input.AccountID,
-		Name:      name,
-		Source:    ClassSourceManual,
-		Archived:  false,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	if err := s.store.CreateClass(ctx, class); err != nil {
-		if errors.Is(err, ErrAssetClassAlreadyExists) {
-			return nil, err
-		}
-		return nil, fmt.Errorf("assets service: create class: %w", err)
-	}
-	s.requestSnapshotsRebuild(ctx, input.AccountID)
-	return class, nil
-}
+// 	now := s.now().UTC()
+// 	class := &Class{
+// 		ID:        uuid.New(),
+// 		AccountID: input.AccountID,
+// 		Name:      name,
+// 		Source:    ClassSourceManual,
+// 		Archived:  false,
+// 		CreatedAt: now,
+// 		UpdatedAt: now,
+// 	}
+// 	if err := s.store.CreateClass(ctx, class); err != nil {
+// 		if errors.Is(err, ErrAssetClassAlreadyExists) {
+// 			return nil, err
+// 		}
+// 		return nil, fmt.Errorf("assets service: create class: %w", err)
+// 	}
+// 	s.requestSnapshotsRebuild(ctx, input.AccountID)
+// 	return class, nil
+// }
 
-// UpdateClass mutates a manual class name/archive status.
-func (s *Service) UpdateClass(ctx context.Context, input UpdateClassInput) error {
-	if err := s.EnsureAccountProjection(ctx, input.AccountID); err != nil {
-		return err
-	}
-	class, err := s.store.FetchClassByID(ctx, input.AccountID, input.ClassID)
-	if err != nil {
-		return fmt.Errorf("assets service: fetch class: %w", err)
-	}
-	if class == nil {
-		return ErrAssetClassNotFound
-	}
-	if class.Source != ClassSourceManual {
-		return ErrAssetClassNotManual
-	}
+// // UpdateClass mutates a manual class name/archive status.
+// func (s *Service) UpdateClass(ctx context.Context, input UpdateClassInput) error {
+// 	if err := s.EnsureAccountProjection(ctx, input.AccountID); err != nil {
+// 		return err
+// 	}
+// 	class, err := s.store.FetchClassByID(ctx, input.AccountID, input.ClassID)
+// 	if err != nil {
+// 		return fmt.Errorf("assets service: fetch class: %w", err)
+// 	}
+// 	if class == nil {
+// 		return ErrAssetClassNotFound
+// 	}
+// 	if class.Source != ClassSourceManual {
+// 		return ErrAssetClassNotManual
+// 	}
 
-	var name *string
-	if input.Name != nil {
-		normalized, normErr := normalizeClassName(*input.Name)
-		if normErr != nil {
-			return normErr
-		}
-		name = &normalized
-	}
+// 	var name *string
+// 	if input.Name != nil {
+// 		normalized, normErr := normalizeClassName(*input.Name)
+// 		if normErr != nil {
+// 			return normErr
+// 		}
+// 		name = &normalized
+// 	}
 
-	if err := s.store.UpdateClass(ctx, input.AccountID, input.ClassID, name, input.Archived); err != nil {
-		if errors.Is(err, ErrAssetClassAlreadyExists) {
-			return err
-		}
-		return fmt.Errorf("assets service: update class: %w", err)
-	}
-	s.requestSnapshotsRebuild(ctx, input.AccountID)
-	return nil
-}
+// 	if err := s.store.UpdateClass(ctx, input.AccountID, input.ClassID, name, input.Archived); err != nil {
+// 		if errors.Is(err, ErrAssetClassAlreadyExists) {
+// 			return err
+// 		}
+// 		return fmt.Errorf("assets service: update class: %w", err)
+// 	}
+// 	s.requestSnapshotsRebuild(ctx, input.AccountID)
+// 	return nil
+// }
 
-// DeleteClass removes a manual class and related items/history.
-func (s *Service) DeleteClass(ctx context.Context, accountID, classID uuid.UUID) error {
-	if err := s.EnsureAccountProjection(ctx, accountID); err != nil {
-		return err
-	}
-	class, err := s.store.FetchClassByID(ctx, accountID, classID)
-	if err != nil {
-		return fmt.Errorf("assets service: fetch class: %w", err)
-	}
-	if class == nil {
-		return ErrAssetClassNotFound
-	}
-	if class.Source != ClassSourceManual {
-		return ErrAssetClassNotManual
-	}
-	deleted, err := s.store.DeleteClass(ctx, accountID, classID)
-	if err != nil {
-		return fmt.Errorf("assets service: delete class: %w", err)
-	}
-	if deleted == 0 {
-		return ErrAssetClassNotFound
-	}
-	s.requestSnapshotsRebuild(ctx, accountID)
-	return nil
-}
+// // DeleteClass removes a manual class and related items/history.
+// func (s *Service) DeleteClass(ctx context.Context, accountID, classID uuid.UUID) error {
+// 	if err := s.EnsureAccountProjection(ctx, accountID); err != nil {
+// 		return err
+// 	}
+// 	class, err := s.store.FetchClassByID(ctx, accountID, classID)
+// 	if err != nil {
+// 		return fmt.Errorf("assets service: fetch class: %w", err)
+// 	}
+// 	if class == nil {
+// 		return ErrAssetClassNotFound
+// 	}
+// 	if class.Source != ClassSourceManual {
+// 		return ErrAssetClassNotManual
+// 	}
+// 	deleted, err := s.store.DeleteClass(ctx, accountID, classID)
+// 	if err != nil {
+// 		return fmt.Errorf("assets service: delete class: %w", err)
+// 	}
+// 	if deleted == 0 {
+// 		return ErrAssetClassNotFound
+// 	}
+// 	s.requestSnapshotsRebuild(ctx, accountID)
+// 	return nil
+// }
 
 // CreateItem creates a new tracked asset item under a manual class.
-func (s *Service) CreateItem(ctx context.Context, input CreateItemInput) (*Item, error) {
-	name, err := normalizeItemName(input.Name)
-	if err != nil {
-		return nil, err
-	}
-	initialWorth, err := parseSignedWorth(input.InitialWorth)
-	if err != nil {
-		return nil, err
-	}
-	effectiveDate, err := parseEffectiveDate(input.EffectiveDate, s.now)
-	if err != nil {
-		return nil, err
-	}
-	note := normalizeOptionalNote(input.Note)
+// func (s *Service) CreateItem(ctx context.Context, input CreateItemInput) (*Item, error) {
+// 	name, err := normalizeItemName(input.Name)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	initialWorth, err := parseSignedWorth(input.InitialWorth)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	effectiveDate, err := parseEffectiveDate(input.EffectiveDate, s.now)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	note := normalizeOptionalNote(input.Note)
 
-	if err := s.EnsureAccountProjection(ctx, input.AccountID); err != nil {
-		return nil, err
-	}
-	class, err := s.store.FetchClassByID(ctx, input.AccountID, input.ClassID)
-	if err != nil {
-		return nil, fmt.Errorf("assets service: fetch class: %w", err)
-	}
-	if class == nil {
-		return nil, ErrAssetClassNotFound
-	}
-	if class.Source != ClassSourceManual {
-		return nil, ErrAssetClassNotManual
-	}
+// 	if err := s.EnsureAccountProjection(ctx, input.AccountID); err != nil {
+// 		return nil, err
+// 	}
+// 	class, err := s.store.FetchClassByID(ctx, input.AccountID, input.ClassID)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("assets service: fetch class: %w", err)
+// 	}
+// 	if class == nil {
+// 		return nil, ErrAssetClassNotFound
+// 	}
+// 	if class.Source != ClassSourceManual {
+// 		return nil, ErrAssetClassNotManual
+// 	}
 
-	now := s.now().UTC()
-	item := &Item{
-		ID:           uuid.New(),
-		ClassID:      input.ClassID,
-		AccountID:    input.AccountID,
-		Name:         name,
-		CurrentWorth: 0,
-		Archived:     false,
-		CreatedAt:    now,
-		UpdatedAt:    now,
-	}
+// 	now := s.now().UTC()
+// 	item := &Item{
+// 		ID:           uuid.New(),
+// 		ClassID:      input.ClassID,
+// 		AccountID:    input.AccountID,
+// 		Name:         name,
+// 		CurrentWorth: 0,
+// 		Archived:     false,
+// 		CreatedAt:    now,
+// 		UpdatedAt:    now,
+// 	}
 
-	if err := s.store.WithTx(ctx, func(txCtx context.Context) error {
-		if createErr := s.store.CreateItem(txCtx, item); createErr != nil {
-			return createErr
-		}
-		if updateErr := s.store.UpdateItemWorth(txCtx, input.AccountID, input.ClassID, item.ID, initialWorth); updateErr != nil {
-			return updateErr
-		}
-		item.CurrentWorth = initialWorth
+// 	if err := s.store.WithTx(ctx, func(txCtx context.Context) error {
+// 		if createErr := s.store.CreateItem(txCtx, item); createErr != nil {
+// 			return createErr
+// 		}
+// 		if updateErr := s.store.UpdateItemWorth(txCtx, input.AccountID, input.ClassID, item.ID, initialWorth); updateErr != nil {
+// 			return updateErr
+// 		}
+// 		item.CurrentWorth = initialWorth
 
-		classTotal, sumErr := s.store.SumClassWorth(txCtx, input.AccountID, input.ClassID)
-		if sumErr != nil {
-			return sumErr
-		}
-		history := &HistoryEntry{
-			ID:              uuid.New(),
-			AccountID:       input.AccountID,
-			ClassID:         input.ClassID,
-			ItemID:          item.ID,
-			ChangeType:      ChangeTypeSet,
-			Direction:       nil,
-			Amount:          initialWorth,
-			PreviousWorth:   0,
-			NewWorth:        initialWorth,
-			ClassTotalWorth: classTotal,
-			EffectiveDate:   effectiveDate,
-			Note:            note,
-			CreatedAt:       now,
-		}
-		return s.store.CreateHistory(txCtx, history)
-	}); err != nil {
-		if errors.Is(err, ErrAssetItemAlreadyExists) {
-			return nil, err
-		}
-		return nil, fmt.Errorf("assets service: create item: %w", err)
-	}
-	s.requestSnapshotsRebuild(ctx, input.AccountID)
-	return item, nil
-}
+// 		classTotal, sumErr := s.store.SumClassWorth(txCtx, input.AccountID, input.ClassID)
+// 		if sumErr != nil {
+// 			return sumErr
+// 		}
+// 		history := &HistoryEntry{
+// 			ID:              uuid.New(),
+// 			AccountID:       input.AccountID,
+// 			ClassID:         input.ClassID,
+// 			ItemID:          item.ID,
+// 			ChangeType:      ChangeTypeSet,
+// 			Direction:       nil,
+// 			Amount:          initialWorth,
+// 			PreviousWorth:   0,
+// 			NewWorth:        initialWorth,
+// 			ClassTotalWorth: classTotal,
+// 			EffectiveDate:   effectiveDate,
+// 			Note:            note,
+// 			CreatedAt:       now,
+// 		}
+// 		return s.store.CreateHistory(txCtx, history)
+// 	}); err != nil {
+// 		if errors.Is(err, ErrAssetItemAlreadyExists) {
+// 			return nil, err
+// 		}
+// 		return nil, fmt.Errorf("assets service: create item: %w", err)
+// 	}
+// 	s.requestSnapshotsRebuild(ctx, input.AccountID)
+// 	return item, nil
+// }
 
-// SetItemWorth sets absolute worth for an item.
-func (s *Service) SetItemWorth(ctx context.Context, input SetItemWorthInput) error {
-	worth, err := parseSignedWorth(input.Worth)
-	if err != nil {
-		return err
-	}
-	effectiveDate, err := parseEffectiveDate(input.EffectiveDate, s.now)
-	if err != nil {
-		return err
-	}
-	note := normalizeOptionalNote(input.Note)
-	return s.applyWorthChange(ctx, input.AccountID, input.ClassID, input.ItemID, ChangeTypeSet, nil, worth, effectiveDate, note)
-}
+// // SetItemWorth sets absolute worth for an item.
+// func (s *Service) SetItemWorth(ctx context.Context, input SetItemWorthInput) error {
+// 	worth, err := parseSignedWorth(input.Worth)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	effectiveDate, err := parseEffectiveDate(input.EffectiveDate, s.now)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	note := normalizeOptionalNote(input.Note)
+// 	return s.applyWorthChange(ctx, input.AccountID, input.ClassID, input.ItemID, ChangeTypeSet, nil, worth, effectiveDate, note)
+// }
 
-// AdjustItemWorth adjusts worth with explicit direction and positive amount.
-func (s *Service) AdjustItemWorth(ctx context.Context, input AdjustItemWorthInput) error {
-	amount, err := parsePositiveAmount(input.Amount)
-	if err != nil {
-		return err
-	}
-	effectiveDate, err := parseEffectiveDate(input.EffectiveDate, s.now)
-	if err != nil {
-		return err
-	}
-	direction, err := parseDirection(input.Direction)
-	if err != nil {
-		return err
-	}
-	note := normalizeOptionalNote(input.Note)
-	return s.applyWorthChange(ctx, input.AccountID, input.ClassID, input.ItemID, ChangeTypeAdjust, &direction, amount, effectiveDate, note)
-}
+// // AdjustItemWorth adjusts worth with explicit direction and positive amount.
+// func (s *Service) AdjustItemWorth(ctx context.Context, input AdjustItemWorthInput) error {
+// 	amount, err := parsePositiveAmount(input.Amount)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	effectiveDate, err := parseEffectiveDate(input.EffectiveDate, s.now)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	direction, err := parseDirection(input.Direction)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	note := normalizeOptionalNote(input.Note)
+// 	return s.applyWorthChange(ctx, input.AccountID, input.ClassID, input.ItemID, ChangeTypeAdjust, &direction, amount, effectiveDate, note)
+// }
 
-func (s *Service) applyWorthChange(
-	ctx context.Context,
-	accountID uuid.UUID,
-	classID uuid.UUID,
-	itemID uuid.UUID,
-	changeType ChangeType,
-	direction *ChangeDirection,
-	amount money.Price,
-	effectiveDate time.Time,
-	note string,
-) error {
-	if err := s.EnsureAccountProjection(ctx, accountID); err != nil {
-		return err
-	}
-	class, err := s.store.FetchClassByID(ctx, accountID, classID)
-	if err != nil {
-		return fmt.Errorf("assets service: fetch class: %w", err)
-	}
-	if class == nil {
-		return ErrAssetClassNotFound
-	}
-	if class.Source != ClassSourceManual && changeType != ChangeTypeSet {
-		// Portfolio worth is set only by sync flow.
-		return ErrAssetClassNotManual
-	}
-	if class.Source == ClassSourcePortfolio {
-		return ErrAssetClassNotManual
-	}
+// func (s *Service) applyWorthChange(
+// 	ctx context.Context,
+// 	accountID uuid.UUID,
+// 	classID uuid.UUID,
+// 	itemID uuid.UUID,
+// 	changeType ChangeType,
+// 	direction *ChangeDirection,
+// 	amount money.Price,
+// 	effectiveDate time.Time,
+// 	note string,
+// ) error {
+// 	if err := s.EnsureAccountProjection(ctx, accountID); err != nil {
+// 		return err
+// 	}
+// 	class, err := s.store.FetchClassByID(ctx, accountID, classID)
+// 	if err != nil {
+// 		return fmt.Errorf("assets service: fetch class: %w", err)
+// 	}
+// 	if class == nil {
+// 		return ErrAssetClassNotFound
+// 	}
+// 	if class.Source != ClassSourceManual && changeType != ChangeTypeSet {
+// 		// Portfolio worth is set only by sync flow.
+// 		return ErrAssetClassNotManual
+// 	}
+// 	if class.Source == ClassSourcePortfolio {
+// 		return ErrAssetClassNotManual
+// 	}
 
-	now := s.now().UTC()
-	if err := s.store.WithTx(ctx, func(txCtx context.Context) error {
-		item, fetchErr := s.store.FetchItemByID(txCtx, accountID, classID, itemID)
-		if fetchErr != nil {
-			return fetchErr
-		}
-		if item == nil {
-			return ErrAssetItemNotFound
-		}
-		previousWorth := item.CurrentWorth
-		nextWorth := amount
-		if changeType == ChangeTypeAdjust {
-			if direction != nil && *direction == ChangeDirectionDecrease {
-				nextWorth = previousWorth - amount
-			} else {
-				nextWorth = previousWorth + amount
-			}
-		}
-		if updateErr := s.store.UpdateItemWorth(txCtx, accountID, classID, itemID, nextWorth); updateErr != nil {
-			return updateErr
-		}
+// 	now := s.now().UTC()
+// 	if err := s.store.WithTx(ctx, func(txCtx context.Context) error {
+// 		item, fetchErr := s.store.FetchItemByID(txCtx, accountID, classID, itemID)
+// 		if fetchErr != nil {
+// 			return fetchErr
+// 		}
+// 		if item == nil {
+// 			return ErrAssetItemNotFound
+// 		}
+// 		previousWorth := item.CurrentWorth
+// 		nextWorth := amount
+// 		if changeType == ChangeTypeAdjust {
+// 			if direction != nil && *direction == ChangeDirectionDecrease {
+// 				nextWorth = previousWorth - amount
+// 			} else {
+// 				nextWorth = previousWorth + amount
+// 			}
+// 		}
+// 		if updateErr := s.store.UpdateItemWorth(txCtx, accountID, classID, itemID, nextWorth); updateErr != nil {
+// 			return updateErr
+// 		}
 
-		classTotal, sumErr := s.store.SumClassWorth(txCtx, accountID, classID)
-		if sumErr != nil {
-			return sumErr
-		}
+// 		classTotal, sumErr := s.store.SumClassWorth(txCtx, accountID, classID)
+// 		if sumErr != nil {
+// 			return sumErr
+// 		}
 
-		entry := &HistoryEntry{
-			ID:              uuid.New(),
-			AccountID:       accountID,
-			ClassID:         classID,
-			ItemID:          itemID,
-			ChangeType:      changeType,
-			Direction:       direction,
-			Amount:          amount,
-			PreviousWorth:   previousWorth,
-			NewWorth:        nextWorth,
-			ClassTotalWorth: classTotal,
-			EffectiveDate:   effectiveDate,
-			Note:            note,
-			CreatedAt:       now,
-		}
-		return s.store.CreateHistory(txCtx, entry)
-	}); err != nil {
-		return err
-	}
-	s.requestSnapshotsRebuild(ctx, accountID)
-	return nil
-}
+// 		entry := &HistoryEntry{
+// 			ID:              uuid.New(),
+// 			AccountID:       accountID,
+// 			ClassID:         classID,
+// 			ItemID:          itemID,
+// 			ChangeType:      changeType,
+// 			Direction:       direction,
+// 			Amount:          amount,
+// 			PreviousWorth:   previousWorth,
+// 			NewWorth:        nextWorth,
+// 			ClassTotalWorth: classTotal,
+// 			EffectiveDate:   effectiveDate,
+// 			Note:            note,
+// 			CreatedAt:       now,
+// 		}
+// 		return s.store.CreateHistory(txCtx, entry)
+// 	}); err != nil {
+// 		return err
+// 	}
+// 	s.requestSnapshotsRebuild(ctx, accountID)
+// 	return nil
+// }
 
 // ListClasses returns table rows for account classes.
 func (s *Service) ListClasses(ctx context.Context, accountID uuid.UUID, includeArchived bool) ([]ClassSummary, error) {
@@ -593,7 +593,7 @@ func (s *Service) GetClassDetails(ctx context.Context, input ListClassDetailsInp
 	historyAsc := reverseHistory(historyLatestDesc)
 
 	growth := toGrowthPoints(historyAsc)
-	history := make([]HistoryEntry, 0, len(historyDesc))
+	history := make([]Mutation, 0, len(historyDesc))
 	for _, entry := range historyDesc {
 		if entry == nil {
 			continue
@@ -681,8 +681,8 @@ func (s *Service) RebuildTotalSnapshots(ctx context.Context, accountID uuid.UUID
 	return nil
 }
 
-func reverseHistory(rows []*HistoryEntry) []*HistoryEntry {
-	out := make([]*HistoryEntry, 0, len(rows))
+func reverseHistory(rows []*Mutation) []*Mutation {
+	out := make([]*Mutation, 0, len(rows))
 	for i := len(rows) - 1; i >= 0; i-- {
 		out = append(out, rows[i])
 	}
@@ -694,7 +694,7 @@ func startOfDayUTC(value time.Time) time.Time {
 	return time.Date(v.Year(), v.Month(), v.Day(), 0, 0, 0, 0, time.UTC)
 }
 
-func buildSnapshotsFromHistory(accountID uuid.UUID, history []*HistoryEntry, today time.Time) []*Snapshot {
+func buildSnapshotsFromHistory(accountID uuid.UUID, history []*Mutation, today time.Time) []*Snapshot {
 	if len(history) == 0 {
 		return nil
 	}
@@ -752,7 +752,7 @@ func buildSnapshotsFromHistory(accountID uuid.UUID, history []*HistoryEntry, tod
 	return out
 }
 
-func toGrowthPoints(entries []*HistoryEntry) []GrowthPoint {
+func toGrowthPoints(entries []*Mutation) []GrowthPoint {
 	type point struct {
 		date  time.Time
 		worth money.Price
@@ -857,7 +857,7 @@ func (s *Service) syncPortfolioHistoryFromSnapshots(ctx context.Context, account
 			return err
 		}
 		if item == nil {
-			item = &Item{
+			item = &Asset{
 				ID:           uuid.New(),
 				ClassID:      class.ID,
 				AccountID:    accountID,
@@ -890,11 +890,11 @@ func (s *Service) syncPortfolioHistoryFromSnapshots(ctx context.Context, account
 				continue
 			}
 			date := snapshot.OccurredAt.UTC()
-			entry := &HistoryEntry{
+			entry := &Mutation{
 				ID:              uuid.New(),
 				AccountID:       accountID,
 				ClassID:         class.ID,
-				ItemID:          item.ID,
+				AssetID:         item.ID,
 				ChangeType:      ChangeTypeSet,
 				Direction:       nil,
 				Amount:          snapshot.MarketValue,

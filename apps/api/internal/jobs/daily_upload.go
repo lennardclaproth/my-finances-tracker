@@ -38,7 +38,7 @@ type dailyUploadListingStore interface {
 }
 
 type dailyUploadDailyStore interface {
-	CreateWithInsertStatus(ctx context.Context, daily *marketdata.Daily) (bool, error)
+	CreateWithInsertStatus(ctx context.Context, daily *marketdata.EOD) (bool, error)
 }
 
 type dailyUploadFileReader interface {

@@ -100,10 +100,10 @@ type marketstackEODResponse struct {
 // it constructs history objects from the response and returns them as an iterator.
 // It handles pagination by making multiple requests until all data is retrieved.
 // If any request fails, it yields an error and stops the iteration.
-func (c *MarketStackClient) GetEOD(ctx context.Context, symbols []string, from, to *time.Time) iter.Seq2[Daily, error] {
+func (c *MarketStackClient) GetEOD(ctx context.Context, symbols []string, from, to *time.Time) iter.Seq2[EOD, error] {
 	const limit int32 = 1000
 
-	return func(yield func(Daily, error) bool) {
+	return func(yield func(EOD, error) bool) {
 		var (
 			offset int32 = 0
 			total        = -1
@@ -112,7 +112,7 @@ func (c *MarketStackClient) GetEOD(ctx context.Context, symbols []string, from, 
 			// Fetch one page of EOD data
 			page, err := c.fetchEODPage(ctx, symbols, offset, limit, from, to)
 			if err != nil {
-				yield(Daily{}, fmt.Errorf("GetEOD failed: %w", err))
+				yield(EOD{}, fmt.Errorf("GetEOD failed: %w", err))
 				return
 			}
 			// On the first page, we get the total number of records to calculate how many
@@ -121,7 +121,7 @@ func (c *MarketStackClient) GetEOD(ctx context.Context, symbols []string, from, 
 			if total == -1 {
 				err := c.deductEODTokens(ctx, page.Pagination.Total, limit)
 				if err != nil {
-					yield(Daily{}, fmt.Errorf("GetEOD failed: %w", err))
+					yield(EOD{}, fmt.Errorf("GetEOD failed: %w", err))
 					return
 				}
 				total = page.Pagination.Total
@@ -235,11 +235,11 @@ func (c *MarketStackClient) deductEODTokens(ctx context.Context, total int, limi
 // It converts each data entry in the page to a History object and yields it. If any entry is malformed, it skips it.
 // If the consumer signals to stop (by returning false), it stops yielding and returns.
 func (c *MarketStackClient) yieldDailies(
-	yield func(Daily, error) bool,
+	yield func(EOD, error) bool,
 	page marketstackEODResponse,
 ) bool {
 	for _, d := range page.Data {
-		h, err := NewDaily(d.Symbol, d.Date.Time, d.Open, d.Close, d.High, d.Low, int64(d.Volume))
+		h, err := NewEOD(d.Symbol, d.Date.Time, d.Open, d.Close, d.High, d.Low, int64(d.Volume))
 		if err != nil {
 			continue // skip malformed rows
 		}

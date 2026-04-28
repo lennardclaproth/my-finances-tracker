@@ -94,7 +94,7 @@ type fakeDailyPersistStore struct {
 	inserted map[string]bool
 }
 
-func (s *fakeDailyPersistStore) CreateWithInsertStatus(_ context.Context, daily *marketdata.Daily) (bool, error) {
+func (s *fakeDailyPersistStore) CreateWithInsertStatus(_ context.Context, daily *marketdata.EOD) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.inserted == nil {

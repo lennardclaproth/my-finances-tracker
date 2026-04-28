@@ -1,4 +1,4 @@
-package bus
+package messaging
 
 import (
 	"encoding/json"

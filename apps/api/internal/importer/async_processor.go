@@ -188,6 +188,7 @@ func (p *AsyncProcessor) processCashflow(ctx context.Context, imp *Import, v *ve
 			txd.Description,
 			txd.Note,
 			string(v.Name),
+			"",
 			txd.Direction,
 			amount,
 			txd.Date,

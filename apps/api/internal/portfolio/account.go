@@ -1,7 +1,6 @@
 package portfolio
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -16,10 +15,6 @@ type Account struct {
 	Building  bool      `db:"building"`
 	CreatedAt time.Time `db:"created_at"`
 	UpdatedAt time.Time `db:"updated_at"`
-}
-
-type AccountCreator interface {
-	Create(ctx context.Context, acc *Account) error
 }
 
 func NewAccount(accountID uuid.UUID) *Account {

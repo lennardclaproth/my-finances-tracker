@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"log/slog"
+
 	"github.com/google/uuid"
 	"github.com/lennardclaproth/my-finances-tracker/api"
 	"github.com/lennardclaproth/my-finances-tracker/internal/account"
@@ -21,7 +23,6 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/money"
 	"github.com/lennardclaproth/my-finances-tracker/internal/portfolio"
 	"github.com/lennardclaproth/my-finances-tracker/internal/storage"
-	"log/slog"
 )
 
 func TestIntegration_AssetsManualClassAndWorthMutations(t *testing.T) {
@@ -601,11 +602,11 @@ func TestIntegration_AssetsClassDetailsGrowthUsesLatestHistoryWindow(t *testing.
 			if err := assetStore.UpdateItemWorth(txCtx, acc.ID, createdClass.ID, createdItem.ID, nextWorth); err != nil {
 				return err
 			}
-			return assetStore.CreateHistory(txCtx, &assets.HistoryEntry{
+			return assetStore.CreateHistory(txCtx, &assets.Mutation{
 				ID:              uuid.New(),
 				AccountID:       acc.ID,
 				ClassID:         createdClass.ID,
-				ItemID:          createdItem.ID,
+				AssetID:         createdItem.ID,
 				ChangeType:      assets.ChangeTypeSet,
 				Direction:       nil,
 				Amount:          nextWorth,

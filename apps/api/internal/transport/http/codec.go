@@ -13,29 +13,51 @@ import (
 	"github.com/google/uuid"
 )
 
-// DecoderFunc decodes an incoming HTTP request into a typed request model.
+// # DecoderFunc
+//
+// DecoderFunc is a function type that defines how to decode an http request into a specific type.
+// It returns the decoded value and an error if the decoding fails. The error can be of type DecodeError to provide more
+// context about the decoding failure.
 type DecoderFunc[T any] func(r *http.Request) (T, error)
 
-// DecodeError captures structured decode failure details for endpoint responses.
+// # DecodeError
+//
+// DecodeError is a custom error type that provides additional context about decoding failures. It includes the field that caused the error,
+// a message describing the error, and an optional HTTP status code to indicate the appropriate response status for the error.
 type DecodeError struct {
-	Status  int
-	Field   string
+	// Field is the name of the field that caused the decoding error, if applicable.
+	Field string
+	// Message provides a description of the decoding error.
 	Message string
-	Err     error
+	// Status is an HTTP status code that can be used to indicate the appropriate response status for this error.
+	Status int
+	// Err is the underlying error that caused the decoding failure, if applicable.
+	Err error
 }
 
-// Error returns the wrapped decode error message.
+// Error implements the error interface for DecodeError. It returns a string representation of the error, including the field and message if available.
 func (e *DecodeError) Error() string {
 	if e == nil {
 		return "decode error"
 	}
+
+	base := "decode error"
+
+	// Construct the error message based on the available information.
+	// 1. If both Field and Message are present, include both in the error message.
+	// 2. If only Message is present, use it as the error message.
+	// 3. If Err is present, include the underlying error message in the output.
+	if e.Field != "" && e.Message != "" {
+		base = fmt.Sprintf("%s: %s", e.Field, e.Message)
+	}
+	if e.Field == "" && e.Message != "" {
+		base = e.Message
+	}
 	if e.Err != nil {
-		return e.Err.Error()
+		return fmt.Sprintf("%s: %v", base, e.Err)
 	}
-	if e.Message != "" {
-		return e.Message
-	}
-	return "decode error"
+
+	return base
 }
 
 // Unwrap returns the underlying decode failure.
@@ -46,15 +68,6 @@ func (e *DecodeError) Unwrap() error {
 	return e.Err
 }
 
-func newDecodeError(status int, field, message string, err error) error {
-	return &DecodeError{
-		Status:  status,
-		Field:   field,
-		Message: message,
-		Err:     err,
-	}
-}
-
 // MultipartFileDecoderOptions configures multipart request decoding behavior.
 type MultipartFileDecoderOptions struct {
 	FieldName    string
@@ -63,28 +76,35 @@ type MultipartFileDecoderOptions struct {
 	AllowedTypes []string // optional: []{"text/csv", "application/vnd.ms-excel"}
 }
 
-// DecodeJSON decodes a strict single JSON object payload into T.
-func DecodeJSON[T any](r *http.Request) (T, error) {
+// JSONDecode decodes a strict single JSON object payload into T.
+func JSONDecode[T any](r *http.Request) (T, error) {
 	var req T
+	// Check for empty body before decoding to provide a clearer error message.
 	if r.Body == nil {
-		return req, newDecodeError(http.StatusBadRequest, "body", "request body is required", io.EOF)
+		return req, &DecodeError{
+			Status:  http.StatusBadRequest,
+			Field:   "body",
+			Message: "request body is required",
+			Err:     io.EOF,
+		}
 	}
-
+	// Use a decoder with DisallowUnknownFields to catch extra fields and provide better error messages.
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&req); err != nil {
+	err := decoder.Decode(&req)
+	// Classify JSON decoding errors to provide more specific error messages.
+	if err != nil {
 		return req, classifyJSONDecodeError(err)
 	}
-
+	// Check for multiple JSON values in the body, which is not allowed.
 	if err := decoder.Decode(&struct{}{}); err != nil && !errors.Is(err, io.EOF) {
-		return req, newDecodeError(
-			http.StatusBadRequest,
-			"body",
-			"request body must contain a single JSON value",
-			err,
-		)
+		return req, &DecodeError{
+			Status:  http.StatusBadRequest,
+			Field:   "body",
+			Message: "request body must contain a single JSON value",
+			Err:     err,
+		}
 	}
-
 	return req, nil
 }
 
@@ -119,34 +139,34 @@ func DecodeQuery[T any](r *http.Request) (T, error) {
 		case reflect.Int, reflect.Int64:
 			i, err := strconv.Atoi(val)
 			if err != nil {
-				return target, newDecodeError(
-					http.StatusBadRequest,
-					tag,
-					fmt.Sprintf("%s must be a valid integer", tag),
-					err,
-				)
+				return target, &DecodeError{
+					Status:  http.StatusBadRequest,
+					Field:   tag,
+					Message: fmt.Sprintf("%s must be a valid integer", tag),
+					Err:     err,
+				}
 			}
 			f.SetInt(int64(i))
 		case reflect.Float64:
 			fv, err := strconv.ParseFloat(val, 64)
 			if err != nil {
-				return target, newDecodeError(
-					http.StatusBadRequest,
-					tag,
-					fmt.Sprintf("%s must be a valid float", tag),
-					err,
-				)
+				return target, &DecodeError{
+					Status:  http.StatusBadRequest,
+					Field:   tag,
+					Message: fmt.Sprintf("%s must be a valid float", tag),
+					Err:     err,
+				}
 			}
 			f.SetFloat(fv)
 		case reflect.Bool:
 			bv, err := strconv.ParseBool(val)
 			if err != nil {
-				return target, newDecodeError(
-					http.StatusBadRequest,
-					tag,
-					fmt.Sprintf("%s must be a valid boolean", tag),
-					err,
-				)
+				return target, &DecodeError{
+					Status:  http.StatusBadRequest,
+					Field:   tag,
+					Message: fmt.Sprintf("%s must be a valid boolean", tag),
+					Err:     err,
+				}
 			}
 			f.SetBool(bv)
 		default:
@@ -154,12 +174,12 @@ func DecodeQuery[T any](r *http.Request) (T, error) {
 			if f.Type() == reflect.TypeOf(uuid.UUID{}) {
 				parsedUUID, err := uuid.Parse(val)
 				if err != nil {
-					return target, newDecodeError(
-						http.StatusBadRequest,
-						tag,
-						fmt.Sprintf("%s must be a valid UUID", tag),
-						err,
-					)
+					return target, &DecodeError{
+						Status:  http.StatusBadRequest,
+						Field:   tag,
+						Message: fmt.Sprintf("%s must be a valid UUID", tag),
+						Err:     err,
+					}
 				}
 				f.Set(reflect.ValueOf(parsedUUID))
 				continue
@@ -168,12 +188,12 @@ func DecodeQuery[T any](r *http.Request) (T, error) {
 			if f.Type() == reflect.TypeOf((*uuid.UUID)(nil)) {
 				parsedUUID, err := uuid.Parse(val)
 				if err != nil {
-					return target, newDecodeError(
-						http.StatusBadRequest,
-						tag,
-						fmt.Sprintf("%s must be a valid UUID", tag),
-						err,
-					)
+					return target, &DecodeError{
+						Status:  http.StatusBadRequest,
+						Field:   tag,
+						Message: fmt.Sprintf("%s must be a valid UUID", tag),
+						Err:     err,
+					}
 				}
 				f.Set(reflect.ValueOf(&parsedUUID))
 				continue
@@ -226,22 +246,37 @@ func DecodeMultipartFile[T any](r *http.Request, opt MultipartFileDecoderOptions
 	if err := r.ParseMultipartForm(maxMem); err != nil {
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) || strings.Contains(strings.ToLower(err.Error()), "request body too large") {
-			return out, newDecodeError(
-				http.StatusRequestEntityTooLarge,
-				field,
-				fmt.Sprintf("%s exceeds max size of %d bytes", field, maxBytes),
-				err,
-			)
+			return out, &DecodeError{
+				Status:  http.StatusRequestEntityTooLarge,
+				Field:   field,
+				Message: fmt.Sprintf("%s exceeds max size of %d bytes", field, maxBytes),
+				Err:     err,
+			}
 		}
-		return out, newDecodeError(http.StatusBadRequest, "body", "invalid multipart form payload", err)
+		return out, &DecodeError{
+			Status:  http.StatusBadRequest,
+			Field:   "body",
+			Message: "invalid multipart form payload",
+			Err:     err,
+		}
 	}
 
 	f, fh, err := r.FormFile(field)
 	if err != nil {
 		if errors.Is(err, http.ErrMissingFile) {
-			return out, newDecodeError(http.StatusBadRequest, field, fmt.Sprintf("%s is required", field), err)
+			return out, &DecodeError{
+				Status:  http.StatusBadRequest,
+				Field:   field,
+				Message: fmt.Sprintf("%s is required", field),
+				Err:     err,
+			}
 		}
-		return out, newDecodeError(http.StatusBadRequest, field, fmt.Sprintf("failed to read %s", field), err)
+		return out, &DecodeError{
+			Status:  http.StatusBadRequest,
+			Field:   field,
+			Message: fmt.Sprintf("failed to read %s", field),
+			Err:     err,
+		}
 	}
 
 	// Optional content-type check (best-effort; can be missing/lying).
@@ -256,9 +291,19 @@ func DecodeMultipartFile[T any](r *http.Request, opt MultipartFileDecoderOptions
 		}
 		if !allowed {
 			if closeErr := f.Close(); closeErr != nil {
-				return out, newDecodeError(http.StatusUnsupportedMediaType, field, "unsupported media type", closeErr)
+				return out, &DecodeError{
+					Status:  http.StatusUnsupportedMediaType,
+					Field:   field,
+					Message: "unsupported media type",
+					Err:     closeErr,
+				}
 			}
-			return out, newDecodeError(http.StatusUnsupportedMediaType, field, "unsupported media type", nil)
+			return out, &DecodeError{
+				Status:  http.StatusUnsupportedMediaType,
+				Field:   field,
+				Message: "unsupported media type",
+				Err:     nil,
+			}
 		}
 	}
 
@@ -316,34 +361,34 @@ func DecodeMultipartFile[T any](r *http.Request, opt MultipartFileDecoderOptions
 		case reflect.Int, reflect.Int64:
 			intVal, err := strconv.ParseInt(formVal, 10, 64)
 			if err != nil {
-				return out, newDecodeError(
-					http.StatusBadRequest,
-					formTag,
-					fmt.Sprintf("%s must be a valid integer", formTag),
-					err,
-				)
+				return out, &DecodeError{
+					Status:  http.StatusBadRequest,
+					Field:   formTag,
+					Message: fmt.Sprintf("%s must be a valid integer", formTag),
+					Err:     err,
+				}
 			}
 			fieldValue.SetInt(intVal)
 		case reflect.Float64:
 			floatVal, err := strconv.ParseFloat(formVal, 64)
 			if err != nil {
-				return out, newDecodeError(
-					http.StatusBadRequest,
-					formTag,
-					fmt.Sprintf("%s must be a valid float", formTag),
-					err,
-				)
+				return out, &DecodeError{
+					Status:  http.StatusBadRequest,
+					Field:   formTag,
+					Message: fmt.Sprintf("%s must be a valid float", formTag),
+					Err:     err,
+				}		
 			}
 			fieldValue.SetFloat(floatVal)
 		case reflect.Bool:
 			boolVal, err := strconv.ParseBool(formVal)
 			if err != nil {
-				return out, newDecodeError(
-					http.StatusBadRequest,
-					formTag,
-					fmt.Sprintf("%s must be a valid boolean", formTag),
-					err,
-				)
+				return out, &DecodeError{
+					Status:  http.StatusBadRequest,
+					Field:   formTag,
+					Message: fmt.Sprintf("%s must be a valid boolean", formTag),
+					Err:     err,
+				}
 			}
 			fieldValue.SetBool(boolVal)
 		default:
@@ -351,12 +396,12 @@ func DecodeMultipartFile[T any](r *http.Request, opt MultipartFileDecoderOptions
 			if fieldValue.Type() == reflect.TypeOf(uuid.UUID{}) {
 				parsedUUID, err := uuid.Parse(formVal)
 				if err != nil {
-					return out, newDecodeError(
-						http.StatusBadRequest,
-						formTag,
-						fmt.Sprintf("%s must be a valid UUID", formTag),
-						err,
-					)
+					return out, &DecodeError{
+						Status:  http.StatusBadRequest,
+						Field:   formTag,
+						Message: fmt.Sprintf("%s must be a valid UUID", formTag),
+						Err:     err,
+					}
 				}
 				fieldValue.Set(reflect.ValueOf(parsedUUID))
 				continue
@@ -365,12 +410,12 @@ func DecodeMultipartFile[T any](r *http.Request, opt MultipartFileDecoderOptions
 			if fieldValue.Type() == reflect.TypeOf((*uuid.UUID)(nil)) {
 				parsedUUID, err := uuid.Parse(formVal)
 				if err != nil {
-					return out, newDecodeError(
-						http.StatusBadRequest,
-						formTag,
-						fmt.Sprintf("%s must be a valid UUID", formTag),
-						err,
-					)
+					return out, &DecodeError{
+						Status:  http.StatusBadRequest,
+						Field:   formTag,
+						Message: fmt.Sprintf("%s must be a valid UUID", formTag),
+						Err:     err,
+					}
 				}
 				fieldValue.Set(reflect.ValueOf(&parsedUUID))
 			}
@@ -382,28 +427,58 @@ func DecodeMultipartFile[T any](r *http.Request, opt MultipartFileDecoderOptions
 
 func classifyJSONDecodeError(err error) error {
 	if errors.Is(err, io.EOF) {
-		return newDecodeError(http.StatusBadRequest, "body", "request body is required", err)
+		return &DecodeError{
+			Status:  http.StatusBadRequest,
+			Field:   "body",
+			Message: "request body is required",
+			Err:     err,
+		}
 	}
 
 	var syntaxErr *json.SyntaxError
 	if errors.As(err, &syntaxErr) {
-		return newDecodeError(http.StatusBadRequest, "body", "malformed JSON body", err)
+		return &DecodeError{
+			Status:  http.StatusBadRequest,
+			Field:   "body",
+			Message: "malformed JSON body",
+			Err:     err,
+		}
 	}
 
 	if errors.Is(err, io.ErrUnexpectedEOF) {
-		return newDecodeError(http.StatusBadRequest, "body", "malformed JSON body", err)
+		return &DecodeError{
+			Status:  http.StatusBadRequest,
+			Field:   "body",
+			Message: "malformed JSON body",
+			Err:     err,
+		}
 	}
 
 	msg := err.Error()
 	if strings.HasPrefix(msg, "json: unknown field ") {
 		field := strings.TrimPrefix(msg, "json: unknown field ")
 		field = strings.Trim(field, "\"")
-		return newDecodeError(http.StatusBadRequest, field, fmt.Sprintf("unknown field %q", field), err)
+		return &DecodeError{
+			Status:  http.StatusBadRequest,
+			Field:   field,
+			Message: fmt.Sprintf("unknown field %q", field),
+			Err:     err,
+		}
 	}
 
 	if strings.HasPrefix(msg, "json: cannot unmarshal ") {
-		return newDecodeError(http.StatusBadRequest, "body", "JSON body has invalid types", err)
+		return &DecodeError{
+			Status:  http.StatusBadRequest,
+			Field:   "body",
+			Message: "JSON body has invalid types",
+			Err:     err,
+		}
 	}
 
-	return newDecodeError(http.StatusBadRequest, "body", "invalid JSON body", err)
+	return &DecodeError{
+		Status:  http.StatusBadRequest,
+		Field:   "body",
+		Message: "invalid JSON body",
+		Err:     err,
+	}
 }

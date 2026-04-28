@@ -224,7 +224,7 @@ func (s *SQLXAssetStore) DeleteClass(ctx context.Context, accountID, classID uui
 }
 
 // CreateItem inserts one item.
-func (s *SQLXAssetStore) CreateItem(ctx context.Context, item *assets.Item) error {
+func (s *SQLXAssetStore) CreateItem(ctx context.Context, item *assets.Asset) error {
 	query := fmt.Sprintf(`
 		INSERT INTO %s (id, class_id, account_id, name, current_worth, archived, created_at, updated_at)
 		VALUES (:id, :class_id, :account_id, :name, :current_worth, :archived, :created_at, :updated_at)
@@ -240,14 +240,14 @@ func (s *SQLXAssetStore) CreateItem(ctx context.Context, item *assets.Item) erro
 }
 
 // FetchItemByID returns one item scoped by account/class.
-func (s *SQLXAssetStore) FetchItemByID(ctx context.Context, accountID, classID, itemID uuid.UUID) (*assets.Item, error) {
+func (s *SQLXAssetStore) FetchItemByID(ctx context.Context, accountID, classID, itemID uuid.UUID) (*assets.Asset, error) {
 	query := s.db.Rebind(fmt.Sprintf(`
 		SELECT * FROM %s
 		WHERE id = ? AND class_id = ? AND account_id = ?
 		LIMIT 1
 	`, s.itemsTable))
 	executor := s.db.GetExecutor(ctx)
-	var item assets.Item
+	var item assets.Asset
 	if err := sqlx.GetContext(ctx, executor, &item, query, itemID, classID, accountID); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -258,14 +258,14 @@ func (s *SQLXAssetStore) FetchItemByID(ctx context.Context, accountID, classID, 
 }
 
 // FetchItemByClassAndName returns one item by class/name.
-func (s *SQLXAssetStore) FetchItemByClassAndName(ctx context.Context, accountID, classID uuid.UUID, name string) (*assets.Item, error) {
+func (s *SQLXAssetStore) FetchItemByClassAndName(ctx context.Context, accountID, classID uuid.UUID, name string) (*assets.Asset, error) {
 	query := s.db.Rebind(fmt.Sprintf(`
 		SELECT * FROM %s
 		WHERE class_id = ? AND account_id = ? AND LOWER(name) = LOWER(?)
 		LIMIT 1
 	`, s.itemsTable))
 	executor := s.db.GetExecutor(ctx)
-	var item assets.Item
+	var item assets.Asset
 	if err := sqlx.GetContext(ctx, executor, &item, query, classID, accountID, name); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -276,7 +276,7 @@ func (s *SQLXAssetStore) FetchItemByClassAndName(ctx context.Context, accountID,
 }
 
 // ListItemsByClass lists items sorted by name.
-func (s *SQLXAssetStore) ListItemsByClass(ctx context.Context, accountID, classID uuid.UUID, includeArchived bool) ([]*assets.Item, error) {
+func (s *SQLXAssetStore) ListItemsByClass(ctx context.Context, accountID, classID uuid.UUID, includeArchived bool) ([]*assets.Asset, error) {
 	query := fmt.Sprintf(`
 		SELECT * FROM %s
 		WHERE account_id = ? AND class_id = ?
@@ -289,7 +289,7 @@ func (s *SQLXAssetStore) ListItemsByClass(ctx context.Context, accountID, classI
 	query += " ORDER BY name ASC, created_at ASC"
 	query = s.db.Rebind(query)
 	executor := s.db.GetExecutor(ctx)
-	items := make([]*assets.Item, 0)
+	items := make([]*assets.Asset, 0)
 	if err := sqlx.SelectContext(ctx, executor, &items, query, args...); err != nil {
 		return nil, fmt.Errorf("sqlx_asset_store: list items: %w", err)
 	}
@@ -356,7 +356,7 @@ func (s *SQLXAssetStore) SumAccountWorth(ctx context.Context, accountID uuid.UUI
 }
 
 // CreateHistory inserts one history entry.
-func (s *SQLXAssetStore) CreateHistory(ctx context.Context, entry *assets.HistoryEntry) error {
+func (s *SQLXAssetStore) CreateHistory(ctx context.Context, entry *assets.Mutation) error {
 	query := fmt.Sprintf(`
 		INSERT INTO %s (
 			id, account_id, class_id, item_id, change_type, direction, amount, previous_worth,
@@ -387,7 +387,7 @@ func (s *SQLXAssetStore) DeleteHistoryByClass(ctx context.Context, accountID, cl
 }
 
 // ListHistoryByClass lists class history by effective date.
-func (s *SQLXAssetStore) ListHistoryByClass(ctx context.Context, accountID, classID uuid.UUID, limit int, ascending bool) ([]*assets.HistoryEntry, error) {
+func (s *SQLXAssetStore) ListHistoryByClass(ctx context.Context, accountID, classID uuid.UUID, limit int, ascending bool) ([]*assets.Mutation, error) {
 	order := "DESC"
 	if ascending {
 		order = "ASC"
@@ -413,9 +413,9 @@ func (s *SQLXAssetStore) ListHistoryByClass(ctx context.Context, accountID, clas
 		_ = rows.Close()
 	}()
 
-	out := make([]*assets.HistoryEntry, 0)
+	out := make([]*assets.Mutation, 0)
 	for rows.Next() {
-		var row assets.HistoryEntry
+		var row assets.Mutation
 		if err := rows.StructScan(&row); err != nil {
 			return nil, fmt.Errorf("sqlx_asset_store: scan history row: %w", err)
 		}
@@ -425,7 +425,7 @@ func (s *SQLXAssetStore) ListHistoryByClass(ctx context.Context, accountID, clas
 }
 
 // ListHistoryForAccount lists account-scoped history by effective date.
-func (s *SQLXAssetStore) ListHistoryForAccount(ctx context.Context, accountID uuid.UUID, limit int, ascending bool) ([]*assets.HistoryEntry, error) {
+func (s *SQLXAssetStore) ListHistoryForAccount(ctx context.Context, accountID uuid.UUID, limit int, ascending bool) ([]*assets.Mutation, error) {
 	order := "DESC"
 	if ascending {
 		order = "ASC"
@@ -452,9 +452,9 @@ func (s *SQLXAssetStore) ListHistoryForAccount(ctx context.Context, accountID uu
 		_ = rows.Close()
 	}()
 
-	out := make([]*assets.HistoryEntry, 0)
+	out := make([]*assets.Mutation, 0)
 	for rows.Next() {
-		var row assets.HistoryEntry
+		var row assets.Mutation
 		if err := rows.StructScan(&row); err != nil {
 			return nil, fmt.Errorf("sqlx_asset_store: scan account history row: %w", err)
 		}

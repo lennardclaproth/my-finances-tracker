@@ -85,7 +85,7 @@ func TestIntegration_TransactionsCreatedEvent_BuildsPortfolio(t *testing.T) {
 	}
 
 	txDate := time.Now().UTC().AddDate(0, 0, -1)
-	daily, err := marketdata.NewDaily(symbol, txDate, 100.0, 100.0, 100.0, 100.0, 1000)
+	daily, err := marketdata.NewEOD(symbol, txDate, 100.0, 100.0, 100.0, 100.0, 1000)
 	if err != nil {
 		t.Fatalf("failed creating daily seed: %v", err)
 	}
@@ -279,7 +279,7 @@ func seedPortfolioBuildFixture(t *testing.T, ctx context.Context, deps *appDepen
 	}
 
 	txDate := time.Now().UTC().AddDate(0, 0, -1)
-	daily, err := marketdata.NewDaily(symbol, txDate, 100.0, 100.0, 100.0, 100.0, 1000)
+	daily, err := marketdata.NewEOD(symbol, txDate, 100.0, 100.0, 100.0, 100.0, 1000)
 	if err != nil {
 		t.Fatalf("failed creating daily seed: %v", err)
 	}

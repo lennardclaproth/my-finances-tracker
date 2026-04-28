@@ -22,12 +22,12 @@ func NewSQLXDailyStore(db *DB) *SQLXDailyStore {
 	}
 }
 
-func (s *SQLXDailyStore) Create(ctx context.Context, daily *marketdata.Daily) error {
+func (s *SQLXDailyStore) Create(ctx context.Context, daily *marketdata.EOD) error {
 	_, err := s.CreateWithInsertStatus(ctx, daily)
 	return err
 }
 
-func (s *SQLXDailyStore) CreateWithInsertStatus(ctx context.Context, daily *marketdata.Daily) (bool, error) {
+func (s *SQLXDailyStore) CreateWithInsertStatus(ctx context.Context, daily *marketdata.EOD) (bool, error) {
 	if daily.ListingID == uuid.Nil {
 		return false, marketdata.ErrDailyListingIDEmpty
 	}
@@ -70,8 +70,8 @@ func (s *SQLXDailyStore) CreateWithInsertStatus(ctx context.Context, daily *mark
 	return affected > 0, nil
 }
 
-func (s *SQLXDailyStore) FetchByListingID(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]marketdata.Daily, error) {
-	return s.FetchByListingIDWithSort(ctx, listingID, from, to, limit, offset, marketdata.DailyDateSortAsc)
+func (s *SQLXDailyStore) FetchByListingID(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]marketdata.EOD, error) {
+	return s.FetchByListingIDWithSort(ctx, listingID, from, to, limit, offset, marketdata.SortEODAsc)
 }
 
 func (s *SQLXDailyStore) FetchByListingIDWithSort(
@@ -79,8 +79,8 @@ func (s *SQLXDailyStore) FetchByListingIDWithSort(
 	listingID uuid.UUID,
 	from, to *time.Time,
 	limit, offset int,
-	sortOrder marketdata.DailyDateSortOrder,
-) (*[]marketdata.Daily, error) {
+	sortOrder marketdata.EODSortOrder,
+) (*[]marketdata.EOD, error) {
 	query := fmt.Sprintf(`
 		SELECT
 			id,
@@ -107,7 +107,7 @@ func (s *SQLXDailyStore) FetchByListingIDWithSort(
 		query += " AND date <= ?"
 		args = append(args, *to)
 	}
-	if marketdata.NormalizeDailyDateSortOrder(string(sortOrder)) == marketdata.DailyDateSortDesc {
+	if marketdata.NormalizeDailyDateSortOrder(string(sortOrder)) == marketdata.SortEODDesc {
 		query += " ORDER BY date DESC"
 	} else {
 		query += " ORDER BY date ASC"
@@ -123,7 +123,7 @@ func (s *SQLXDailyStore) FetchByListingIDWithSort(
 	}
 
 	query = s.db.Rebind(strings.TrimSpace(query))
-	var dailies []marketdata.Daily
+	var dailies []marketdata.EOD
 	if err := s.db.SelectContext(ctx, &dailies, query, args...); err != nil {
 		return nil, err
 	}
