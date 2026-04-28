@@ -19,8 +19,6 @@ type unitOfWork interface {
 	Do(ctx context.Context, fn func(txCtx context.Context) error) error
 }
 
-
-
 type assetUpdater interface {
 	SetWorth(ctx context.Context, asset *assets.Asset) error
 }

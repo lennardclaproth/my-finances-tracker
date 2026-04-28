@@ -11,7 +11,7 @@ import (
 )
 
 type AssetCreator struct {
-	aec accExistsChecker
+	aec accountExistsChecker
 	cg  classGetter
 	uow unitOfWork
 	as  assetStorer
@@ -24,7 +24,7 @@ type assetStorer interface {
 }
 
 func NewAssetCreator(
-	aec accExistsChecker,
+	aec accountExistenceChecker,
 	cg classGetter,
 	uow unitOfWork,
 	as assetStorer,

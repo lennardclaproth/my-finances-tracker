@@ -7,13 +7,18 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lennardclaproth/my-finances-tracker/internal/assets"
 )
 
 type ClassHandler struct {
+	aec accountExistenceChecker
+	cs  classStorer
+	cg  classGetter
 }
 
-type accExistsChecker interface {
-	Exists(ctx context.Context, id uuid.UUID) (bool, error)
+type classStorer interface {
+	Create(ctx context.Context, class *assets.Class) error
+	Update(ctx context.Context, class *assets.Class) error
 }
 
 func NewClassHandler() *ClassHandler {
@@ -22,66 +27,69 @@ func NewClassHandler() *ClassHandler {
 
 // CreateClass creates a manual class for an account.
 func (h *ClassHandler) CreateClass(ctx context.Context, accID uuid.UUID, name string) (*Class, error) {
-	// name, err := normalizeClassName(input.Name)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// if err := s.EnsureAccountProjection(ctx, input.AccountID); err != nil {
-	// 	return nil, err
-	// }
-
-	now := s.now().UTC()
-	class := &Class{
-		ID:        uuid.New(),
-		AccountID: input.AccountID,
-		Name:      name,
-		Source:    ClassSourceManual,
-		Archived:  false,
-		CreatedAt: now,
-		UpdatedAt: now,
+	// Guard against account existence
+	exists, err := h.aec.Exists(ctx, accID)
+	if err != nil {
+		return nil, fmt.Errorf("handlers: failed to create class: %w", err)
 	}
-	if err := s.store.CreateClass(ctx, class); err != nil {
-		if errors.Is(err, ErrAssetClassAlreadyExists) {
-			return nil, err
-		}
-		return nil, fmt.Errorf("assets service: create class: %w", err)
+	if !exists {
+		return nil, fmt.Errorf("handlers: failed to create class: %w", ErrAccountNotFound)
 	}
-	s.requestSnapshotsRebuild(ctx, input.AccountID)
+	// Create new class
+	class, err := assets.NewClass(accID, nil, name)
+	if err != nil {
+		return fmt.Errorf("handlers: create class failed: %w", err), nil
+	}
+	// Store class
+	err = h.cs.Create(ctx, class)
+	if err != nil {
+		return nil, fmt.Errorf("handlers: failed to create class: %w", err)
+	}
+	// TODO: publish rebuild event
 	return class, nil
 }
 
 // UpdateClass mutates a manual class name/archive status.
-func (s *Service) UpdateClass(ctx context.Context, input UpdateClassInput) error {
-	if err := s.EnsureAccountProjection(ctx, input.AccountID); err != nil {
-		return err
-	}
-	class, err := s.store.FetchClassByID(ctx, input.AccountID, input.ClassID)
+func (h *ClassHandler) UpdateClass(ctx context.Context, accID, classID uuid.UUID, name *string, archived *bool) error {
+	// if err := s.EnsureAccountProjection(ctx, input.AccountID); err != nil {
+	// 	return err
+	// }
+	exists, err := h.aec.Exists(ctx, accID)
 	if err != nil {
-		return fmt.Errorf("assets service: fetch class: %w", err)
+		return fmt.Errorf("handlers: failed to update class: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("handlers: failed to update class: %w", ErrAccountNotFound)
+	}
+	class, err := h.cg.Get(ctx, accID, classID)
+	if err != nil {
+		return fmt.Errorf("handlers: failed to update class: %w", err)
 	}
 	if class == nil {
-		return ErrAssetClassNotFound
+		return fmt.Errorf("handlers: failed to update class: %w", ErrClassNotFound)
 	}
-	if class.Source != ClassSourceManual {
-		return ErrAssetClassNotManual
+	if class.Source != assets.ClassSourceManual {
+		return fmt.Errorf("handlers: failed to update class: %w", ErrClassSourceNotManual)
 	}
-
-	var name *string
-	if input.Name != nil {
-		normalized, normErr := normalizeClassName(*input.Name)
-		if normErr != nil {
-			return normErr
-		}
-		name = &normalized
+	
+	// var name *string
+	// if input.Name != nil {
+	// 	normalized, normErr := normalizeClassName(*input.Name)
+	// 	if normErr != nil {
+	// 		return normErr
+	// 	}
+	// 	name = &normalized
+	// }
+	err = class.Update(name, archived)
+	if err != nil {
+		return fmt.Errorf("handlers: failed to update class: %w", err)
 	}
-
-	if err := s.store.UpdateClass(ctx, input.AccountID, input.ClassID, name, input.Archived); err != nil {
-		if errors.Is(err, ErrAssetClassAlreadyExists) {
-			return err
-		}
-		return fmt.Errorf("assets service: update class: %w", err)
+	err = h.cs.Update(ctx, class)
+	if err != nil {
+		return fmt.Errorf("handlers: failed to update class: %w", err)
 	}
-	s.requestSnapshotsRebuild(ctx, input.AccountID)
+	
+	//TODO: publish rebuild
 	return nil
 }
 

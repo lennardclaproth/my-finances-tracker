@@ -11,22 +11,24 @@ import (
 )
 
 type AssetWorthSetter struct {
-	aec accExistsChecker
+	aec accountExistenceChecker
 	cg  classGetter
 	uow unitOfWork
 	ag  assetGetter
 	ca  classAggregator
 	mc  MutationCreationHandler
+	au  assetUpdater
 }
 
-func NewAssetWorthSetter(aec accExistsChecker, cg classGetter, uow unitOfWork, ag assetGetter, ca classAggregator, mc MutationCreationHandler) *AssetWorthSetter {
+func NewAssetWorthSetter(aec accountExistenceChecker, cg classGetter, uow unitOfWork, ag assetGetter, ca classAggregator, mc MutationCreationHandler, au assetUpdater) *AssetWorthSetter {
 	return &AssetWorthSetter{
 		aec: aec,
-		cg: cg,
+		cg:  cg,
 		uow: uow,
-		ag: ag,
-		ca: ca,
-		mc: mc,
+		ag:  ag,
+		ca:  ca,
+		mc:  mc,
+		au:  au,
 	}
 }
 

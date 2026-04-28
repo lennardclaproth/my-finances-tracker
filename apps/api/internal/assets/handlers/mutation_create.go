@@ -40,7 +40,11 @@ func (h *MutationCreationHandler) Create(ctx context.Context, accID, classID, as
 		effectiveDate, note,
 	)
 	if err != nil {
-		return fmt.Errorf("handlers: Create mutation failed: %w", err)
+		return nil, fmt.Errorf("handlers: Create mutation failed: %w", err)
 	}
-	return h.mc.Create(ctx, mutation)
+	err = h.mc.Create(ctx, mutation)
+	if err != nil {
+		return nil, fmt.Errorf("handlers: Create mutation failed: %w", err)
+	}
+	return mutation, nil
 }
