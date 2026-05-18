@@ -69,7 +69,7 @@ var (
 	// ErrInvalidListingCurrency indicates unsupported listing currency value.
 	ErrInvalidListingCurrency = fmt.Errorf("invalid listing currency")
 	// ErrSyncInProgress indicates a listing sync lock is already held.
-	ErrSyncInProgress = fmt.Errorf("sync is already in progress for this listing")
+	
 )
 
 const (

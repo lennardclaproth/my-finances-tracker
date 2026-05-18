@@ -1,0 +1,47 @@
+@import 'tailwindcss';
+
+.noto-sans {
+  font-family: "Noto Sans", sans-serif;
+  src: url('/fonts/noto-sans.woff2') format('woff2');
+  font-optical-sizing: auto;
+  font-weight: 300;
+  font-style: normal;
+  font-variation-settings:
+    "wdth" 100;
+}
+
+.garamond {
+    font-family: "EB Garamond", serif;
+    src: url('/fonts/eb-garamond.woff2') format('woff2');
+    font-optical-sizing: auto;
+    font-weight: 600;
+    font-style: normal;
+    font-variation-settings:
+        "wdth" 100;
+}
+
+@theme {
+  --font-sans: 'Noto Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Noto Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'EB Garamond', ui-serif, serif;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+  }
+
+  body {
+    @apply bg-taupe-100 text-slate-800 antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+    @apply text-slate-900;
+  }
+}

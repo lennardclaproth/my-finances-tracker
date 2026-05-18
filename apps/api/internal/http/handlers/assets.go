@@ -528,7 +528,7 @@ func mapAssetServiceError(err error) (int, map[string]string, bool) {
 		return http.StatusConflict, map[string]string{"item": err.Error()}, true
 	case errors.Is(err, assets.ErrAssetClassNameRequired),
 		errors.Is(err, assets.ErrAssetClassNameReserved),
-		errors.Is(err, assets.ErrAssetClassNotManual),
+		errors.Is(err, assets.ErrClassNotManual),
 		errors.Is(err, assets.ErrAssetItemNameRequired),
 		errors.Is(err, assets.ErrAssetWorthInvalid),
 		errors.Is(err, assets.ErrAssetAmountInvalid),

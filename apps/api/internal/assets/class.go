@@ -17,11 +17,19 @@ const (
 	ClassSourcePortfolio ClassSource = "PORTFOLIO"
 )
 
+const (
+	// PortfolioClassName is the fixed name for the portfolio-linked class.
+	PortfolioClassName = "Portfolio"
+	// PortfolioAssetName is the fixed asset name for the portfolio-linked class.
+	PortfolioAssetName = "Portfolio Worth"
+)
+
 // Class groups related assets (for example, property or savings).
 type Class struct {
 	ID        uuid.UUID   `db:"id"`
 	AccountID uuid.UUID   `db:"account_id"`
 	Assets    []Asset     `db:"-"`
+	Mutations []Mutation  `db:"-"`
 	Name      string      `db:"name"`
 	Source    ClassSource `db:"source"`
 	Archived  bool        `db:"archived"`
@@ -41,7 +49,7 @@ func NewClass(accID uuid.UUID, srcI *ClassSource, nRaw string) (*Class, error) {
 		return nil, ErrClassNameEmpty
 	}
 	if strings.EqualFold(name, PortfolioClassName) {
-		return nil, ErrClassNameReserved
+		return nil, ErrClassReserved
 	}
 	// Set now time.
 	now := time.Now()
@@ -68,7 +76,7 @@ func (c *Class) Update(name *string, archived *bool) error {
 			return ErrClassNameEmpty
 		}
 		if strings.EqualFold(n, PortfolioClassName) {
-			return ErrClassNameReserved
+			return ErrClassReserved
 		}
 		c.Name = *name
 	}

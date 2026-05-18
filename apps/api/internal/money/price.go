@@ -28,3 +28,4 @@ func (p Price) Float64() float64 {
 func (p Price) String() string {
 	return fmt.Sprintf("%.6f", p.Float64())
 }
+
