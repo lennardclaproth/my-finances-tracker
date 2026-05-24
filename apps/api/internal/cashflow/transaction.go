@@ -14,6 +14,46 @@ import (
 )
 
 type CashFlowDirection string
+
+func ParseDirection(raw string) (*CashFlowDirection, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "":
+		return nil, nil
+	case "in":
+		direction := CashIn
+		return &direction, nil
+	case "out":
+		direction := CashOut
+		return &direction, nil
+	default:
+		return nil, fmt.Errorf("direction must be either in or out")
+	}
+}
+
+func SplitTags(tags string) []string {
+	if strings.TrimSpace(tags) == "" {
+		return nil
+	}
+
+	raw := strings.Split(tags, ",")
+	out := make([]string, 0, len(raw))
+	seen := make(map[string]struct{}, len(raw))
+	for _, entry := range raw {
+		tag := strings.TrimSpace(entry)
+		if tag == "" {
+			continue
+		}
+
+		key := strings.ToLower(tag)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, tag)
+	}
+	return out
+}
+
 type AccountType string
 
 type CsvParser interface {

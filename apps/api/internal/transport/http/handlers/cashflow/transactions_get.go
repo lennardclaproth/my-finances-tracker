@@ -1,6 +1,63 @@
 package cashflow
 
-// GetCashflowTransactions searches and filters cashflow transactions.
+import (
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/lennardclaproth/my-finances-tracker/internal/cashflow"
+	"github.com/lennardclaproth/my-finances-tracker/internal/date"
+	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
+	httpx "github.com/lennardclaproth/my-finances-tracker/internal/transport/http"
+)
+
+// GetTransactionsRequest contains filters, sorting, and pagination for cashflow transactions.
+type GetTransactionsRequest struct {
+	Limit       int    `query:"limit"`
+	Offset      int    `query:"offset"`
+	SortBy      string `query:"sort_by"`
+	SortOrder   string `query:"sort_order"`
+	Q           string `query:"q"`
+	Description string `query:"description"`
+	Note        string `query:"note"`
+	Source      string `query:"source"`
+	Direction   string `query:"direction"`
+	Tags        string `query:"tags"`
+	Untagged    bool   `query:"untagged"`
+	HideIgnored bool   `query:"hide_ignored"`
+	From        string `query:"from"`
+	To          string `query:"to"`
+}
+
+// GetTransactionResponse represents one cashflow transaction in a list response.
+type GetTransactionResponse struct {
+	ID          uuid.UUID `json:"id"`
+	Description string    `json:"description"`
+	Note        string    `json:"note"`
+	Source      string    `json:"source"`
+	AmountCents int64     `json:"amountCents"`
+	Direction   string    `json:"direction"`
+	Date        time.Time `json:"date"`
+	Tag         string    `json:"tag"`
+	Ignored     bool      `json:"ignored"`
+}
+
+// PaginationResponse describes offset pagination metadata.
+type PaginationResponse struct {
+	Limit  int `json:"limit"`
+	Offset int `json:"offset"`
+	Count  int `json:"count"`
+	Total  int `json:"total"`
+}
+
+// GetTransactionsResponse returns paginated cashflow transactions.
+type GetTransactionsResponse struct {
+	Pagination PaginationResponse          `json:"pagination"`
+	Data       []CreateTransactionResponse `json:"data"`
+}
+
+// GetTransactions searches and filters cashflow transactions.
 //
 // @Summary     Search cashflow transactions
 // @Description Filter cashflow transactions with explicit field filters and optional fuzzy search over description, note, and tag.
@@ -21,67 +78,42 @@ package cashflow
 // @Param       hide_ignored query bool false "Hide ignored transactions"
 // @Param       from query string false "Start date (YYYY-MM-DD)"
 // @Param       to query string false "End date (YYYY-MM-DD)"
-// @Success     200 {object} api.CashflowTransactionsResponse
+// @Success     200 {object} TransactionsResponse
 // @Failure     400 {object} map[string]string "Bad request"
 // @Failure     500 {object} map[string]string "Internal server error"
 // @Router      /cashflow/transactions [get]
-func GetCashflowTransactions(log logging.Logger, store *storage.SQLXBankTransactionStore) http.Handler {
-	endpoint := func(ctx context.Context, req api.GetCashflowTransactionsRequest) (status int, res any, err error) {
-		var from *time.Time
-		if req.From != "" {
-			parsedFrom, parseErr := time.Parse("2006-01-02", req.From)
-			if parseErr != nil {
-				return http.StatusBadRequest, map[string]string{"from": "from must be in YYYY-MM-DD format"}, nil
-			}
-			from = &parsedFrom
-		}
-
-		var to *time.Time
-		if req.To != "" {
-			parsedTo, parseErr := time.Parse("2006-01-02", req.To)
-			if parseErr != nil {
-				return http.StatusBadRequest, map[string]string{"to": "to must be in YYYY-MM-DD format"}, nil
-			}
-			to = &parsedTo
-		}
-
-		if from != nil && to != nil && from.After(*to) {
-			return http.StatusBadRequest, map[string]string{"from": "from must be before or equal to to"}, nil
-		}
-
-		direction, directionErr := normalizeDirectionFilter(req.Direction)
-		if directionErr != nil {
-			return http.StatusBadRequest, map[string]string{"direction": directionErr.Error()}, nil
-		}
-
-		limit := req.Limit
-		if limit == 0 {
-			limit = 100
-		}
-
-		result, err := store.Fetch(ctx, storage.CashflowTransactionQuery{
-			Limit:       limit,
-			Offset:      req.Offset,
-			SortBy:      req.SortBy,
-			SortOrder:   req.SortOrder,
-			Q:           req.Q,
-			Description: req.Description,
-			Note:        req.Note,
-			Source:      req.Source,
-			Direction:   direction,
-			Tags:        splitTags(req.Tags),
-			Untagged:    req.Untagged,
-			HideIgnored: req.HideIgnored,
-			From:        from,
-			To:          to,
-		})
+func GetTransactions(log logging.Logger, queries *cashflow.Queries) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, err := httpx.DecodeQuery[GetTransactionsRequest](r)
 		if err != nil {
-			return http.StatusInternalServerError, struct{}{}, err
+			if httpx.WriteDecodeError(w, err) {
+				return
+			}
+
+			_ = httpx.JSONEncode(w, http.StatusBadRequest, map[string]string{
+				"error": "invalid query parameters",
+			})
+			return
 		}
 
-		items := make([]api.Transaction, 0, len(result.Transactions))
+		query, problems := toTransactionListQuery(req)
+		if len(problems) > 0 {
+			_ = httpx.JSONEncode(w, http.StatusBadRequest, problems)
+			return
+		}
+
+		result, err := queries.ListTransactions(r.Context(), query)
+		if err != nil {
+			log.Error(r.Context(), "cashflow transactions: failed to list transactions", err)
+			_ = httpx.JSONEncode(w, http.StatusInternalServerError, map[string]string{
+				"error": "failed to get cashflow transactions",
+			})
+			return
+		}
+
+		items := make([]CreateTransactionResponse, 0, len(result.Transactions))
 		for _, tx := range result.Transactions {
-			items = append(items, api.Transaction{
+			items = append(items, CreateTransactionResponse{
 				ID:          tx.ID,
 				Description: tx.Description,
 				Note:        tx.Note,
@@ -94,25 +126,63 @@ func GetCashflowTransactions(log logging.Logger, store *storage.SQLXBankTransact
 			})
 		}
 
-		return http.StatusOK, api.CashflowTransactionsResponse{
-			Pagination: api.Pagination{
-				Limit:  limit,
-				Offset: req.Offset,
+		_ = httpx.JSONEncode(w, http.StatusOK, GetTransactionsResponse{
+			Pagination: PaginationResponse{
+				Limit:  query.Limit,
+				Offset: query.Offset,
 				Count:  len(items),
 				Total:  result.Total,
 			},
 			Data: items,
-		}, nil
+		})
+	})
+}
+
+func toTransactionListQuery(req GetTransactionsRequest) (cashflow.TransactionListQuery, map[string]string) {
+	problems := make(map[string]string)
+
+	if req.Limit < 0 {
+		problems["limit"] = "limit must be greater than or equal to 0"
+	}
+	if req.Offset < 0 {
+		problems["offset"] = "offset must be greater than or equal to 0"
 	}
 
-	decodeFn := httpx.DecoderFunc[api.GetCashflowTransactionsRequest](func(r *http.Request) (api.GetCashflowTransactionsRequest, error) {
-		var req api.GetCashflowTransactionsRequest
-		res, err := httpx.DecodeQuery[api.GetCashflowTransactionsRequest](r)
-		if err != nil {
-			return req, fmt.Errorf("GetCashflowTransactions failed to decode query: %w", err)
+	sort, sortErr := cashflow.ParseTransactionSort(req.SortBy, req.SortOrder)
+	if sortErr != nil {
+		if strings.Contains(sortErr.Error(), "sort_order") {
+			problems["sort_order"] = sortErr.Error()
+		} else {
+			problems["sort_by"] = sortErr.Error()
 		}
-		return res, nil
-	})
+	}
+	direction, directionErr := cashflow.ParseDirection(req.Direction)
+	if directionErr != nil {
+		problems["direction"] = directionErr.Error()
+	}
+	from, to, dateErr := date.ParseFromTo(req.From, req.To)
+	if dateErr != nil {
+		problems["date_range"] = dateErr.Error()
+	}
 
-	return httpx.Endpoint(decodeFn, log, endpoint)
+	limit := req.Limit
+	if limit == 0 {
+		limit = 100
+	}
+
+	return cashflow.TransactionListQuery{
+		Limit:       limit,
+		Offset:      req.Offset,
+		Sort:        sort,
+		Q:           req.Q,
+		Description: req.Description,
+		Note:        req.Note,
+		Source:      req.Source,
+		Direction:   direction,
+		Tags:        cashflow.SplitTags(req.Tags),
+		Untagged:    req.Untagged,
+		HideIgnored: req.HideIgnored,
+		From:        from,
+		To:          to,
+	}, problems
 }

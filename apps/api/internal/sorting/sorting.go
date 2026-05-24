@@ -29,6 +29,38 @@ func Parse(s string) (Direction, error) {
 	}
 }
 
+// FieldParser validates and maps a raw sort field to a feature-supported field.
+type FieldParser func(string) (Field, error)
+
+// ParseSort constructs a sort value from raw field and direction values.
+//
+// Valid sortable fields and the default direction are supplied by the calling
+// feature because sorting rules vary by query use case.
+func ParseSort(
+	fieldRaw string,
+	directionRaw string,
+	defaultDirection Direction,
+	parseField FieldParser,
+) (Sort, error) {
+	field, err := parseField(fieldRaw)
+	if err != nil {
+		return Sort{}, fmt.Errorf("parse sort field: %w", err)
+	}
+
+	direction := defaultDirection
+	if strings.TrimSpace(directionRaw) != "" {
+		direction, err = Parse(directionRaw)
+		if err != nil {
+			return Sort{}, fmt.Errorf("parse sort direction: %w", err)
+		}
+	}
+
+	return Sort{
+		Field:     field,
+		Direction: direction,
+	}, nil
+}
+
 func MustParse(s string) Direction {
 	d, err := Parse(s)
 	if err != nil {

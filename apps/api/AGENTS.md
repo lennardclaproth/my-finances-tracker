@@ -19,6 +19,8 @@
 - Use `Commands` and `Queries` as the default application/domain boundary when they fit the implementation.
 - Other feature-level collaborators such as builders, syncers, processors, or services may be appropriate when that is the existing nearby pattern.
 - Before adding a helper, utility, abstraction, validator, mapper, error type, logger wrapper, package, or reusable type, search `apps/api` for an established equivalent or nearby pattern.
+- Do not add adapter interfaces, reflection bridges, or duplicate domain types just to avoid updating the real boundary. Prefer feature-owned query/command types, have storage implement those feature interfaces directly, and reuse shared packages such as `internal/sorting` for sort fields and directions.
+- Put feature-level errors in the package's `errors.go` file when one exists.
 
 ## HTTP transport
 - New or refactored HTTP code should follow the standards in `internal/transport/http`.
