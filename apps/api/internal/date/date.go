@@ -1,6 +1,9 @@
 package date
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 func StartOfDayUTC(t time.Time) time.Time {
 	t = t.UTC()
@@ -38,4 +41,33 @@ func DateOnly(t time.Time, loc *time.Location) time.Time {
 	tt := t.In(loc)
 	y, m, d := tt.Date()
 	return time.Date(y, m, d, 0, 0, 0, 0, loc)
+}
+
+// func ParseFromTo(from *time.Time, to *time.Time)
+
+// ParseFromTo converts optional date query parameters into a validated date range.
+func ParseFromTo(fromRaw, toRaw string) (*time.Time, *time.Time, error) {
+	var from *time.Time
+	if fromRaw != "" {
+		parsedFrom, err := time.Parse("2006-01-02", fromRaw)
+		if err != nil {
+			return nil, nil, fmt.Errorf("from must be in YYYY-MM-DD format")
+		}
+		from = &parsedFrom
+	}
+
+	var to *time.Time
+	if toRaw != "" {
+		parsedTo, err := time.Parse("2006-01-02", toRaw)
+		if err != nil {
+			return nil, nil, fmt.Errorf("to must be in YYYY-MM-DD format")
+		}
+		to = &parsedTo
+	}
+
+	if from != nil && to != nil && from.After(*to) {
+		return nil, nil, fmt.Errorf("from must be before or equal to to")
+	}
+
+	return from, to, nil
 }

@@ -152,14 +152,14 @@ func GetCashflowTransactions(log logging.Logger, store *storage.SQLXBankTransact
 // @Failure     400 {object} map[string]string "Bad request"
 // @Failure     500 {object} map[string]string "Internal server error"
 // @Router      /cashflow/analytics/monthly [get]
-func GetCashflowMonthlyAnalytics(log logging.Logger, store *storage.SQLXBankTransactionStore) http.Handler {
+func GetCashflowMonthlyAnalytics(log logging.Logger, queries *cashflow.Queries) http.Handler {
 	endpoint := func(ctx context.Context, req api.GetCashflowAnalyticsRequest) (status int, res any, err error) {
 		from, to, parseErr := parseCashflowAnalyticsRange(req.From, req.To)
 		if parseErr != nil {
 			return http.StatusBadRequest, map[string]string{"date_range": parseErr.Error()}, nil
 		}
 
-		points, err := store.FetchMonthlyAnalytics(ctx, storage.CashflowAnalyticsQuery{
+		points, err := queries.MonthlyAnalytics(ctx, cashflow.AnalyticsFilter{
 			From:           from,
 			To:             to,
 			IncludeIgnored: req.IncludeIgnored,

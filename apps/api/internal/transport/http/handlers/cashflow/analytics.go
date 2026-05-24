@@ -1,17 +1,35 @@
 package cashflow
 
 import (
-	"context"
-	"fmt"
 	"net/http"
 
-	"github.com/lennardclaproth/my-finances-tracker/api"
-	httpx "github.com/lennardclaproth/my-finances-tracker/internal/http"
+	"github.com/lennardclaproth/my-finances-tracker/internal/cashflow"
+	"github.com/lennardclaproth/my-finances-tracker/internal/date"
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
-	"github.com/lennardclaproth/my-finances-tracker/internal/storage"
+	httpx "github.com/lennardclaproth/my-finances-tracker/internal/transport/http"
 )
 
-// GetCashflowMonthlyAnalytics returns incoming, outgoing and net totals grouped per month.
+// MonthlyAnalyticsRequest contains query filters for monthly cashflow analytics.
+type MonthlyAnalyticsRequest struct {
+	From           string `query:"from"`
+	To             string `query:"to"`
+	IncludeIgnored bool   `query:"include_ignored"`
+}
+
+// MonthlyAnalyticsPointResponse represents one month of aggregated cashflow metrics.
+type MonthlyAnalyticsPointResponse struct {
+	Month         string `json:"month"`
+	IncomingCents int64  `json:"incoming_cents"`
+	OutgoingCents int64  `json:"outgoing_cents"`
+	NetCents      int64  `json:"net_cents"`
+}
+
+// CashflowMonthlyAnalyticsResponse returns monthly analytics time-series data.
+type CashflowMonthlyAnalyticsResponse struct {
+	Data []MonthlyAnalyticsPointResponse `json:"data"`
+}
+
+// GetMonthlyAnalytics returns incoming, outgoing and net totals grouped per month.
 //
 // @Summary     Get cashflow monthly analytics
 // @Description Returns monthly incoming, outgoing and net totals for the selected range.
@@ -21,29 +39,44 @@ import (
 // @Param       from query string false "Start date (YYYY-MM-DD)"
 // @Param       to query string false "End date (YYYY-MM-DD)"
 // @Param       include_ignored query bool false "Include ignored transactions"
-// @Success     200 {object} api.CashflowMonthlyAnalyticsResponse
+// @Success     200 {object} CashflowMonthlyAnalyticsResponse
 // @Failure     400 {object} map[string]string "Bad request"
 // @Failure     500 {object} map[string]string "Internal server error"
 // @Router      /cashflow/analytics/monthly [get]
-func GetCashflowMonthlyAnalytics(log logging.Logger, store *storage.SQLXBankTransactionStore) http.Handler {
-	endpoint := func(ctx context.Context, req api.GetCashflowAnalyticsRequest) (status int, res any, err error) {
-		from, to, parseErr := parseCashflowAnalyticsRange(req.From, req.To)
-		if parseErr != nil {
-			return http.StatusBadRequest, map[string]string{"date_range": parseErr.Error()}, nil
+func GetMonthlyAnalytics(log logging.Logger, queries *cashflow.Queries) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, err := httpx.DecodeQuery[MonthlyAnalyticsRequest](r)
+		if err != nil {
+			if httpx.WriteDecodeError(w, err) {
+				return
+			}
+
+			_ = httpx.JSONEncode(w, http.StatusBadRequest, map[string]string{
+				"error": "invalid query parameters",
+			})
+			return
 		}
 
-		points, err := store.FetchMonthlyAnalytics(ctx, storage.CashflowAnalyticsQuery{
+		from, to, err := date.ParseFromTo(req.From, req.To)
+		if err != nil {
+			_ = httpx.JSONEncode(w, http.StatusBadRequest, map[string]string{"date_range": err.Error()})
+			return
+		}
+
+		points, err := queries.MonthlyAnalytics(r.Context(), cashflow.AnalyticsFilter{
 			From:           from,
 			To:             to,
 			IncludeIgnored: req.IncludeIgnored,
 		})
 		if err != nil {
-			return http.StatusInternalServerError, struct{}{}, err
+			log.Error(r.Context(), "cashflow monthly analytics: failed to get monthly analytics", err)
+			_ = httpx.JSONEncode(w, http.StatusInternalServerError, map[string]string{"error": "failed to get cashflow monthly analytics"})
+			return
 		}
 
-		out := make([]api.CashflowMonthlyAnalyticsPoint, 0, len(points))
+		out := make([]MonthlyAnalyticsPointResponse, 0, len(points))
 		for _, point := range points {
-			out = append(out, api.CashflowMonthlyAnalyticsPoint{
+			out = append(out, MonthlyAnalyticsPointResponse{
 				Month:         point.Month.Format("2006-01-02"),
 				IncomingCents: point.IncomingCents,
 				OutgoingCents: point.OutgoingCents,
@@ -51,17 +84,6 @@ func GetCashflowMonthlyAnalytics(log logging.Logger, store *storage.SQLXBankTran
 			})
 		}
 
-		return http.StatusOK, api.CashflowMonthlyAnalyticsResponse{Data: out}, nil
-	}
-
-	decodeFn := httpx.DecoderFunc[api.GetCashflowAnalyticsRequest](func(r *http.Request) (api.GetCashflowAnalyticsRequest, error) {
-		var req api.GetCashflowAnalyticsRequest
-		res, err := httpx.DecodeQuery[api.GetCashflowAnalyticsRequest](r)
-		if err != nil {
-			return req, fmt.Errorf("GetCashflowMonthlyAnalytics failed to decode query: %w", err)
-		}
-		return res, nil
+		_ = httpx.JSONEncode(w, http.StatusOK, CashflowMonthlyAnalyticsResponse{Data: out})
 	})
-
-	return httpx.Endpoint(decodeFn, log, endpoint)
 }

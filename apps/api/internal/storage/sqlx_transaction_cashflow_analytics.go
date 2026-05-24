@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lennardclaproth/my-finances-tracker/internal/cashflow"
 )
 
 type CashflowAnalyticsQuery struct {
@@ -35,12 +36,39 @@ type CashflowTagDistribution struct {
 }
 
 func (s *SQLXBankTransactionStore) FetchMonthlyAnalytics(ctx context.Context, query CashflowAnalyticsQuery) ([]CashflowMonthlyAnalyticsPoint, error) {
+	points, err := s.FetchCashflowMonthlyAnalytics(ctx, cashflow.AnalyticsFilter{
+		From:           query.From,
+		To:             query.To,
+		IncludeIgnored: query.IncludeIgnored,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]CashflowMonthlyAnalyticsPoint, 0, len(points))
+	for _, point := range points {
+		out = append(out, CashflowMonthlyAnalyticsPoint{
+			Month:         point.Month,
+			IncomingCents: point.IncomingCents,
+			OutgoingCents: point.OutgoingCents,
+			NetCents:      point.NetCents,
+		})
+	}
+	return out, nil
+}
+
+// FetchCashflowMonthlyAnalytics returns monthly cashflow totals for the read-side cashflow use case.
+func (s *SQLXBankTransactionStore) FetchCashflowMonthlyAnalytics(ctx context.Context, filter cashflow.AnalyticsFilter) ([]cashflow.MonthlyAnalyticsPoint, error) {
 	monthExpr := "TO_CHAR(DATE_TRUNC('month', date), 'YYYY-MM-01')"
 	if s.db.DriverName() == string(Sqlite) {
 		monthExpr = "COALESCE(STRFTIME('%Y-%m-01', date), SUBSTR(CAST(date AS TEXT), 1, 7) || '-01')"
 	}
 
-	whereClause, args := buildCashflowAnalyticsWhereClause(query)
+	whereClause, args := buildCashflowAnalyticsWhereClause(CashflowAnalyticsQuery{
+		From:           filter.From,
+		To:             filter.To,
+		IncludeIgnored: filter.IncludeIgnored,
+	})
 	rawQuery := fmt.Sprintf(`
 		SELECT
 			%s AS month_start,
@@ -65,14 +93,14 @@ func (s *SQLXBankTransactionStore) FetchMonthlyAnalytics(ctx context.Context, qu
 		return nil, fmt.Errorf("sqlx_transaction_store: failed to fetch monthly analytics: %w", err)
 	}
 
-	points := make([]CashflowMonthlyAnalyticsPoint, 0, len(rows))
+	points := make([]cashflow.MonthlyAnalyticsPoint, 0, len(rows))
 	for _, r := range rows {
 		month, err := time.Parse("2006-01-02", r.MonthStart)
 		if err != nil {
 			return nil, fmt.Errorf("sqlx_transaction_store: failed to parse month %q: %w", r.MonthStart, err)
 		}
 		month = month.UTC()
-		points = append(points, CashflowMonthlyAnalyticsPoint{
+		points = append(points, cashflow.MonthlyAnalyticsPoint{
 			Month:         month,
 			IncomingCents: r.IncomingCents,
 			OutgoingCents: r.OutgoingCents,

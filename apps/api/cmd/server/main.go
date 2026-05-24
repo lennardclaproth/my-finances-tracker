@@ -18,6 +18,7 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/bootstrap"
 	"github.com/lennardclaproth/my-finances-tracker/internal/bus"
 	memorybus "github.com/lennardclaproth/my-finances-tracker/internal/bus/memory"
+	cashflowdomain "github.com/lennardclaproth/my-finances-tracker/internal/cashflow"
 	cashflowservice "github.com/lennardclaproth/my-finances-tracker/internal/cashflow/service"
 	"github.com/lennardclaproth/my-finances-tracker/internal/config"
 	"github.com/lennardclaproth/my-finances-tracker/internal/http"
@@ -241,6 +242,7 @@ func setupRouterWithDeps(
 		deps.importStore,
 		deps.cashflowTransactionStore,
 	)
+	cashflowQueries := cashflowdomain.NewQueries(deps.cashflowTransactionStore)
 	assetService := assets.NewService(
 		deps.accountStore,
 		deps.portfolioSnapshotStore,
@@ -361,7 +363,7 @@ func setupRouterWithDeps(
 	)
 	router.HandleWithMiddleware(
 		"GET /cashflow/analytics/monthly",
-		handlers.GetCashflowMonthlyAnalytics(log, deps.cashflowTransactionStore),
+		handlers.GetCashflowMonthlyAnalytics(log, cashflowQueries),
 		http.WithRequestLogging(log),
 	)
 	router.HandleWithMiddleware(

@@ -1,4 +1,4 @@
-# AGENTS.md
+<!-- # AGENTS.md
 
 ## Scope
 - This repository is a monorepo.
@@ -93,4 +93,4 @@
 - Changelog entries for feature work must explicitly mention the feature ID.
 
 ## Maintaining this file
-- If the user corrects recurring behavior or adds durable repo rules, update `AGENTS.md` so the guidance persists.
+- If the user corrects recurring behavior or adds durable repo rules, update `AGENTS.md` so the guidance persists. -->
