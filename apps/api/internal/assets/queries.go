@@ -113,7 +113,7 @@ type ClassDetails struct {
 	Mutations []Mutation
 }
 
-// ClassDetails returns class items, growth points, and history.
+// ClassDetails returns class assets, growth points, and mutations.
 func (q *Queries) ClassDetails(ctx context.Context, classID, accID uuid.UUID) (*ClassDetails, error) {
 	// Get class including assets and mutations (mutations sorted DESC)
 	class, err := q.qs.Class(ctx, classID)

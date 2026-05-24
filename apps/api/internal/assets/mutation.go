@@ -29,22 +29,22 @@ const (
 
 // Mutation captures one worth mutation for a tracked asset entry.
 type Mutation struct {
-	ID              uuid.UUID        `db:"id"`
-	AccountID       uuid.UUID        `db:"account_id"`
-	ClassID         uuid.UUID        `db:"class_id"`
-	AssetID         uuid.UUID        `db:"asset_id"`
-	ChangeType      ChangeType       `db:"change_type"`
-	Direction       *ChangeDirection `db:"direction"`
+	ID         uuid.UUID        `db:"id"`
+	AccountID  uuid.UUID        `db:"account_id"`
+	ClassID    uuid.UUID        `db:"class_id"`
+	AssetID    uuid.UUID        `db:"asset_id"`
+	ChangeType ChangeType       `db:"change_type"`
+	Direction  *ChangeDirection `db:"direction"`
 	// The amount of the change
-	Amount          money.Price      `db:"amount"`
+	Amount money.Price `db:"amount"`
 	// The previous worth of the Asset
-	PreviousWorth   money.Price      `db:"previous_worth"`
+	PreviousWorth money.Price `db:"previous_worth"`
 	// The new worth of the Asset
-	NewWorth        money.Price      `db:"new_worth"`
-	ClassTotalWorth money.Price      `db:"class_total_worth"`
-	EffectiveDate   time.Time        `db:"effective_date"`
-	Note            *string          `db:"note"`
-	CreatedAt       time.Time        `db:"created_at"`
+	NewWorth        money.Price `db:"new_worth"`
+	ClassTotalWorth money.Price `db:"class_total_worth"`
+	EffectiveDate   time.Time   `db:"effective_date"`
+	Note            *string     `db:"note"`
+	CreatedAt       time.Time   `db:"created_at"`
 }
 
 func NewMutation(

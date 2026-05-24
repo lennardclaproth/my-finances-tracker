@@ -151,15 +151,15 @@ func (u *DailyUpload) SetRowErrors(rowErrors []DailyUploadRowError, sampleLimit 
 
 // DecodeRowErrors parses persisted row error JSON into RowErrors.
 
-	func (u *DailyUpload) DecodeRowErrors() error {
-		if u.RowErrorsJSON == "" {
-			u.RowErrors = []DailyUploadRowError{}
-			return nil
-		}
-		var rows []DailyUploadRowError
-		if err := json.Unmarshal([]byte(u.RowErrorsJSON), &rows); err != nil {
-			return err
-		}
-		u.RowErrors = rows
+func (u *DailyUpload) DecodeRowErrors() error {
+	if u.RowErrorsJSON == "" {
+		u.RowErrors = []DailyUploadRowError{}
 		return nil
 	}
+	var rows []DailyUploadRowError
+	if err := json.Unmarshal([]byte(u.RowErrorsJSON), &rows); err != nil {
+		return err
+	}
+	u.RowErrors = rows
+	return nil
+}

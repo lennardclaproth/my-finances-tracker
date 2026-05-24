@@ -17,15 +17,24 @@ type creator interface {
 	Create(ctx context.Context, acc *Account) error
 }
 
-// Create persists the account and publishes an AccountCreated event when a publisher is configured.
-func (c *Commands) Create(ctx context.Context, id, externalId *uuid.UUID, name string) error {
-	acc, err := NewAccount(name, id, externalId)
+// Create persists an account and publishes an AccountCreated event when a
+// publisher is configured.
+//
+// The id argument is optional. If id is nil or uuid.Nil, Create generates a new
+// UUID for the account.
+//
+// The externalID argument is optional and can be used to store an identifier
+// from an external system, such as Google or Entra ID.
+//
+// The name argument is required and must not be empty or whitespace.
+func (c *Commands) Create(ctx context.Context, id *uuid.UUID, externalID *string, name string) (*uuid.UUID, error) {
+	acc, err := NewAccount(name, id, externalID)
 	if err != nil {
-		return fmt.Errorf("create: failed to create new account")
+		return nil, fmt.Errorf("create: failed to create new account")
 	}
 	if err := c.c.Create(ctx, acc); err != nil {
-		return fmt.Errorf("handlers: failed to create account: %w", err)
+		return nil, fmt.Errorf("create: failed to create account: %w", err)
 	}
 	c.b.Publish(ctx, TopicAccountCreated, AccountCreated{AccID: acc.ID})
-	return nil
+	return &acc.ID, nil
 }

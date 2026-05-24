@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
+	apphttp "github.com/lennardclaproth/my-finances-tracker/internal/transport/http"
 )
 
 // HealthHandler returns a simple health check handler.
@@ -16,11 +17,7 @@ import (
 // @Router      /health [get]
 // @Tags        Health
 func HealthHandler(log logging.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
-			log.Warn(r.Context(), "failed writing health response", "error", err.Error())
-		}
-	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apphttp.JSONEncode(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
 }

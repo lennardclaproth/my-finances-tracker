@@ -4,7 +4,8 @@ import "errors"
 
 // Asset errors.
 var (
-	ErrAssetNotFound = errors.New("asset not found")
+	ErrAssetNotFound   = errors.New("asset not found")
+	ErrAssetNotInClass = errors.New("asset does not belong to the specified class")
 )
 
 // Account errors
@@ -14,11 +15,12 @@ var (
 
 // Class errors
 var (
-	ErrClassNotFound      = errors.New("class not found")
-	ErrClassNotManual     = errors.New("asset class must be manual")
-	ErrClassReserved      = errors.New("asset class cannot use a reserved name")
-	ErrClassNameEmpty     = errors.New("asset class name cannot be empty")
-	ErrClassAlreadyExists = errors.New("asset class already exists")
+	ErrClassNotFound        = errors.New("class not found")
+	ErrClassNotManual       = errors.New("asset class must be manual")
+	ErrClassReserved        = errors.New("asset class cannot use a reserved name")
+	ErrClassNameEmpty       = errors.New("asset class name cannot be empty")
+	ErrClassAlreadyExists   = errors.New("asset class already exists")
+	ErrClassAccountMismatch = errors.New("asset class does not belong to the specified account")
 )
 
 // Syncer errors

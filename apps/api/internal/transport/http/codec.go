@@ -77,6 +77,9 @@ type MultipartFileDecoderOptions struct {
 }
 
 // JSONDecode decodes a strict single JSON object payload into T.
+//
+// It returns a DecodeError containing information about the fault
+// that occurred while decoding. This error is 
 func JSONDecode[T any](r *http.Request) (T, error) {
 	var req T
 	// Check for empty body before decoding to provide a clearer error message.
@@ -204,7 +207,7 @@ func DecodeQuery[T any](r *http.Request) (T, error) {
 	return target, nil
 }
 
-func encode[T any](w http.ResponseWriter, status int, v T) error {
+func JSONEncode[T any](w http.ResponseWriter, status int, v T) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
@@ -377,7 +380,7 @@ func DecodeMultipartFile[T any](r *http.Request, opt MultipartFileDecoderOptions
 					Field:   formTag,
 					Message: fmt.Sprintf("%s must be a valid float", formTag),
 					Err:     err,
-				}		
+				}
 			}
 			fieldValue.SetFloat(floatVal)
 		case reflect.Bool:

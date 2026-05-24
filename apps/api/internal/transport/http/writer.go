@@ -2,6 +2,7 @@ package http
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -22,6 +23,24 @@ func NewResponseWriter(w http.ResponseWriter) *responseWriter {
 func (rw *responseWriter) WriteHeader(code int) {
 	rw.StatusCode = code
 	rw.ResponseWriter.WriteHeader(code)
+}
+
+func WriteDecodeError(w http.ResponseWriter, err error) bool {
+	var decodeErr *DecodeError
+	if !errors.As(err, &decodeErr) {
+		return false
+	}
+
+	field := decodeErr.Field
+	if field == "" {
+		field = "body"
+	}
+
+	_ = JSONEncode(w, decodeErr.Status, map[string]string{
+		field: decodeErr.Message,
+	})
+
+	return true
 }
 
 func (rw *responseWriter) Write(b []byte) (int, error) {

@@ -29,3 +29,11 @@ func (p Price) String() string {
 	return fmt.Sprintf("%.6f", p.Float64())
 }
 
+func StrToPrice(s string) (Price, error) {
+	var amount float64
+	_, err := fmt.Sscanf(s, "%f", &amount)
+	if err != nil {
+		return 0, ErrInvalidPrice
+	}
+	return NewPrice(amount)
+}

@@ -155,32 +155,17 @@ func (c *Commands) CreateMutation(
 
 func (c *Commands) UpdateAssetWorth(
 	ctx context.Context,
-	accID, classID, assetID uuid.UUID,
+	accID, assetID uuid.UUID,
 	worth money.Price,
 	changeType ChangeType,
 	direction *ChangeDirection,
 	effectiveDate time.Time,
 	note *string,
 ) error {
-	// Check if class exists
-	class, err := c.cg.Class(ctx, classID)
-	if err != nil {
-		return fmt.Errorf("update asset worth: failed to get class: %w", err)
-	}
-	if class == nil {
-		return fmt.Errorf("update asset worth: %w", ErrClassNotFound)
-	}
-	// guard against updating non manual asset classes
-	if class.Source != ClassSourceManual && changeType != ChangeTypeSet {
-		// Portfolio worth is set only by sync flow.
-		return fmt.Errorf("update asset worth: %w", ErrClassNotManual)
-	}
-	if class.Source == ClassSourcePortfolio {
-		return fmt.Errorf("update asset worth: %w", ErrClassReserved)
-	}
-	// Start a transaction to ensure atomicity
-	err = c.uow.Do(ctx, func(txCtx context.Context) error {
-		// Get the asset
+	err := c.uow.Do(ctx, func(txCtx context.Context) error {
+		// Get the asset and guard against false values
+		// We assume that the asset is returned with the
+		// related class
 		asset, err := c.cg.Asset(txCtx, assetID)
 		if err != nil {
 			return fmt.Errorf("update asset worth: failed to get asset: %w", err)
@@ -188,10 +173,23 @@ func (c *Commands) UpdateAssetWorth(
 		if asset == nil {
 			return fmt.Errorf("update asset worth: %w", ErrAssetNotFound)
 		}
+		if asset.Class == nil {
+			return fmt.Errorf("update asset worth: asset is not populated from database, this error should not occur")
+		}
+		if asset.Class.AccountID != accID {
+			return fmt.Errorf("update asset worth: %w", ErrClassAccountMismatch)
+		}
+		if asset.Class.Source != ClassSourceManual && changeType != ChangeTypeSet {
+			// Portfolio worth is set only by sync flow.
+			return fmt.Errorf("update asset worth: %w", ErrClassNotManual)
+		}
+		if asset.Class.Source == ClassSourcePortfolio {
+			return fmt.Errorf("update asset worth: %w", ErrClassReserved)
+		}
 		previousWorth := asset.CurrentWorth
-		classTotal, err := c.ca.AggregateValue(txCtx, accID, classID)
+		classTotal, err := c.ca.AggregateValue(txCtx, accID, asset.ClassID)
 		// Create mutation for change
-		m, err := c.CreateMutation(txCtx, accID, classID, asset.ID,
+		m, err := c.CreateMutation(txCtx, accID, asset.ClassID, asset.ID,
 			changeType, direction,
 			worth, previousWorth, classTotal,
 			effectiveDate, note)
@@ -213,7 +211,7 @@ func (c *Commands) UpdateAssetWorth(
 }
 
 // UpdateClass mutates a manual class name/archive status.
-func (c *Commands) UpdateClass(ctx context.Context, classID uuid.UUID, name string, archived bool) error {
+func (c *Commands) UpdateClass(ctx context.Context, classID uuid.UUID, name *string, archived *bool) error {
 	class, err := c.cg.Class(ctx, classID)
 	if err != nil {
 		return fmt.Errorf("update class: fetch class: %w", err)
@@ -224,7 +222,7 @@ func (c *Commands) UpdateClass(ctx context.Context, classID uuid.UUID, name stri
 	if class.Source != ClassSourceManual {
 		return fmt.Errorf("update class: %w", ErrClassNotManual)
 	}
-	if err := class.Update(&name, &archived); err != nil {
+	if err := class.Update(name, archived); err != nil {
 		return fmt.Errorf("update class: failed to update domain model: %w", err)
 	}
 	if err := c.cs.UpdateClass(ctx, class); err != nil {
@@ -235,13 +233,16 @@ func (c *Commands) UpdateClass(ctx context.Context, classID uuid.UUID, name stri
 }
 
 // DeleteClass removes a manual class and related items/history.
-func (c *Commands) DeleteClass(ctx context.Context, classID uuid.UUID) error {
+func (c *Commands) DeleteClass(ctx context.Context, accountID, classID uuid.UUID) error {
 	class, err := c.cg.Class(ctx, classID)
 	if err != nil {
 		return fmt.Errorf("delete asset: failed to get class: %w", err)
 	}
 	if class == nil {
 		return ErrClassNotFound
+	}
+	if class.AccountID != accountID {
+		return fmt.Errorf("delete asset: failed to delete: %w", ErrClassAccountMismatch)
 	}
 	if class.Source != ClassSourceManual {
 		return ErrClassNotManual

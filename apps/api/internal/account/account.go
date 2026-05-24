@@ -11,11 +11,12 @@ import (
 
 // Account is the canonical account aggregate shared across domains.
 type Account struct {
-	ID         uuid.UUID  `db:"id"`
-	ExternalID *uuid.UUID `db:"external_id"`
-	Name       string     `db:"name"`
-	CreatedAt  time.Time  `db:"created_at"`
-	UpdatedAt  time.Time  `db:"updated_at"`
+	ID uuid.UUID `db:"id"`
+	// ExternalID in the account domain is an optional identifier that can come from an external system (i.e. Google or EntraID)
+	ExternalID *string   `db:"external_id"`
+	Name       string    `db:"name"`
+	CreatedAt  time.Time `db:"created_at"`
+	UpdatedAt  time.Time `db:"updated_at"`
 }
 
 var (
@@ -47,7 +48,7 @@ type Publisher interface {
 }
 
 // NewAccount constructs a validated account instance with generated identity and timestamps.
-func NewAccount(name string, id, externalID *uuid.UUID) (*Account, error) {
+func NewAccount(name string, id *uuid.UUID, externalID *string) (*Account, error) {
 	trimmed := strings.TrimSpace(name)
 	if trimmed == "" {
 		return nil, ErrAccountNameRequired

@@ -69,7 +69,7 @@ var (
 	// ErrInvalidListingCurrency indicates unsupported listing currency value.
 	ErrInvalidListingCurrency = fmt.Errorf("invalid listing currency")
 	// ErrSyncInProgress indicates a listing sync lock is already held.
-	
+
 )
 
 const (
@@ -78,8 +78,8 @@ const (
 	SourceBrandNewDay  Source = "brandnewday"
 )
 
-// IsManualIngestion returns true if the source is a manual ingestion provider, 
-// which means that data for listings with this source will not be automatically synced 
+// IsManualIngestion returns true if the source is a manual ingestion provider,
+// which means that data for listings with this source will not be automatically synced
 // and must be ingested manually by the user.
 func (s Source) IsManualIngestion() bool {
 	return s == SourceBrandNewDay

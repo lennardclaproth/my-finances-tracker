@@ -10,15 +10,15 @@ import (
 )
 
 var (
-	ErrAssetNameEmpty      = errors.New("asset name cannot be empty")
+	ErrAssetNameEmpty = errors.New("asset name cannot be empty")
 )
 
 // Asset is one concrete asset tracked inside a class.
 type Asset struct {
 	ID           uuid.UUID   `db:"id"`
 	ClassID      uuid.UUID   `db:"class_id"`
-	Class        Class       `db:"-"`
-	Mutations    []Mutation  `db:"-"`
+	Class        *Class      `db:"-"`
+	Mutations    *[]Mutation `db:"-"`
 	AccountID    uuid.UUID   `db:"account_id"`
 	Name         string      `db:"name"`
 	CurrentWorth money.Price `db:"current_worth"`

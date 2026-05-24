@@ -62,25 +62,25 @@ func (p *ManualUploadPolicy) ValidateListing(ctx context.Context, listingID uuid
 		return nil, ErrManualUploadListingNotFound
 	}
 
-		providerName, err := ProviderNameFromSource(listing.Source)
-		if err != nil {
-			return nil, ErrManualUploadProviderUnavailable
-		}
-		provider, err := p.providers.GetByName(ctx, providerName)
-		if err != nil {
-			if errors.Is(err, ErrProviderNotFound) {
-				return nil, ErrManualUploadProviderUnavailable
-			}
-			return nil, err
-		}
-		if provider == nil {
-			return nil, ErrManualUploadProviderUnavailable
-		}
-		if !provider.IsManualIngestion() {
-			return nil, ErrManualUploadProviderNotManual
-		}
-		if p.parserValid == nil || p.parserValid(listing.Source) != nil {
-			return nil, ErrManualUploadParserUnavailable
-		}
-		return listing, nil
+	providerName, err := ProviderNameFromSource(listing.Source)
+	if err != nil {
+		return nil, ErrManualUploadProviderUnavailable
 	}
+	provider, err := p.providers.GetByName(ctx, providerName)
+	if err != nil {
+		if errors.Is(err, ErrProviderNotFound) {
+			return nil, ErrManualUploadProviderUnavailable
+		}
+		return nil, err
+	}
+	if provider == nil {
+		return nil, ErrManualUploadProviderUnavailable
+	}
+	if !provider.IsManualIngestion() {
+		return nil, ErrManualUploadProviderNotManual
+	}
+	if p.parserValid == nil || p.parserValid(listing.Source) != nil {
+		return nil, ErrManualUploadParserUnavailable
+	}
+	return listing, nil
+}
