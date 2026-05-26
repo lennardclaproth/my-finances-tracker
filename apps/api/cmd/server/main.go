@@ -243,6 +243,7 @@ func setupRouterWithDeps(
 		deps.cashflowTransactionStore,
 	)
 	cashflowQueries := cashflowdomain.NewQueries(deps.cashflowTransactionStore)
+	portfolioQueries := portfolio.NewQueries(deps.positionStore)
 	assetService := assets.NewService(
 		deps.accountStore,
 		deps.portfolioSnapshotStore,
@@ -314,7 +315,7 @@ func setupRouterWithDeps(
 	)
 	router.HandleWithMiddleware(
 		"GET /portfolio/positions",
-		handlers.GetPortfolioPositions(log, deps.accountStore, deps.positionStore),
+		handlers.GetPortfolioPositions(log, deps.accountStore, portfolioQueries),
 		http.WithRequestLogging(log),
 	)
 	router.HandleWithMiddleware(
