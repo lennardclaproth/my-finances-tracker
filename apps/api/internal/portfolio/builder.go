@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lennardclaproth/my-finances-tracker/internal/date"
 	"github.com/lennardclaproth/my-finances-tracker/internal/marketdata"
+	"github.com/lennardclaproth/my-finances-tracker/internal/sorting"
 
 	"github.com/lennardclaproth/my-finances-tracker/internal/money"
 )
@@ -84,7 +85,7 @@ func (b *Builder) buildPositionSnapshots(
 		return nil, fmt.Errorf("build position snapshots: get transactions: %w", err)
 	}
 	// Get historical market data for the listing from the position open date to today
-	dailies, err := b.mdq.GetEODByListing(ctx, *pos.ListingID, &startDate, nil, 0, 0, marketdata.SortEODAsc)
+	dailies, err := b.mdq.GetEODByListing(ctx, *pos.ListingID, &startDate, nil, 0, 0, sorting.ASC)
 	if err != nil {
 		return nil, fmt.Errorf("build position snapshots: get dailies: %w", err)
 	}

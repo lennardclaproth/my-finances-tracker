@@ -1,41 +1,54 @@
-package handlers
+package vendors
 
 import (
-	"context"
 	"net/http"
+	"time"
 
-	"github.com/lennardclaproth/my-finances-tracker/api"
-	httpx "github.com/lennardclaproth/my-finances-tracker/internal/http"
+	"github.com/google/uuid"
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
+	httpx "github.com/lennardclaproth/my-finances-tracker/internal/transport/http"
 	"github.com/lennardclaproth/my-finances-tracker/internal/vendor"
 )
 
-// GetVendors lists active vendors for import selection.
+// VendorResponse represents one vendor record.
+type VendorResponse struct {
+	ID             uuid.UUID `json:"id"`
+	Name           string    `json:"name"`
+	Type           string    `json:"type"`
+	Active         bool      `json:"active"`
+	ImportDisabled bool      `json:"import_disabled"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+// List lists active vendors for import selection.
 //
 // @Summary List vendors
 // @Description Lists active vendors for imports.
 // @Tags vendors
 // @Accept json
 // @Produce json
-// @Success 200 {array} api.VendorResponse
+// @Success 200 {array} VendorResponse
 // @Failure 500 {object} map[string]string
 // @Router /vendors [get]
-func GetVendors(
+func List(
 	log logging.Logger,
-	lister vendor.ActiveVendorLister,
+	queries *vendor.Queries,
 ) http.Handler {
-	endpoint := func(ctx context.Context, _ struct{}) (status int, res []api.VendorResponse, err error) {
-		vendors, err := lister.ListActive(ctx)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		vendors, err := queries.ListActive(r.Context())
 		if err != nil {
-			return http.StatusInternalServerError, nil, err
+			log.Error(r.Context(), "list vendors: failed to list active vendors", err)
+			_ = httpx.JSONEncode(w, http.StatusInternalServerError, map[string]string{"error": "failed to list vendors"})
+			return
 		}
 
-		response := make([]api.VendorResponse, 0, len(vendors))
+		response := make([]VendorResponse, 0, len(vendors))
 		for _, v := range vendors {
 			if v == nil {
 				continue
 			}
-			response = append(response, api.VendorResponse{
+			response = append(response, VendorResponse{
 				ID:             v.ID,
 				Name:           string(v.Name),
 				Type:           string(v.Type),
@@ -45,12 +58,7 @@ func GetVendors(
 				UpdatedAt:      v.UpdatedAt,
 			})
 		}
-		return http.StatusOK, response, nil
-	}
 
-	decodeFn := httpx.DecoderFunc[struct{}](func(r *http.Request) (struct{}, error) {
-		return struct{}{}, nil
+		_ = httpx.JSONEncode(w, http.StatusOK, response)
 	})
-
-	return httpx.Endpoint(decodeFn, log, endpoint)
 }
