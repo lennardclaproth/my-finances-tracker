@@ -43,8 +43,6 @@ func DateOnly(t time.Time, loc *time.Location) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, loc)
 }
 
-// func ParseFromTo(from *time.Time, to *time.Time)
-
 // ParseFromTo converts optional date query parameters into a validated date range.
 func ParseFromTo(fromRaw, toRaw string) (*time.Time, *time.Time, error) {
 	var from *time.Time

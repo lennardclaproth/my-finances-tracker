@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lennardclaproth/my-finances-tracker/internal/date"
+	"github.com/lennardclaproth/my-finances-tracker/internal/sorting"
 )
 
 type queryStore interface {
@@ -61,9 +62,6 @@ func (q *Queries) SearchListings(ctx context.Context, qs string, limit, offset i
 	return listings, total, nil
 }
 
-// EODSortOrder controls date ordering for daily retrieval.
-type EODSortOrder string
-
 type Metadata struct {
 	Message     string
 	ResultCount int
@@ -75,24 +73,19 @@ type EODResult struct {
 	Metadata Metadata
 }
 
-const (
-	SortEODAsc  EODSortOrder = "asc"
-	SortEODDesc EODSortOrder = "desc"
-)
-
 func (q *Queries) GetEODByListing(
 	ctx context.Context,
 	listingID uuid.UUID,
 	from, to *time.Time,
 	limit, offset int,
-	sortOrder EODSortOrder,
+	sortOrder sorting.Direction,
 ) (*EODResult, error) {
 	ls, err := q.qs.Get(ctx, listingID)
 	if err != nil {
 		return nil, fmt.Errorf("handlers: GetByListing failed to get listing: %w", err)
 	}
 	if ls == nil {
-		return nil, fmt.Errorf("handlers: GetByListing listing not found")
+		return nil, fmt.Errorf("handlers: GetByListing: %w", ErrListingNotFound)
 	}
 	if !ls.Active {
 		return nil, fmt.Errorf("handlers: GetByListing listing with symbol %s is not active", ls.Symbol)
@@ -160,7 +153,7 @@ func getEODResult(
 	ls *Listing,
 	from, to *time.Time,
 	limit, offset *int,
-	sortOrder EODSortOrder,
+	sortOrder sorting.Direction,
 	msg string,
 	qs queryStore,
 ) (*EODResult, error) {
