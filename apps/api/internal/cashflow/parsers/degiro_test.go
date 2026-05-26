@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/lennardclaproth/my-finances-tracker/internal/cashflow"
+	"github.com/lennardclaproth/my-finances-tracker/internal/money"
 	"github.com/lennardclaproth/my-finances-tracker/internal/vendor"
 )
 
@@ -44,7 +45,8 @@ func TestDegiroParser_ParseAll_HappyPath(t *testing.T) {
 	if got[1].Direction != cashflow.CashIn {
 		t.Fatalf("expected row 2 direction in, got %s", got[1].Direction)
 	}
-	if got[1].Amount != 641.02 {
+	price, err := money.NewPrice(641.02)
+	if got[1].Amount != price {
 		t.Fatalf("expected row 2 amount 641.02, got %f", got[1].Amount)
 	}
 

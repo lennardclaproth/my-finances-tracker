@@ -57,6 +57,11 @@ func (s *SQLXBankTransactionStore) FetchMonthlyAnalytics(ctx context.Context, qu
 	return out, nil
 }
 
+// GetMonthlyAnalytics returns monthly analytics for the application read model.
+func (s *SQLXBankTransactionStore) GetMonthlyAnalytics(ctx context.Context, filter cashflow.AnalyticsFilter) ([]cashflow.MonthlyAnalyticsPoint, error) {
+	return s.FetchCashflowMonthlyAnalytics(ctx, filter)
+}
+
 // FetchCashflowMonthlyAnalytics returns monthly cashflow totals for the read-side cashflow use case.
 func (s *SQLXBankTransactionStore) FetchCashflowMonthlyAnalytics(ctx context.Context, filter cashflow.AnalyticsFilter) ([]cashflow.MonthlyAnalyticsPoint, error) {
 	monthExpr := "TO_CHAR(DATE_TRUNC('month', date), 'YYYY-MM-01')"
@@ -160,6 +165,38 @@ func (s *SQLXBankTransactionStore) FetchTagDistribution(ctx context.Context, que
 		Incoming: mapToSortedDistributionEntries(incoming),
 		Outgoing: mapToSortedDistributionEntries(outgoing),
 	}, nil
+}
+
+// GetTagDistribution returns tag distribution for the application read model.
+func (s *SQLXBankTransactionStore) GetTagDistribution(ctx context.Context, filter cashflow.AnalyticsFilter) (*cashflow.TagDistribution, error) {
+	dist, err := s.FetchTagDistribution(ctx, CashflowAnalyticsQuery{
+		From:           filter.From,
+		To:             filter.To,
+		IncludeIgnored: filter.IncludeIgnored,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if dist == nil {
+		return &cashflow.TagDistribution{}, nil
+	}
+
+	return &cashflow.TagDistribution{
+		Combined: toCashflowTagDistributionEntries(dist.Combined),
+		Incoming: toCashflowTagDistributionEntries(dist.Incoming),
+		Outgoing: toCashflowTagDistributionEntries(dist.Outgoing),
+	}, nil
+}
+
+func toCashflowTagDistributionEntries(entries []CashflowTagDistributionEntry) []cashflow.TagDistributionEntry {
+	out := make([]cashflow.TagDistributionEntry, 0, len(entries))
+	for _, entry := range entries {
+		out = append(out, cashflow.TagDistributionEntry{
+			Tag:        entry.Tag,
+			TotalCents: entry.TotalCents,
+		})
+	}
+	return out
 }
 
 func buildCashflowAnalyticsWhereClause(query CashflowAnalyticsQuery) (string, []any) {

@@ -16,6 +16,7 @@ type Queries struct {
 
 type queryStore interface {
 	GetMonthlyAnalytics(ctx context.Context, filter AnalyticsFilter) ([]MonthlyAnalyticsPoint, error)
+	GetTagDistribution(ctx context.Context, filter AnalyticsFilter) (*TagDistribution, error)
 	ListTransactions(ctx context.Context, query TransactionListQuery) (*TransactionListResult, error)
 	CountByFilter(ctx context.Context, filters TransactionFilters) (int, error)
 }
@@ -40,6 +41,19 @@ type MonthlyAnalyticsPoint struct {
 	NetCents      int64
 }
 
+// TagDistributionEntry contains the total amount for a single cashflow tag.
+type TagDistributionEntry struct {
+	Tag        string
+	TotalCents int64
+}
+
+// TagDistribution contains cashflow tag totals grouped by direction.
+type TagDistribution struct {
+	Combined []TagDistributionEntry
+	Incoming []TagDistributionEntry
+	Outgoing []TagDistributionEntry
+}
+
 // MonthlyAnalytics returns incoming, outgoing, and net totals grouped by month.
 func (q *Queries) MonthlyAnalytics(ctx context.Context, filter AnalyticsFilter) ([]MonthlyAnalyticsPoint, error) {
 	points, err := q.qs.GetMonthlyAnalytics(ctx, filter)
@@ -47,6 +61,18 @@ func (q *Queries) MonthlyAnalytics(ctx context.Context, filter AnalyticsFilter) 
 		return nil, fmt.Errorf("cashflow monthly analytics: %w", err)
 	}
 	return points, nil
+}
+
+// TagDistribution returns tag totals for combined, incoming, and outgoing cashflows.
+func (q *Queries) TagDistribution(ctx context.Context, filter AnalyticsFilter) (*TagDistribution, error) {
+	dist, err := q.qs.GetTagDistribution(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("cashflow tag distribution: %w", err)
+	}
+	if dist == nil {
+		return &TagDistribution{}, nil
+	}
+	return dist, nil
 }
 
 const (

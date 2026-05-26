@@ -22,7 +22,10 @@ type accountExistenceChecker interface {
 
 type commandStore interface {
 	CreateTransaction(ctx context.Context, tx *Transaction) error
+	UpdateTagByIDs(ctx context.Context, ids []uuid.UUID, tag string) (int, error)
 	UpdateTagByFilter(ctx context.Context, filters TransactionFilters, tag string) (int, error)
+	UpdateIgnoredByIDs(ctx context.Context, ids []uuid.UUID, ignored bool) (int, error)
+	UpdateIgnoredByFilter(ctx context.Context, filters TransactionFilters, ignored bool) (int, error)
 }
 
 const (
@@ -167,20 +170,56 @@ type TagByFilterCommand struct {
 	Filters   TransactionFilters
 }
 
+// TagByID applies a tag to one cashflow transaction.
+func (c *Commands) TagByID(ctx context.Context, id uuid.UUID, tag string) error {
+	_, err := c.TagByIDs(ctx, []uuid.UUID{id}, tag)
+	if err != nil {
+		return fmt.Errorf("cashflow tag by id: %w", err)
+	}
+	return nil
+}
+
+// TagByIDs applies a tag to the selected cashflow transactions.
+func (c *Commands) TagByIDs(ctx context.Context, ids []uuid.UUID, tag string) (int, error) {
+	updated, err := c.cs.UpdateTagByIDs(ctx, ids, tag)
+	if err != nil {
+		return 0, fmt.Errorf("cashflow tag by ids: %w", err)
+	}
+	return updated, nil
+}
+
 // TagByFilter applies or schedules tagging based on total matched rows and async policy.
 func (c *Commands) TagByFilter(ctx context.Context, tag string, accID uuid.UUID, filters TransactionFilters) (BulkTagResult, error) {
 	total, err := c.qs.CountByFilter(ctx, filters)
 	if err != nil {
-		return BulkTagResult{}, err
+		return BulkTagResult{}, fmt.Errorf("cashflow tag by filter count: %w", err)
 	}
 	// TODO: implement async tagging
 	updated, err := c.cs.UpdateTagByFilter(ctx, filters, tag)
 	if err != nil {
-		return BulkTagResult{}, err
+		return BulkTagResult{}, fmt.Errorf("cashflow tag by filter update: %w", err)
 	}
 	return BulkTagResult{
 		Mode:         TagByFilterModeSync,
 		UpdatedCount: updated,
 		TotalMatched: total,
 	}, nil
+}
+
+// IgnoreByIDs sets the ignored flag for the selected cashflow transactions.
+func (c *Commands) IgnoreByIDs(ctx context.Context, ids []uuid.UUID, ignored bool) (int, error) {
+	updated, err := c.cs.UpdateIgnoredByIDs(ctx, ids, ignored)
+	if err != nil {
+		return 0, fmt.Errorf("cashflow ignore by ids: %w", err)
+	}
+	return updated, nil
+}
+
+// IgnoreByFilter sets the ignored flag for cashflow transactions matching the supplied filters.
+func (c *Commands) IgnoreByFilter(ctx context.Context, filters TransactionFilters, ignored bool) (int, error) {
+	updated, err := c.cs.UpdateIgnoredByFilter(ctx, filters, ignored)
+	if err != nil {
+		return 0, fmt.Errorf("cashflow ignore by filter: %w", err)
+	}
+	return updated, nil
 }

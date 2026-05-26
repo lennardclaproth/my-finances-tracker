@@ -88,6 +88,11 @@ func (s *SQLXBankTransactionStore) Create(ctx context.Context, tx *cashflow.Tran
 	return nil
 }
 
+// CreateTransaction persists one cashflow transaction for the application command boundary.
+func (s *SQLXBankTransactionStore) CreateTransaction(ctx context.Context, tx *cashflow.Transaction) error {
+	return s.Create(ctx, tx)
+}
+
 func isCashflowDuplicate(err error) bool {
 	var pqErr *pq.Error
 	if errors.As(err, &pqErr) {
@@ -233,6 +238,11 @@ func (s *SQLXBankTransactionStore) CountByQuery(ctx context.Context, query Cashf
 	return total, nil
 }
 
+// CountByFilter counts cashflow transactions matching application-level filters.
+func (s *SQLXBankTransactionStore) CountByFilter(ctx context.Context, filters cashflow.TransactionFilters) (int, error) {
+	return s.CountByQuery(ctx, cashflowTransactionQueryFromFilters(filters))
+}
+
 func (s *SQLXBankTransactionStore) UpdateTagByQuery(ctx context.Context, query CashflowTransactionQuery, tag string) (int, error) {
 	whereClause, args := buildCashflowWhereClause(query)
 	updateQuery := fmt.Sprintf(`
@@ -256,6 +266,11 @@ func (s *SQLXBankTransactionStore) UpdateTagByQuery(ctx context.Context, query C
 		return 0, fmt.Errorf("sqlx_transaction_store: failed to fetch rows affected: %w", err)
 	}
 	return int(affected), nil
+}
+
+// UpdateTagByFilter updates tags for cashflow transactions matching application-level filters.
+func (s *SQLXBankTransactionStore) UpdateTagByFilter(ctx context.Context, filters cashflow.TransactionFilters, tag string) (int, error) {
+	return s.UpdateTagByQuery(ctx, cashflowTransactionQueryFromFilters(filters), tag)
 }
 
 func (s *SQLXBankTransactionStore) UpdateTagByIDs(ctx context.Context, ids []uuid.UUID, tag string) (int, error) {
@@ -315,6 +330,11 @@ func (s *SQLXBankTransactionStore) UpdateIgnoredByQuery(ctx context.Context, que
 	return int(affected), nil
 }
 
+// UpdateIgnoredByFilter updates ignored-state for cashflow transactions matching application-level filters.
+func (s *SQLXBankTransactionStore) UpdateIgnoredByFilter(ctx context.Context, filters cashflow.TransactionFilters, ignored bool) (int, error) {
+	return s.UpdateIgnoredByQuery(ctx, cashflowTransactionQueryFromFilters(filters), ignored)
+}
+
 func (s *SQLXBankTransactionStore) UpdateIgnoredByIDs(ctx context.Context, ids []uuid.UUID, ignored bool) (int, error) {
 	if len(ids) == 0 {
 		return 0, nil
@@ -344,6 +364,28 @@ func (s *SQLXBankTransactionStore) UpdateIgnoredByIDs(ctx context.Context, ids [
 		return 0, fmt.Errorf("sqlx_transaction_store: failed to fetch rows affected: %w", err)
 	}
 	return int(affected), nil
+}
+
+func cashflowTransactionQueryFromFilters(filters cashflow.TransactionFilters) CashflowTransactionQuery {
+	query := CashflowTransactionQuery{
+		Q:           filters.Query,
+		Description: filters.Description,
+		Note:        filters.Note,
+		Source:      filters.Source,
+		Tags:        filters.Tags,
+		From:        filters.From,
+		To:          filters.To,
+	}
+	if filters.Direction != nil {
+		query.Direction = string(*filters.Direction)
+	}
+	if filters.Untagged != nil {
+		query.Untagged = *filters.Untagged
+	}
+	if filters.HideIgnored != nil {
+		query.HideIgnored = *filters.HideIgnored
+	}
+	return query
 }
 
 func buildCashflowWhereClause(query CashflowTransactionQuery) (string, []any) {

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/lennardclaproth/my-finances-tracker/internal/cashflow"
+	"github.com/lennardclaproth/my-finances-tracker/internal/money"
 	"github.com/lennardclaproth/my-finances-tracker/internal/vendor"
 )
 
@@ -37,7 +38,8 @@ func TestN26Parser_ParseAll_EnglishHeaders(t *testing.T) {
 	if got[0].Direction != cashflow.CashOut {
 		t.Fatalf("expected row 1 direction out, got %s", got[0].Direction)
 	}
-	if got[0].Amount != -1.85 {
+	price, _ := money.NewPrice(-1.85)
+	if got[0].Amount != price {
 		t.Fatalf("expected row 1 amount -1.85, got %f", got[0].Amount)
 	}
 	if got[0].Date.Format("2006-01-02") != "2025-06-21" {
@@ -86,7 +88,8 @@ func TestN26Parser_ParseAll_GermanHeadersAndSemicolon(t *testing.T) {
 	if got[0].Direction != cashflow.CashOut {
 		t.Fatalf("expected direction out, got %s", got[0].Direction)
 	}
-	if got[0].Amount != -79.88 {
+	price, _ := money.NewPrice(-79.88)
+	if got[0].Amount !=  price{
 		t.Fatalf("expected amount -79.88, got %f", got[0].Amount)
 	}
 	if got[0].Date.Format("2006-01-02") != "2025-08-13" {

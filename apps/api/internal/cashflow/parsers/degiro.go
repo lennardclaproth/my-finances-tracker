@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lennardclaproth/my-finances-tracker/internal/cashflow"
+	"github.com/lennardclaproth/my-finances-tracker/internal/money"
 )
 
 // DegiroParser parses DEGIRO CSV files and constructs TransactionData entries.
@@ -141,13 +142,13 @@ func (p *DegiroParser) ParseRow(record []string, rowNumber int, importID uuid.UU
 	if orderID != "" {
 		noteParts = append(noteParts, "OrderID:"+orderID)
 	}
-
+	price, _ := money.NewPrice(amount)
 	return cashflow.TransactionData{
 		Description: desc,
 		Note:        strings.Join(noteParts, " | "),
 		Source:      "DEGIRO",
 		Direction:   direction,
-		Amount:      amount,
+		Amount:      price,
 		Date:        parsedDate,
 		AccountType: p.accountType,
 	}, nil

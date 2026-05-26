@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lennardclaproth/my-finances-tracker/internal/cashflow"
+	"github.com/lennardclaproth/my-finances-tracker/internal/money"
 )
 
 const (
@@ -205,13 +206,13 @@ func (p *N26Parser) ParseRow(record []string, rowNumber int, importID uuid.UUID)
 	if exchangeRate := p.value(record, n26FieldExchangeRate); exchangeRate != "" {
 		noteParts = append(noteParts, "ExchangeRate:"+exchangeRate)
 	}
-
+	price, _ := money.NewPrice(amount)
 	return cashflow.TransactionData{
 		Description: description,
 		Note:        strings.Join(noteParts, " | "),
 		Source:      "N26",
 		Direction:   direction,
-		Amount:      amount,
+		Amount:      price,
 		Date:        parsedDate,
 		AccountType: p.accountType,
 	}, nil

@@ -8,7 +8,7 @@ type TransactionFilters struct {
 	Note        string
 	Source      string
 
-	Sort        *CashFlowDirection
+	Direction   *CashFlowDirection
 	Tags        []string
 	Untagged    *bool
 	HideIgnored *bool

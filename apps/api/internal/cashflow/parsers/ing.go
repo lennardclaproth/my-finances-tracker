@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lennardclaproth/my-finances-tracker/internal/cashflow"
+	"github.com/lennardclaproth/my-finances-tracker/internal/money"
 )
 
 // IngParser parses ING CSV files and constructs Transactions.
@@ -129,13 +130,13 @@ func (p *IngParser) ParseRow(record []string, rowNumber int, importId uuid.UUID)
 	if err != nil {
 		return cashflow.TransactionData{}, fmt.Errorf("invalid date: %w", err)
 	}
-
+	price, _ := money.NewPrice(amount)
 	return cashflow.TransactionData{
 		Description: desc,
 		Note:        note,
 		Source:      source,
 		Direction:   direction,
-		Amount:      amount,
+		Amount:      price,
 		Date:        parsedDate,
 		AccountType: p.accountType, // default to checking for ING
 	}, nil
