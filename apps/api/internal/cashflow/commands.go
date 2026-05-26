@@ -3,36 +3,104 @@ package cashflow
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/lennardclaproth/my-finances-tracker/internal/money"
 )
 
 type Commands struct {
 	cs  commandStore
-	eac accountExistenceChecker
-	p   publisher
-}
-
-type commandStore interface {
-	CreateTransaction(ctx context.Context, tx *Transaction) error
-	CountByFilter(ctx context.Context, filters TransactionFilters) (int, error)
-	UpdateTagByFilter(ctx context.Context, filters TransactionFilters, tag string) (int, error)
+	qs  queryStore
+	aec accountExistenceChecker
 }
 
 type accountExistenceChecker interface {
 	Exists(ctx context.Context, id uuid.UUID) (bool, error)
 }
 
-type publisher interface {
-	Publish(ctx context.Context, payload any) error
+type commandStore interface {
+	CreateTransaction(ctx context.Context, tx *Transaction) error
+	UpdateTagByFilter(ctx context.Context, filters TransactionFilters, tag string) (int, error)
 }
 
 const (
 	manualCashflowBatchMaxSize = 100
 )
 
+// NewCommands creates cashflow write-side use cases.
+func NewCommands(
+	cStore commandStore,
+	qStore queryStore,
+	aec accountExistenceChecker,
+) *Commands {
+	return &Commands{
+		cs:  cStore,
+		qs:  qStore,
+		aec: aec,
+	}
+}
+
+type TransactionData struct {
+	Description string
+	Note        string
+	Source      string
+	Direction   CashFlowDirection
+	Amount      money.Price
+	Date        time.Time
+	AccountType *AccountType
+	Tag         string
+}
+
+// NewTransactionData validates and maps manual cashflow input into transaction data.
+func NewTransactionData(dateRaw, amountRaw, typeRaw, descriptionRaw, noteRaw, tagRaw, vendorRaw string) (TransactionData, error) {
+	date, err := time.Parse("2006-01-02", strings.TrimSpace(dateRaw))
+	if err != nil {
+		return TransactionData{}, ErrManualCashflowInvalidDate
+	}
+
+	amount, err := money.ParsePrice(amountRaw)
+	if err != nil {
+		return TransactionData{}, err
+	}
+
+	direction, err := ParseDirection(typeRaw)
+	if err != nil {
+		return TransactionData{}, err
+	}
+
+	description := strings.TrimSpace(descriptionRaw)
+	if description == "" {
+		return TransactionData{}, ErrManualCashflowDescriptionRequired
+	}
+	note := strings.TrimSpace(noteRaw)
+	if note == "" {
+		return TransactionData{}, ErrManualCashflowNoteRequired
+	}
+	tag := strings.TrimSpace(tagRaw)
+	if tag == "" {
+		return TransactionData{}, ErrManualCashflowTagRequired
+	}
+
+	source := "manual"
+	if vendorName := strings.TrimSpace(vendorRaw); vendorName != "" {
+		source = "manual:" + vendorName
+	}
+
+	return TransactionData{
+		Description: description,
+		Note:        note,
+		Source:      source,
+		Direction:   *direction,
+		Amount:      amount,
+		Date:        date.UTC(),
+		Tag:         tag,
+	}, nil
+}
+
 // CreateMany validates and persists manual cashflow transactions for one account.
-func (c *Commands) CreateMany(ctx context.Context, accID, impID uuid.UUID, transactions []TransactionData) ([]*Transaction, error) {
+func (c *Commands) CreateMany(ctx context.Context, accID uuid.UUID, impID *uuid.UUID, transactions []TransactionData) ([]*Transaction, error) {
 	if len(transactions) == 0 {
 		return nil, fmt.Errorf("create many: %w", ErrTransactionsRequired)
 	}
@@ -40,11 +108,11 @@ func (c *Commands) CreateMany(ctx context.Context, accID, impID uuid.UUID, trans
 		return nil, fmt.Errorf("create many: %w", ErrTransactionLimitExceeded)
 	}
 
-	exists, err := c.eac.Exists(ctx, accID)
+	exists, err := c.aec.Exists(ctx, accID)
 	if err != nil {
-		return nil, fmt.Errorf("create many: failed to check account existence: %w", err)
+		return nil, fmt.Errorf("create many: failed to check if account exists: %w", err)
 	}
-	if exists == false {
+	if !exists {
 		return nil, fmt.Errorf("create many: %w", ErrAccountNotFound)
 	}
 
@@ -62,7 +130,7 @@ func (c *Commands) CreateMany(ctx context.Context, accID, impID uuid.UUID, trans
 			rowNumber,
 			impID,
 			nil,
-			&accID,
+			accID,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("manual cashflow create: build transaction: %w", err)
@@ -101,26 +169,11 @@ type TagByFilterCommand struct {
 
 // TagByFilter applies or schedules tagging based on total matched rows and async policy.
 func (c *Commands) TagByFilter(ctx context.Context, tag string, accID uuid.UUID, filters TransactionFilters) (BulkTagResult, error) {
-	total, err := c.cs.CountByFilter(ctx, filters)
+	total, err := c.qs.CountByFilter(ctx, filters)
 	if err != nil {
 		return BulkTagResult{}, err
 	}
-	// TODO: Refactor this into a nice pub sub flow
-	if total > manualCashflowBatchMaxSize && c.p != nil && accID != uuid.Nil {
-		if err := c.p.Publish(ctx, TagByFilterCommand{
-			Tag:       tag,
-			AccountID: &accID,
-			Filters:   filters,
-		}); err != nil {
-			return BulkTagResult{}, err
-		}
-		return BulkTagResult{
-			Mode:         TagByFilterModeAsync,
-			UpdatedCount: 0,
-			TotalMatched: total,
-		}, nil
-	}
-
+	// TODO: implement async tagging
 	updated, err := c.cs.UpdateTagByFilter(ctx, filters, tag)
 	if err != nil {
 		return BulkTagResult{}, err

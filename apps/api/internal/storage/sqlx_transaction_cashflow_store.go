@@ -187,6 +187,39 @@ func (s *SQLXBankTransactionStore) Fetch(ctx context.Context, query CashflowTran
 	}, nil
 }
 
+// ListTransactions returns cashflow transactions for the application read model.
+func (s *SQLXBankTransactionStore) ListTransactions(ctx context.Context, query cashflow.TransactionListQuery) (*cashflow.TransactionListResult, error) {
+	direction := ""
+	if query.Direction != nil {
+		direction = string(*query.Direction)
+	}
+
+	result, err := s.Fetch(ctx, CashflowTransactionQuery{
+		Limit:       query.Limit,
+		Offset:      query.Offset,
+		SortBy:      string(query.Sort.Field),
+		SortOrder:   strings.ToLower(query.Sort.Direction.SQL()),
+		Q:           query.Q,
+		Description: query.Description,
+		Note:        query.Note,
+		Source:      query.Source,
+		Direction:   direction,
+		Tags:        query.Tags,
+		Untagged:    query.Untagged,
+		HideIgnored: query.HideIgnored,
+		From:        query.From,
+		To:          query.To,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &cashflow.TransactionListResult{
+		Total:        result.Total,
+		Transactions: result.Transactions,
+	}, nil
+}
+
 func (s *SQLXBankTransactionStore) CountByQuery(ctx context.Context, query CashflowTransactionQuery) (int, error) {
 	whereClause, args := buildCashflowWhereClause(query)
 	countQuery := fmt.Sprintf("SELECT COUNT(1) FROM %s%s", s.tableName, whereClause)

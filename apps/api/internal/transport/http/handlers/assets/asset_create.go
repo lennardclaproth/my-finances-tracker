@@ -36,7 +36,7 @@ func (r CreateAssetRequest) isValid() (bool, map[string]string) {
 		problems["name"] = "name cannot exceed 255 characters"
 	}
 
-	initWorth, err := money.StrToPrice(r.InitialWorth)
+	initWorth, err := money.ParsePrice(r.InitialWorth)
 	if err != nil {
 		problems["initial_worth"] = "initial_worth must be a valid decimal string"
 	} else if initWorth < 0 {
@@ -81,7 +81,7 @@ func CreateAsset(log logging.Logger, commands assets.Commands) http.Handler {
 			httpx.JSONEncode(w, http.StatusBadRequest, problems)
 			return
 		}
-		initWorth, _ := money.StrToPrice(req.InitialWorth)
+		initWorth, _ := money.ParsePrice(req.InitialWorth)
 		// if err != nil {
 		// 	log.Error(r.Context(), "create asset: initial worth failed to parse, this error should not occur", err)
 		// 	httpx.JSONEncode(w, http.StatusBadRequest, map[string]string{"error": "invalid initial worth format"})

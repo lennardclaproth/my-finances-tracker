@@ -22,7 +22,7 @@ type SetAssetWorthRequest struct {
 func (r SetAssetWorthRequest) isValid() (bool, map[string]string) {
 	problems := make(map[string]string)
 
-	_, err := money.StrToPrice(r.Worth)
+	_, err := money.ParsePrice(r.Worth)
 	if err != nil {
 		problems["worth"] = "invalid worth format"
 	}
@@ -72,7 +72,7 @@ func SetAssetWorth(log logging.Logger, commands assets.Commands) http.Handler {
 			return
 		}
 		//nolint:errcheck
-		worth, _ := money.StrToPrice(req.Worth)
+		worth, _ := money.ParsePrice(req.Worth)
 		//nolint:errcheck
 		effectiveDate, _ := time.Parse("2006-01-02", req.EffectiveDate)
 
@@ -121,7 +121,7 @@ func (r AdjustAssetWorthRequest) isValid() (bool, map[string]string) {
 		problems["direction"] = "direction must be either INCREASE or DECREASE"
 	}
 
-	_, err := money.StrToPrice(r.Amount)
+	_, err := money.ParsePrice(r.Amount)
 	if err != nil {
 		problems["worth"] = "invalid worth format"
 	}
@@ -171,7 +171,7 @@ func AdjustAssetWorth(log logging.Logger, commands assets.Commands) http.Handler
 			return
 		}
 
-		amount, _ := money.StrToPrice(req.Amount)
+		amount, _ := money.ParsePrice(req.Amount)
 		effectiveDate, _ := time.Parse("2026-01-02", req.EffectiveDate)
 		changeDir := assets.ChangeDirectionIncrease
 		if req.Direction == string(assets.ChangeDirectionDecrease) {
