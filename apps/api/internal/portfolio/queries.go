@@ -9,6 +9,7 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/sorting"
 )
 
+// Queries exposes portfolio read-side use cases.
 type Queries struct {
 	qs queryStore
 }
@@ -18,8 +19,15 @@ type queryStore interface {
 	PositionsWithLatestSnapshot(ctx context.Context, accID uuid.UUID, includeClosed bool) ([]*PositionWithLatestSnapshot, error)
 }
 
-// SnapshotsForAccount returns a list of portfolio snapshots for the given account, ordered by date descending.
-// When limit, offset, from and to are nil, it returns all snapshots for the account.
+// NewQueries creates portfolio read-side use cases.
+func NewQueries(qs queryStore) *Queries {
+	return &Queries{
+		qs: qs,
+	}
+}
+
+// SnapshotsForAccount returns portfolio snapshots for the given account.
+// When limit, offset, from and to are nil, it returns all snapshots using the store's default ordering.
 func (q *Queries) SnapshotsForAccount(
 	ctx context.Context,
 	accountID uuid.UUID,
@@ -36,10 +44,6 @@ func (q *Queries) PositionsForAccount(
 	accountID uuid.UUID,
 	includeClosed bool,
 ) ([]*PositionWithLatestSnapshot, error) {
-	if q.qs == nil {
-		return nil, fmt.Errorf("portfolio positions: query store is not configured")
-	}
-
 	positions, err := q.qs.PositionsWithLatestSnapshot(ctx, accountID, includeClosed)
 	if err != nil {
 		return nil, fmt.Errorf("portfolio positions: %w", err)

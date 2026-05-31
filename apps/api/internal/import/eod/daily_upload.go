@@ -1,4 +1,4 @@
-package eodimport
+package eod
 
 import (
 	"encoding/json"

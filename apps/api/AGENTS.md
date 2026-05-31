@@ -19,7 +19,9 @@
 - Use `Commands` and `Queries` as the default application/domain boundary when they fit the implementation.
 - Other feature-level collaborators such as builders, syncers, processors, or services may be appropriate when that is the existing nearby pattern.
 - Before adding a helper, utility, abstraction, validator, mapper, error type, logger wrapper, package, or reusable type, search `apps/api` for an established equivalent or nearby pattern.
+- Before adding date parsing, date range, date formatting, decimal parsing, or decimal formatting helpers, check existing packages such as `internal/date` and `internal/money` and reuse them when their behavior matches.
 - Do not add adapter interfaces, reflection bridges, or duplicate domain types just to avoid updating the real boundary. Prefer feature-owned query/command types, have storage implement those feature interfaces directly, and reuse shared packages such as `internal/sorting` for sort fields and directions.
+- Do not add local transport interfaces when an existing concrete feature `Commands`, `Queries`, or service type already expresses the dependency clearly.
 - Put feature-level errors in the package's `errors.go` file when one exists.
 
 ## HTTP transport
