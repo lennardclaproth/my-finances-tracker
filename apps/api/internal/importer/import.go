@@ -1,7 +1,6 @@
 package importer
 
 import (
-	"fmt"
 	"io"
 	"time"
 
