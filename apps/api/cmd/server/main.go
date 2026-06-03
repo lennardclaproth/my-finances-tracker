@@ -21,6 +21,7 @@ import (
 	cashflowdomain "github.com/lennardclaproth/my-finances-tracker/internal/cashflow"
 	cashflowservice "github.com/lennardclaproth/my-finances-tracker/internal/cashflow/service"
 	"github.com/lennardclaproth/my-finances-tracker/internal/config"
+	"github.com/lennardclaproth/my-finances-tracker/internal/files"
 	"github.com/lennardclaproth/my-finances-tracker/internal/http"
 	handlers "github.com/lennardclaproth/my-finances-tracker/internal/http/handlers"
 	"github.com/lennardclaproth/my-finances-tracker/internal/importer"
@@ -55,8 +56,8 @@ type appDependencies struct {
 	assetStore                *storage.SQLXAssetStore
 	positionStore             *storage.SQLXPositionStore
 	portfolioSnapshotStore    *storage.SQLXPortfolioSnapshotStore
-	disk                      *storage.Disk
-	dailyUploadDisk           *storage.Disk
+	disk                      *files.Disk
+	dailyUploadDisk           *files.Disk
 	dailyUploadEnqueuer       jobs.DailyUploadEnqueuer
 	marketDataService         *marketdata.Service
 }
@@ -180,8 +181,8 @@ func newAppDependencies(log logging.Logger, db *storage.DB, cfg *config.Config) 
 	providerStore := storage.NewSQLXProviderStore(db)
 	listingStore := storage.NewSQLXListingStore(db)
 	dailyStore := storage.NewSQLXDailyStore(db)
-	disk := storage.NewDisk(cfg.DiskStorage.BasePath + "/import")
-	dailyUploadDisk := storage.NewDisk(cfg.DiskStorage.BasePath + "/daily_uploads")
+	disk := files.NewDisk(cfg.DiskStorage.BasePath + "/import")
+	dailyUploadDisk := files.NewDisk(cfg.DiskStorage.BasePath + "/daily_uploads")
 	marketStackClient := marketdata.NewMarketStackClient(providerStore, marketdata.ProviderMarketStack)
 	mds := marketdata.NewService(listingStore, dailyStore, marketStackClient, log, providerStore)
 	return &appDependencies{

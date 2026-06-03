@@ -7,19 +7,24 @@ import (
 )
 
 type Queries struct {
-	querier existsQuerier
+	qs queryStore
 }
 
-type existsQuerier interface {
+type queryStore interface {
 	Exists(ctx context.Context, id uuid.UUID) (bool, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*Account, error)
 }
 
-func NewExistsHandler(querier existsQuerier) *Queries {
+func NewExistsHandler(qs queryStore) *Queries {
 	return &Queries{
-		querier: querier,
+		qs: qs,
 	}
 }
 
 func (q *Queries) Exists(ctx context.Context, id uuid.UUID) (bool, error) {
-	return q.querier.Exists(ctx, id)
+	return q.qs.Exists(ctx, id)
+}
+
+func (q *Queries) GetByID(ctx context.Context, id uuid.UUID) (*Account, error) {
+	return q.qs.GetByID(ctx, id)
 }

@@ -93,6 +93,35 @@ func (s *SQLXBankTransactionStore) CreateTransaction(ctx context.Context, tx *ca
 	return s.Create(ctx, tx)
 }
 
+// CreateTransactions persists a batch of cashflow transactions in a single insert,
+// skipping rows whose checksum already exists, and returns the number inserted.
+func (s *SQLXBankTransactionStore) CreateTransactions(ctx context.Context, txs []*cashflow.Transaction) (int, error) {
+	if len(txs) == 0 {
+		return 0, nil
+	}
+	query := fmt.Sprintf(`
+        INSERT INTO %s (
+            id, account_id, description, note, source, amount_cents,
+            direction, date, checksum, created_at, updated_at, tag,
+			row_number, ignored, import_id, account_type
+        ) VALUES (
+            :id, :account_id, :description, :note, :source, :amount_cents,
+            :direction, :date, :checksum, :created_at, :updated_at, :tag,
+			:row_number, :ignored, :import_id, :account_type
+        )
+		ON CONFLICT (checksum) DO NOTHING
+    `, s.tableName)
+	res, err := s.db.NamedExecContext(ctx, query, txs)
+	if err != nil {
+		return 0, fmt.Errorf("sqlx_transaction_store: failed to bulk insert transactions: %w", err)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("sqlx_transaction_store: failed to fetch rows affected: %w", err)
+	}
+	return int(affected), nil
+}
+
 func isCashflowDuplicate(err error) bool {
 	var pqErr *pq.Error
 	if errors.As(err, &pqErr) {

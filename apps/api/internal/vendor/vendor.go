@@ -61,12 +61,6 @@ type VendorCreator interface {
 	Create(ctx context.Context, vendor *Vendor) error
 }
 
-// VendorFetcher retrieves vendors by ID or name.
-type VendorFetcher interface {
-	FetchById(ctx context.Context, id uuid.UUID) (*Vendor, error)
-	FetchByName(ctx context.Context, name VendorID) (*Vendor, error)
-}
-
 // ActiveVendorLister returns active vendors.
 type ActiveVendorLister interface {
 	ListActive(ctx context.Context) ([]*Vendor, error)

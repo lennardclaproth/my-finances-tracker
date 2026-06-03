@@ -21,7 +21,7 @@ type accountExistenceChecker interface {
 }
 
 type commandStore interface {
-	CreateTransaction(ctx context.Context, tx *Transaction) error
+	CreateTransactions(ctx context.Context, txs []*Transaction) (int, error)
 	UpdateTagByIDs(ctx context.Context, ids []uuid.UUID, tag string) (int, error)
 	UpdateTagByFilter(ctx context.Context, filters TransactionFilters, tag string) (int, error)
 	UpdateIgnoredByIDs(ctx context.Context, ids []uuid.UUID, ignored bool) (int, error)
@@ -54,10 +54,16 @@ type TransactionData struct {
 	Date        time.Time
 	AccountType *AccountType
 	Tag         string
+	// RowNumber is the source row number (e.g. CSV line) and feeds the dedup
+	// checksum. Manual entries leave it zero and receive a generated row number.
+	RowNumber int
 }
 
 // NewTransactionData validates and maps manual cashflow input into transaction data.
-func NewTransactionData(dateRaw, amountRaw, typeRaw, descriptionRaw, noteRaw, tagRaw, vendorRaw string) (TransactionData, error) {
+func NewTransactionData(
+	dateRaw, amountRaw, typeRaw, descriptionRaw, noteRaw, tagRaw, vendorRaw, source string,
+	rowNumber *int,
+) (TransactionData, error) {
 	date, err := time.Parse("2006-01-02", strings.TrimSpace(dateRaw))
 	if err != nil {
 		return TransactionData{}, ErrManualCashflowInvalidDate
@@ -86,7 +92,6 @@ func NewTransactionData(dateRaw, amountRaw, typeRaw, descriptionRaw, noteRaw, ta
 		return TransactionData{}, ErrManualCashflowTagRequired
 	}
 
-	source := "manual"
 	if vendorName := strings.TrimSpace(vendorRaw); vendorName != "" {
 		source = "manual:" + vendorName
 	}
@@ -102,26 +107,44 @@ func NewTransactionData(dateRaw, amountRaw, typeRaw, descriptionRaw, noteRaw, ta
 	}, nil
 }
 
-// CreateMany validates and persists manual cashflow transactions for one account.
-func (c *Commands) CreateMany(ctx context.Context, accID uuid.UUID, impID *uuid.UUID, transactions []TransactionData) ([]*Transaction, error) {
+// CreateManyResult reports the outcome of a batch cashflow create.
+type CreateManyResult struct {
+	// Transactions are the transactions built from the input. On a successful
+	// create with no duplicates these are the persisted rows.
+	Transactions []*Transaction
+	// Imported is the number of rows newly inserted.
+	Imported int
+	// Duplicates is the number of rows skipped because they already existed.
+	Duplicates int
+}
+
+// CreateMany validates a batch of cashflow transactions and persists them with a single
+// bulk insert, skipping and counting rows that already exist. It serves both manual
+// entry and CSV imports: manual callers pass a nil import ID and are capped at
+// manualCashflowBatchMaxSize; import callers pass the import ID and set RowNumber on
+// each TransactionData. Rows without a row number fall back to a generated manual one.
+func (c *Commands) CreateMany(ctx context.Context, accID uuid.UUID, impID *uuid.UUID, transactions []TransactionData) (CreateManyResult, error) {
 	if len(transactions) == 0 {
-		return nil, fmt.Errorf("create many: %w", ErrTransactionsRequired)
+		return CreateManyResult{}, fmt.Errorf("create many: %w", ErrTransactionsRequired)
 	}
-	if len(transactions) > manualCashflowBatchMaxSize {
-		return nil, fmt.Errorf("create many: %w", ErrTransactionLimitExceeded)
+	if impID == nil && len(transactions) > manualCashflowBatchMaxSize {
+		return CreateManyResult{}, fmt.Errorf("create many: %w", ErrTransactionLimitExceeded)
 	}
 
 	exists, err := c.aec.Exists(ctx, accID)
 	if err != nil {
-		return nil, fmt.Errorf("create many: failed to check if account exists: %w", err)
+		return CreateManyResult{}, fmt.Errorf("create many: failed to check if account exists: %w", err)
 	}
 	if !exists {
-		return nil, fmt.Errorf("create many: %w", ErrAccountNotFound)
+		return CreateManyResult{}, fmt.Errorf("create many: %w", ErrAccountNotFound)
 	}
 
-	out := make([]*Transaction, 0, len(transactions))
+	txs := make([]*Transaction, 0, len(transactions))
 	for i, row := range transactions {
-		rowNumber := manualCashflowRowNumber(i)
+		rowNumber := row.RowNumber
+		if rowNumber == 0 {
+			rowNumber = manualCashflowRowNumber(i)
+		}
 		tx, err := NewTransaction(
 			row.Description,
 			row.Note,
@@ -132,23 +155,25 @@ func (c *Commands) CreateMany(ctx context.Context, accID uuid.UUID, impID *uuid.
 			row.Date,
 			rowNumber,
 			impID,
-			nil,
+			row.AccountType,
 			accID,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("manual cashflow create: build transaction: %w", err)
+			return CreateManyResult{}, fmt.Errorf("create many: build transaction: %w", err)
 		}
-		tx.Tag = row.Tag
-		// TODO: consider batch insert if this becomes a bottleneck
-		if err := c.cs.CreateTransaction(ctx, tx); err != nil {
-			return nil, err
-		}
-		out = append(out, tx)
+		txs = append(txs, tx)
 	}
-	//TODO: Publish transactions imported event
 
-	//TODO: change return type
-	return out, nil
+	inserted, err := c.cs.CreateTransactions(ctx, txs)
+	if err != nil {
+		return CreateManyResult{}, fmt.Errorf("create many: %w", err)
+	}
+
+	return CreateManyResult{
+		Transactions: txs,
+		Imported:     inserted,
+		Duplicates:   len(txs) - inserted,
+	}, nil
 }
 
 type ExecutionMode string

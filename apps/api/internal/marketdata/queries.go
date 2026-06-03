@@ -18,6 +18,7 @@ type queryStore interface {
 	ShouldAccumulate(ctx context.Context, lsID uuid.UUID, val bool) error
 	CountEODByListing(ctx context.Context, lsID uuid.UUID, from, to *time.Time) (int, error)
 	GetEODForListing(ctx context.Context, lsID uuid.UUID, from, to *time.Time, limit, offset *int, sort string) ([]*EOD, error)
+	GetProviderByName(ctx context.Context, name ProviderName) (*Provider, error)
 }
 
 type Queries struct {
@@ -43,6 +44,16 @@ func (q *Queries) ListingBySymbol(ctx context.Context, symbol string) (*Listing,
 		return nil, fmt.Errorf("get listing by symbol: failed to execute query: %w", err)
 	}
 	return ls, nil
+}
+
+// Provider returns the best provider candidate for the given provider name,
+// wrapping ErrProviderNotFound when no matching provider exists.
+func (q *Queries) Provider(ctx context.Context, name ProviderName) (*Provider, error) {
+	provider, err := q.qs.GetProviderByName(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("get provider: failed to execute query: %w", err)
+	}
+	return provider, nil
 }
 
 // ListListings returns all listings in deterministic order for UI presentation.

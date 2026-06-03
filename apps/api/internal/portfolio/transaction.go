@@ -70,6 +70,8 @@ type TransactionData struct {
 	Quantity    float64
 	Price       float64
 	Amount      float64
+	// RowNumber is the source row number (e.g. CSV line) and feeds the dedup checksum.
+	RowNumber int
 }
 
 var (

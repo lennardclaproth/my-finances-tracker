@@ -70,6 +70,40 @@ func (s *SQLXDailyStore) CreateWithInsertStatus(ctx context.Context, daily *mark
 	return affected > 0, nil
 }
 
+// CreateMany persists a batch of EOD datapoints in a single insert, skipping rows that
+// already exist for the (listing, date) pair, and returns the number inserted.
+func (s *SQLXDailyStore) CreateMany(ctx context.Context, dailies []*marketdata.EOD) (int, error) {
+	if len(dailies) == 0 {
+		return 0, nil
+	}
+	for _, daily := range dailies {
+		if daily.ListingID == uuid.Nil {
+			return 0, marketdata.ErrDailyListingIDEmpty
+		}
+	}
+	query := fmt.Sprintf(`
+		INSERT INTO %s (
+			id, listing_id, symbol, date,
+			open_cents, high_cents, low_cents, close_cents,
+			volume, created_at, updated_at
+		) VALUES (
+			:id, :listing_id, :symbol, :date,
+			:open, :high, :low, :close,
+			:volume, :created_at, :updated_at
+		)
+		ON CONFLICT(listing_id, date) DO NOTHING
+	`, s.tableName)
+	res, err := s.db.NamedExecContext(ctx, query, dailies)
+	if err != nil {
+		return 0, err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return int(affected), nil
+}
+
 func (s *SQLXDailyStore) FetchByListingID(ctx context.Context, listingID uuid.UUID, from, to *time.Time, limit, offset int) (*[]marketdata.EOD, error) {
 	return s.FetchByListingIDWithSort(ctx, listingID, from, to, limit, offset, marketdata.SortEODAsc)
 }

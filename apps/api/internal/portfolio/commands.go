@@ -21,6 +21,7 @@ type Commands struct {
 type commandStore interface {
 	CreateAccount(ctx context.Context, acc *Account) error
 	CreateTransaction(ctx context.Context, tx *Transaction) error
+	CreateTransactions(ctx context.Context, txs []*Transaction) (int, error)
 }
 
 var (
@@ -193,4 +194,43 @@ func (c *Commands) CreateAccount(ctx context.Context, accountID uuid.UUID) (*Acc
 		return nil, fmt.Errorf("create account: failed to store account: %w", err)
 	}
 	return acc, nil
+}
+
+// CreateManyResult reports the outcome of a batch portfolio create.
+type CreateManyResult struct {
+	// Transactions are the transactions built from the input.
+	Transactions []*Transaction
+	// Imported is the number of rows newly inserted.
+	Imported int
+	// Duplicates is the number of rows skipped because they already existed.
+	Duplicates int
+}
+
+// CreateMany builds a batch of imported portfolio transactions and persists them with a
+// single bulk insert, skipping and counting rows that already exist. Each TransactionData
+// must carry its source row number for deduplication.
+func (c *Commands) CreateMany(ctx context.Context, importID uuid.UUID, accountID *uuid.UUID, rows []TransactionData) (CreateManyResult, error) {
+	if len(rows) == 0 {
+		return CreateManyResult{}, nil
+	}
+
+	txs := make([]*Transaction, 0, len(rows))
+	for _, row := range rows {
+		tx, err := NewTransaction(row, row.RowNumber, importID, accountID, nil)
+		if err != nil {
+			return CreateManyResult{}, fmt.Errorf("create many: build transaction: %w", err)
+		}
+		txs = append(txs, tx)
+	}
+
+	inserted, err := c.cs.CreateTransactions(ctx, txs)
+	if err != nil {
+		return CreateManyResult{}, fmt.Errorf("create many: %w", err)
+	}
+
+	return CreateManyResult{
+		Transactions: txs,
+		Imported:     inserted,
+		Duplicates:   len(txs) - inserted,
+	}, nil
 }

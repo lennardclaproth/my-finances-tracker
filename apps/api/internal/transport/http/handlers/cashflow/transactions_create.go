@@ -121,29 +121,26 @@ func CreateTransactions(
 			return
 		}
 
-		created, err := commands.CreateMany(r.Context(), req.AccountID, nil, transactions)
+		result, err := commands.CreateMany(r.Context(), req.AccountID, nil, transactions)
 		if err != nil {
 			switch {
 			case errors.Is(err, cashflow.ErrAccountNotFound):
 				_ = httpx.JSONEncode(w, http.StatusNotFound, map[string]string{"account_id": err.Error()})
 			case isManualCashflowValidationError(err):
 				_ = httpx.JSONEncode(w, http.StatusBadRequest, map[string]string{"transaction": err.Error()})
-			case errors.Is(err, cashflow.ErrDuplicateTransaction):
-				_ = httpx.JSONEncode(w, http.StatusConflict, map[string]string{"transaction": "duplicate transaction"})
 			default:
 				log.Error(r.Context(), "manual cashflow create: failed to create transactions", err)
 				_ = httpx.JSONEncode(w, http.StatusInternalServerError, map[string]string{"error": "failed to create manual cashflow transactions"})
 			}
 			return
 		}
-		if created == nil {
-			log.Error(r.Context(), "manual cashflow create: empty result", errors.New("empty result"))
-			_ = httpx.JSONEncode(w, http.StatusInternalServerError, map[string]string{"error": "failed to create manual cashflow transactions"})
+		if result.Duplicates > 0 {
+			_ = httpx.JSONEncode(w, http.StatusConflict, map[string]string{"transaction": "duplicate transaction"})
 			return
 		}
 
-		data := make([]CreateTransactionResponse, 0, len(created))
-		for _, tx := range created {
+		data := make([]CreateTransactionResponse, 0, len(result.Transactions))
+		for _, tx := range result.Transactions {
 			data = append(data, CreateTransactionResponse{
 				ID:          tx.ID,
 				Description: tx.Description,
@@ -177,6 +174,8 @@ func toManualCashflowCreateTransactions(
 			tx.Note,
 			tx.Tag,
 			tx.Vendor,
+			"manual",
+			nil,
 		)
 		if err != nil {
 			return nil, err

@@ -63,6 +63,33 @@ func (s *SQLXPortfolioTransactionStore) Create(ctx context.Context, tx *portfoli
 	return nil
 }
 
+// CreateTransactions persists a batch of portfolio transactions in a single insert,
+// skipping rows whose checksum already exists, and returns the number inserted.
+func (s *SQLXPortfolioTransactionStore) CreateTransactions(ctx context.Context, txs []*portfolio.Transaction) (int, error) {
+	if len(txs) == 0 {
+		return 0, nil
+	}
+	query := fmt.Sprintf(`
+		INSERT INTO %s (
+			id, account_id, import_id, origin, source, occurred_at, position_id, isin, symbol, description,
+			type, quantity, unit_price, amount_cents, checksum, row_number, created_at, updated_at
+		) VALUES (
+			:id, :account_id, :import_id, :origin, :source, :occurred_at, :position_id, :isin, :symbol, :description,
+			:type, :quantity, :unit_price, :amount_cents, :checksum, :row_number, :created_at, :updated_at
+		)
+		ON CONFLICT (checksum) DO NOTHING
+	`, s.tableName)
+	res, err := s.db.NamedExecContext(ctx, query, txs)
+	if err != nil {
+		return 0, fmt.Errorf("sqlx_portfolio_transaction_store: bulk insert transactions: %w", err)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("sqlx_portfolio_transaction_store: rows affected: %w", err)
+	}
+	return int(affected), nil
+}
+
 func (s *SQLXPortfolioTransactionStore) GetASC(ctx context.Context, accID uuid.UUID) ([]portfolio.Transaction, error) {
 	query := fmt.Sprintf(`
 		SELECT *
