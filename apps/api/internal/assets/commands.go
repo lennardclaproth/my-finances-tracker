@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lennardclaproth/my-finances-tracker/internal/account"
+	"github.com/lennardclaproth/my-finances-tracker/internal/eventbus"
 	"github.com/lennardclaproth/my-finances-tracker/internal/money"
 )
 
@@ -42,6 +43,27 @@ type Commands struct {
 	aq  account.Queries
 	uow unitOfWork
 	ca  classAggregator
+	bus eventbus.Bus
+}
+
+// NewCommands constructs the assets write-side use cases. The bus may be nil,
+// in which case snapshot rebuild events are not published.
+func NewCommands(
+	cs commandStore,
+	cg commandGetter,
+	aq account.Queries,
+	uow unitOfWork,
+	ca classAggregator,
+	bus eventbus.Bus,
+) *Commands {
+	return &Commands{
+		cs:  cs,
+		cg:  cg,
+		aq:  aq,
+		uow: uow,
+		ca:  ca,
+		bus: bus,
+	}
 }
 
 func (c *Commands) CreateAsset(
@@ -94,7 +116,7 @@ func (c *Commands) CreateAsset(
 	if err != nil {
 		return nil, fmt.Errorf("create asset: failed to execute transaction: %w", err)
 	}
-	// TODO: publish snapshot rebuild event for account.
+	c.publishSnapshotsRebuildRequested(ctx, accID)
 	return asset, nil
 }
 
@@ -122,7 +144,7 @@ func (c *Commands) CreateClass(
 	if err != nil {
 		return nil, fmt.Errorf("create class: failed to store class: %w", err)
 	}
-	// TODO: publish rebuild event
+	c.publishSnapshotsRebuildRequested(ctx, accID)
 	return class, nil
 }
 
@@ -206,7 +228,7 @@ func (c *Commands) UpdateAssetWorth(
 	if err != nil {
 		return fmt.Errorf("update asset worth: failed to execute transaction: %w", err)
 	}
-	// TODO: publish snapshot rebuild event for account.
+	c.publishSnapshotsRebuildRequested(ctx, accID)
 	return nil
 }
 
@@ -228,7 +250,7 @@ func (c *Commands) UpdateClass(ctx context.Context, classID uuid.UUID, name *str
 	if err := c.cs.UpdateClass(ctx, class); err != nil {
 		return fmt.Errorf("update class: failed to store changes: %w", err)
 	}
-	// TODO: publish snapshot rebuild event
+	c.publishSnapshotsRebuildRequested(ctx, class.AccountID)
 	return nil
 }
 
@@ -251,7 +273,7 @@ func (c *Commands) DeleteClass(ctx context.Context, accountID, classID uuid.UUID
 		return fmt.Errorf("delete asset: failed to delete: %w", err)
 	}
 
-	// TODO: publish snapshot rebuild event
+	c.publishSnapshotsRebuildRequested(ctx, accountID)
 	return nil
 }
 
@@ -261,4 +283,14 @@ func (c *Commands) CreateAccount(ctx context.Context, accountID uuid.UUID) (*Acc
 		return nil, fmt.Errorf("create account: failed to store account: %w", err)
 	}
 	return acc, nil
+}
+
+// publishSnapshotsRebuildRequested asks the assets feature to rebuild
+// account-level snapshots after a mutation. It is a no-op when no bus is
+// configured.
+func (c *Commands) publishSnapshotsRebuildRequested(ctx context.Context, accID uuid.UUID) {
+	if c.bus == nil {
+		return
+	}
+	_ = c.bus.Publish(ctx, TopicSnapshotsRebuildRequested, SnapshotsRebuildRequested{AccID: accID})
 }

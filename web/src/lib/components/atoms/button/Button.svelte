@@ -1,15 +1,12 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
-  import Icon from '$lib/components/atoms/icon/Icon.svelte';
-
   import type {
     ButtonIntent,
     ButtonShape,
     ButtonSize,
     ButtonType,
-    ButtonVariant,
-    IconPosition
+    ButtonVariant
   } from './button.types';
 
   import {
@@ -29,8 +26,7 @@
     disabled?: boolean;
     loading?: boolean;
     pressed?: boolean;
-    icon?: string;
-    iconPosition?: IconPosition;
+    ariaLabel?: string;
     class?: string;
     onclick?: (event: MouseEvent) => void;
     children?: Snippet;
@@ -45,8 +41,7 @@
     disabled = false,
     loading = false,
     pressed = false,
-    icon,
-    iconPosition = 'left',
+    ariaLabel,
     class: className = '',
     onclick,
     children
@@ -62,7 +57,6 @@
     buttonSizeClasses[size],
     buttonShapeClasses[shape],
     intentVariantClasses[intent][variant],
-    pressed,
     loading ? 'cursor-wait' : '',
     className
   ]
@@ -79,19 +73,14 @@
   class={classes}
   {type}
   {disabled}
+  aria-label={ariaLabel}
   aria-busy={loading}
   aria-pressed={pressed || undefined}
   onclick={handleClick}
 >
   {#if loading}
     <span class={spinnerClasses} aria-hidden="true"></span>
-  {:else if icon && iconPosition === 'left'}
-    <Icon {icon} {size} />
   {/if}
 
   {@render children?.()}
-
-  {#if !loading && icon && iconPosition === 'right'}
-    <Icon {icon} {size} />
-  {/if}
 </button>

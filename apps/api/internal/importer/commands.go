@@ -294,7 +294,7 @@ func (c *Commands) publishAccepted(ctx context.Context, imp *Import) {
 	if c.bus == nil || imp == nil {
 		return
 	}
-	_ = c.bus.Publish(ctx, TopicImportAccepted, ImportAccepted{
+	_ = c.bus.Publish(ctx, TopicAccepted, Accepted{
 		ImportID: imp.ID,
 		Type:     imp.Type,
 	})
@@ -330,7 +330,7 @@ func (c *Commands) publishCompleted(ctx context.Context, imp *Import) {
 	if c.bus == nil || imp == nil {
 		return
 	}
-	_ = c.bus.Publish(ctx, TopicImportCompleted, ImportCompleted{
+	_ = c.bus.Publish(ctx, TopicCompleted, Completed{
 		ImportID:  imp.ID,
 		Type:      imp.Type,
 		AccountID: imp.AccountID,
@@ -342,7 +342,7 @@ func (c *Commands) publishFailed(ctx context.Context, imp *Import, reason error)
 	if c.bus == nil || imp == nil {
 		return
 	}
-	_ = c.bus.Publish(ctx, TopicImportFailed, ImportFailed{
+	_ = c.bus.Publish(ctx, TopicFailed, Failed{
 		ImportID:  imp.ID,
 		Type:      imp.Type,
 		AccountID: imp.AccountID,

@@ -3,8 +3,10 @@ package notify
 import (
 	"context"
 
-	"github.com/lennardclaproth/my-finances-tracker/api"
-	"github.com/lennardclaproth/my-finances-tracker/internal/bus"
+	"github.com/lennardclaproth/my-finances-tracker/internal/assets"
+	"github.com/lennardclaproth/my-finances-tracker/internal/eventbus"
+	"github.com/lennardclaproth/my-finances-tracker/internal/importer"
+	"github.com/lennardclaproth/my-finances-tracker/internal/portfolio"
 )
 
 const (
@@ -12,8 +14,6 @@ const (
 	EventPortfolioRebuilt = "portfolio.rebuilt"
 	// EventImportCompleted notifies clients that an import finished successfully.
 	EventImportCompleted = "import.completed"
-	// EventBulkTagCompleted notifies clients that async bulk tagging completed.
-	EventBulkTagCompleted = "bulk_tag.completed"
 	// EventAssetsRebuilt notifies clients that assets snapshots were rebuilt.
 	EventAssetsRebuilt = "assets.rebuilt"
 )
@@ -28,11 +28,13 @@ func NewImportCompletedHandler(hub *Hub) *ImportCompletedHandler {
 	return &ImportCompletedHandler{hub: hub}
 }
 
-// Handle pushes an import completed websocket notification for the target account.
-func (h *ImportCompletedHandler) Handle(ctx context.Context, _ bus.Envelope, e api.ImportCompleted) error {
-	if h.hub != nil {
-		h.hub.NotifyDataChanged(ctx, e.AccID, EventImportCompleted)
+// Handle pushes an import-completed websocket notification for the target
+// account. Imports without an account scope (such as EOD imports) are ignored.
+func (h *ImportCompletedHandler) Handle(ctx context.Context, evt importer.Completed, _ eventbus.Metadata) error {
+	if h.hub == nil || evt.AccountID == nil {
+		return nil
 	}
+	h.hub.NotifyDataChanged(ctx, *evt.AccountID, EventImportCompleted)
 	return nil
 }
 
@@ -46,29 +48,12 @@ func NewPortfolioRebuiltHandler(hub *Hub) *PortfolioRebuiltHandler {
 	return &PortfolioRebuiltHandler{hub: hub}
 }
 
-// Handle pushes a portfolio rebuilt websocket notification for the target account.
-func (h *PortfolioRebuiltHandler) Handle(ctx context.Context, _ bus.Envelope, e api.PortfolioRebuilt) error {
-	if h.hub != nil {
-		h.hub.NotifyDataChanged(ctx, e.AccID, EventPortfolioRebuilt)
+// Handle pushes a portfolio-rebuilt websocket notification for the target account.
+func (h *PortfolioRebuiltHandler) Handle(ctx context.Context, evt portfolio.Rebuilt, _ eventbus.Metadata) error {
+	if h.hub == nil {
+		return nil
 	}
-	return nil
-}
-
-// BulkTagCompletedHandler forwards bulk-tag completion events to websocket clients.
-type BulkTagCompletedHandler struct {
-	hub *Hub
-}
-
-// NewBulkTagCompletedHandler creates a BulkTagCompletedHandler.
-func NewBulkTagCompletedHandler(hub *Hub) *BulkTagCompletedHandler {
-	return &BulkTagCompletedHandler{hub: hub}
-}
-
-// Handle pushes a bulk tag completed websocket notification for the target account.
-func (h *BulkTagCompletedHandler) Handle(ctx context.Context, _ bus.Envelope, e api.BulkTagCompleted) error {
-	if h.hub != nil {
-		h.hub.NotifyDataChanged(ctx, e.AccID, EventBulkTagCompleted)
-	}
+	h.hub.NotifyDataChanged(ctx, evt.AccID, EventPortfolioRebuilt)
 	return nil
 }
 
@@ -82,10 +67,11 @@ func NewAssetsSnapshotsRebuiltHandler(hub *Hub) *AssetsSnapshotsRebuiltHandler {
 	return &AssetsSnapshotsRebuiltHandler{hub: hub}
 }
 
-// Handle pushes an assets rebuilt websocket notification for the target account.
-func (h *AssetsSnapshotsRebuiltHandler) Handle(ctx context.Context, _ bus.Envelope, e api.AssetsSnapshotsRebuilt) error {
-	if h.hub != nil {
-		h.hub.NotifyDataChanged(ctx, e.AccID, EventAssetsRebuilt)
+// Handle pushes an assets-rebuilt websocket notification for the target account.
+func (h *AssetsSnapshotsRebuiltHandler) Handle(ctx context.Context, evt assets.SnapshotsRebuilt, _ eventbus.Metadata) error {
+	if h.hub == nil {
+		return nil
 	}
+	h.hub.NotifyDataChanged(ctx, evt.AccID, EventAssetsRebuilt)
 	return nil
 }

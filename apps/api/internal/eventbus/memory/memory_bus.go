@@ -67,6 +67,9 @@ var (
 	ErrTopicCannotBeEmpty = errors.New("topic cannot be empty")
 )
 
+// Ensure MemoryBus satisfies the eventbus.Bus interface.
+var _ eventbus.Bus = (*MemoryBus)(nil)
+
 func NewMemoryBus(opts ...Option) *MemoryBus {
 	b := &MemoryBus{
 		subs:    make(map[string]map[uint64]*subscriber),
@@ -87,7 +90,15 @@ func NewMemoryBus(opts ...Option) *MemoryBus {
 	return b
 }
 
-func (b *MemoryBus) Publish(ctx context.Context, envelope eventbus.Envelope) error {
+// Publish implements eventbus.Bus by building an envelope from the topic,
+// payload, and options and dispatching it to the topic's subscribers.
+func (b *MemoryBus) Publish(ctx context.Context, topic string, payload any, opts ...eventbus.PublishOption) error {
+	return b.dispatch(ctx, eventbus.NewEnvelope(ctx, topic, payload, opts...))
+}
+
+// dispatch routes an already-built envelope to the subscribers of its topic,
+// honoring the configured backpressure policy.
+func (b *MemoryBus) dispatch(ctx context.Context, envelope eventbus.Envelope) error {
 	if b.closed.Load() {
 		return ErrBusClosed
 	}
@@ -223,8 +234,11 @@ func (b *MemoryBus) worker() {
 			s.scheduled.Store(0)
 			continue
 		}
+		// Carry the message metadata so that events published by the handler
+		// inherit this message's correlation chain and are marked as caused by it.
+		hctx := eventbus.ContextWithMetadata(context.Background(), eventbus.MetadataFromEnvelope(envelope))
 		// TODO: implement a timeout to prevent goroutine exhaustion
-		if err := s.handler(context.Background(), envelope); err != nil {
+		if err := s.handler(hctx, envelope); err != nil {
 			apm.CaptureError(context.Background(), err).Send()
 		}
 		if len(s.queue) > 0 && !s.closed.Load() {

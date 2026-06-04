@@ -35,6 +35,11 @@ type uow interface {
 	Do(ctx context.Context, fn func(txCtx context.Context) error) error
 }
 
+// NewSyncer constructs the assets portfolio Syncer.
+func NewSyncer(pq *portfolio.Queries, b *Builder, ss SyncStore, u uow) *Syncer {
+	return &Syncer{pq: pq, b: b, ss: ss, uow: u}
+}
+
 // SyncPortfolio
 func (s *Syncer) SyncPortfolio(ctx context.Context, accID uuid.UUID) error {
 	// Acquire sync lock for account

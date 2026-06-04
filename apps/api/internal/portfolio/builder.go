@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lennardclaproth/my-finances-tracker/internal/date"
+	"github.com/lennardclaproth/my-finances-tracker/internal/eventbus"
 	"github.com/lennardclaproth/my-finances-tracker/internal/marketdata"
 	"github.com/lennardclaproth/my-finances-tracker/internal/sorting"
 
@@ -20,6 +21,7 @@ type Builder struct {
 	pss PositionStore
 	ts  TransactionStore
 	lk  Locker
+	bus eventbus.Bus
 }
 
 type PositionStore interface {
@@ -42,6 +44,26 @@ type TransactionStore interface {
 type Locker interface {
 	TryAcquireBuildLock(ctx context.Context, accID uuid.UUID) (bool, error)
 	ReleaseBuildLock(ctx context.Context, accID uuid.UUID) error
+}
+
+// NewBuilder constructs a portfolio Builder. The bus may be nil, in which case
+// Rebuilt events are not published.
+func NewBuilder(
+	mdq *marketdata.Queries,
+	pfs PortfolioStore,
+	pss PositionStore,
+	ts TransactionStore,
+	lk Locker,
+	bus eventbus.Bus,
+) *Builder {
+	return &Builder{
+		mdq: mdq,
+		pfs: pfs,
+		pss: pss,
+		ts:  ts,
+		lk:  lk,
+		bus: bus,
+	}
 }
 
 func (b *Builder) buildPositionSnapshots(
@@ -323,5 +345,15 @@ func (b *Builder) Build(ctx context.Context, accID uuid.UUID) (err error) {
 		prevSnapshot = snap
 		prevPss = pss
 	}
+	b.publishRebuilt(ctx, accID)
 	return nil
+}
+
+// publishRebuilt announces that an account's portfolio was rebuilt. It is a
+// no-op when no bus is configured.
+func (b *Builder) publishRebuilt(ctx context.Context, accID uuid.UUID) {
+	if b.bus == nil {
+		return
+	}
+	_ = b.bus.Publish(ctx, TopicRebuilt, Rebuilt{AccID: accID})
 }

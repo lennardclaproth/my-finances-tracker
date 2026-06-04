@@ -1,5 +1,8 @@
 import type { ButtonIntent, ButtonSize, ButtonVariant, ButtonShape } from './button.types';
 
+// Shared button styling tokens. These are styling data (not components), so molecules such as
+// IconButton may import them without breaking the atom/molecule boundary.
+
 export const baseButtonClasses = [
   'inline-flex items-center justify-center gap-1',
   'select-none whitespace-nowrap',
@@ -13,12 +16,6 @@ export const buttonSizeClasses = {
   sm: 'h-8 px-2 text-sm',
   md: 'h-10 px-3 text-sm',
   lg: 'h-12 px-3 text-base'
-} satisfies Record<ButtonSize, string>;
-
-export const iconButtonSizeClasses = {
-  sm: 'h-8 w-8 text-sm',
-  md: 'h-10 w-10 text-sm',
-  lg: 'h-12 w-12 text-base'
 } satisfies Record<ButtonSize, string>;
 
 export const iconSizeClasses = {

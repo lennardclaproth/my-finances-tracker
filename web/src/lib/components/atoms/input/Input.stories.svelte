@@ -46,12 +46,6 @@
         control: 'select',
         options: inputIntents
       },
-      leftIcon: {
-        control: 'text'
-      },
-      rightIcon: {
-        control: 'text'
-      },
       disabled: {
         control: 'boolean'
       },
@@ -73,8 +67,6 @@
     type: 'text',
     size: 'md',
     intent: 'default',
-    leftIcon: '',
-    rightIcon: '',
     disabled: false,
     readonly: false,
     required: false
@@ -120,26 +112,6 @@
       intent="error"
       value="Invalid value"
       placeholder="Error input"
-    />
-  </div>
-</Story>
-
-<Story name="With Icons" asChild>
-  <div class="grid max-w-md gap-4">
-    <Input
-      leftIcon="heroicons:magnifying-glass"
-      placeholder="Search..."
-    />
-
-    <Input
-      rightIcon="heroicons:calendar-days"
-      placeholder="Pick a date"
-    />
-
-    <Input
-      leftIcon="heroicons:envelope"
-      rightIcon="heroicons:check-circle"
-      placeholder="Email address"
     />
   </div>
 </Story>

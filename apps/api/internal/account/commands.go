@@ -17,7 +17,7 @@ type creator interface {
 	Create(ctx context.Context, acc *Account) error
 }
 
-// Create persists an account and publishes an AccountCreated event when a
+// Create persists an account and publishes a Created event when a
 // publisher is configured.
 //
 // The id argument is optional. If id is nil or uuid.Nil, Create generates a new
@@ -35,6 +35,6 @@ func (c *Commands) Create(ctx context.Context, id *uuid.UUID, externalID *string
 	if err := c.c.Create(ctx, acc); err != nil {
 		return nil, fmt.Errorf("create: failed to create account: %w", err)
 	}
-	c.b.Publish(ctx, TopicAccountCreated, AccountCreated{AccID: acc.ID})
+	c.b.Publish(ctx, TopicCreated, Created{AccID: acc.ID})
 	return &acc.ID, nil
 }

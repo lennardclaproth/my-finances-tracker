@@ -3,13 +3,13 @@
   import type { ComponentProps } from 'svelte';
 
   import Button from './Button.svelte';
+  import Icon from '$lib/components/atoms/icon/Icon.svelte';
 
   import {
     buttonIntents,
     buttonVariants,
     buttonSizes,
-    buttonShapes,
-    iconPositions
+    buttonShapes
   } from './button.types';
 
   type ButtonProps = ComponentProps<typeof Button>;
@@ -35,13 +35,6 @@
         control: 'select',
         options: buttonShapes
       },
-      iconPosition: {
-        control: 'select',
-        options: iconPositions
-      },
-      icon: {
-        control: 'text'
-      },
       disabled: {
         control: 'boolean'
       },
@@ -55,6 +48,12 @@
   });
 </script>
 
+<!--
+  Button is a pure atom: it renders a native <button> and its children. Icons are composed by the
+  consumer via the Icon atom in the button's children (see the "With Icon" stories). For icon-only
+  buttons use the Molecules/IconButton component.
+-->
+
 {#snippet playground(args: ButtonProps)}
   <Button {...args} onclick={() => console.log('Button clicked')}>
     Button
@@ -67,9 +66,7 @@
     intent: 'primary',
     variant: 'solid',
     size: 'md',
-    icon: 'heroicons:check',
     shape: 'rounded',
-    iconPosition: 'left',
     disabled: false,
     loading: false,
     pressed: false
@@ -88,15 +85,18 @@
 
 <Story name="With Icon Left" asChild>
   <div class="flex flex-wrap items-center gap-3">
-    <Button icon="heroicons:check" intent="success">
+    <Button intent="success">
+      <Icon icon="heroicons:check" />
       Save
     </Button>
 
-    <Button icon="heroicons:pencil-square" intent="info" variant="outline">
+    <Button intent="info" variant="outline">
+      <Icon icon="heroicons:pencil-square" />
       Edit
     </Button>
 
-    <Button icon="heroicons:trash" intent="error" variant="ghost">
+    <Button intent="error" variant="ghost">
+      <Icon icon="heroicons:trash" />
       Delete
     </Button>
   </div>
@@ -104,17 +104,14 @@
 
 <Story name="With Icon Right" asChild>
   <div class="flex flex-wrap items-center gap-3">
-    <Button icon="heroicons:arrow-right" iconPosition="right">
+    <Button>
       Continue
+      <Icon icon="heroicons:arrow-right" />
     </Button>
 
-    <Button
-      icon="heroicons:arrow-top-right-on-square"
-      iconPosition="right"
-      intent="secondary"
-      variant="outline"
-    >
+    <Button intent="secondary" variant="outline">
       Open
+      <Icon icon="heroicons:arrow-top-right-on-square" />
     </Button>
   </div>
 </Story>
@@ -127,7 +124,8 @@
 
         <div class="flex flex-wrap gap-3">
           {#each buttonIntents as intent}
-            <Button {intent} {variant} icon="heroicons:sparkles">
+            <Button {intent} {variant}>
+              <Icon icon="heroicons:sparkles" />
               {intent}
             </Button>
           {/each}
@@ -140,7 +138,8 @@
 <Story name="Sizes" asChild>
   <div class="flex items-center gap-3">
     {#each buttonSizes as size}
-      <Button {size} icon="heroicons:check">
+      <Button {size}>
+        <Icon icon="heroicons:check" {size} />
         {size}
       </Button>
     {/each}
@@ -149,21 +148,27 @@
 
 <Story name="States" asChild>
   <div class="flex flex-wrap items-center gap-3">
-    <Button icon="heroicons:check">Default</Button>
+    <Button>
+      <Icon icon="heroicons:check" />
+      Default
+    </Button>
 
-    <Button icon="heroicons:check" disabled>
+    <Button disabled>
+      <Icon icon="heroicons:check" />
       Disabled
     </Button>
 
-    <Button icon="heroicons:check" loading>
+    <Button loading>
       Loading
     </Button>
 
-    <Button icon="heroicons:check" pressed>
+    <Button pressed>
+      <Icon icon="heroicons:check" />
       Pressed
     </Button>
 
-    <Button icon="heroicons:trash" intent="error" variant="outline">
+    <Button intent="error" variant="outline">
+      <Icon icon="heroicons:trash" />
       Error
     </Button>
   </div>
@@ -179,12 +184,8 @@
           {#each buttonIntents as intent}
             <div class="flex flex-wrap items-center gap-3">
               {#each buttonSizes as size}
-                <Button
-                  {intent}
-                  {variant}
-                  {size}
-                  icon="heroicons:check"
-                >
+                <Button {intent} {variant} {size}>
+                  <Icon icon="heroicons:check" {size} />
                   {intent} {size}
                 </Button>
               {/each}
@@ -199,7 +200,8 @@
 <Story name="Shapes" asChild>
   <div class="flex flex-wrap items-center gap-3">
     {#each buttonShapes as shape}
-      <Button {shape} icon="heroicons:check">
+      <Button {shape}>
+        <Icon icon="heroicons:check" />
         {shape}
       </Button>
     {/each}

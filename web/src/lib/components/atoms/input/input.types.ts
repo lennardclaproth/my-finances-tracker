@@ -2,8 +2,6 @@ export const inputSizes = ['sm', 'md', 'lg'] as const;
 
 export const inputIntents = ['default', 'error', 'success'] as const;
 
-export const iconPositions = ['left', 'right'] as const;
-
 export const inputShapes = ['default', 'rounded', 'pill'] as const;
 
 export type InputSize = typeof inputSizes[number];

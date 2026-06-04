@@ -3,9 +3,12 @@ package account
 import "github.com/google/uuid"
 
 const (
-	TopicAccountCreated = "account.created"
+	// TopicCreated is the eventbus topic published after an account is created.
+	TopicCreated = "account.created"
 )
 
-type AccountCreated struct {
+// Created notifies consumers that a new account was created. It is published
+// through the eventbus.Bus and fans out to the per-feature account projections.
+type Created struct {
 	AccID uuid.UUID
 }

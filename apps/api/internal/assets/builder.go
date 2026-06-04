@@ -22,6 +22,11 @@ type Builder struct {
 	uow unitOfWork
 }
 
+// NewBuilder constructs the assets snapshot Builder.
+func NewBuilder(bs builderStore, uow unitOfWork) *Builder {
+	return &Builder{bs: bs, uow: uow}
+}
+
 // RebuildAll rebuilds account-level assets snapshots from account history.
 func (b *Builder) RebuildAll(ctx context.Context, accountID uuid.UUID) error {
 	sort := sorting.ASC

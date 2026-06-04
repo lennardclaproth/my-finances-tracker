@@ -6,7 +6,7 @@
 
   import Heading from '$lib/components/atoms/typography/Heading.svelte';
   import Text from '$lib/components/atoms/typography/Text.svelte';
-  import Input from '$lib/components/atoms/input/Input.svelte';
+  import IconInput from '$lib/components/molecules/icon-input/IconInput.svelte';
   import Button from '$lib/components/atoms/button/Button.svelte';
 
   import {
@@ -130,7 +130,7 @@
       </Text>
 
       <div class="mt-4 space-y-3">
-        <Input
+        <IconInput
           placeholder="Search..."
           leftIcon="heroicons:magnifying-glass"
         />

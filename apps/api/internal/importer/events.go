@@ -3,30 +3,30 @@ package importer
 import "github.com/google/uuid"
 
 const (
-	// TopicImportAccepted is published after a CSV import record is persisted.
-	TopicImportAccepted = "import.accepted"
-	// TopicImportCompleted is published after a CSV import reaches completed state.
-	TopicImportCompleted = "import.completed"
-	// TopicImportFailed is published after a CSV import reaches failed state.
-	TopicImportFailed = "import.failed"
+	// TopicAccepted is published after a CSV import record is persisted.
+	TopicAccepted = "import.accepted"
+	// TopicCompleted is published after a CSV import reaches completed state.
+	TopicCompleted = "import.completed"
+	// TopicFailed is published after a CSV import reaches failed state.
+	TopicFailed = "import.failed"
 )
 
-// ImportAccepted asks asynchronous workers to process the persisted import.
-type ImportAccepted struct {
+// Accepted asks asynchronous workers to process the persisted import.
+type Accepted struct {
 	ImportID uuid.UUID
 	Type     ImportType
 }
 
-// ImportCompleted notifies consumers that import processing completed.
-type ImportCompleted struct {
+// Completed notifies consumers that import processing completed.
+type Completed struct {
 	ImportID  uuid.UUID
 	Type      ImportType
 	AccountID *uuid.UUID
 	ListingID *uuid.UUID
 }
 
-// ImportFailed notifies consumers that import processing failed.
-type ImportFailed struct {
+// Failed notifies consumers that import processing failed.
+type Failed struct {
 	ImportID  uuid.UUID
 	Type      ImportType
 	AccountID *uuid.UUID
