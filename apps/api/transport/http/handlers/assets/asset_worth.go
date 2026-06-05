@@ -9,7 +9,7 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/assets"
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
 	"github.com/lennardclaproth/my-finances-tracker/internal/money"
-	httpx "github.com/lennardclaproth/my-finances-tracker/internal/transport/http"
+	httpx "github.com/lennardclaproth/my-finances-tracker/transport/http"
 )
 
 type SetAssetWorthRequest struct {

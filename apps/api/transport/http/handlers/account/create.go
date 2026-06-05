@@ -7,7 +7,7 @@ import (
 
 	"github.com/lennardclaproth/my-finances-tracker/internal/account"
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
-	httpx "github.com/lennardclaproth/my-finances-tracker/internal/transport/http"
+	httpx "github.com/lennardclaproth/my-finances-tracker/transport/http"
 )
 
 // CreateAccountRequest creates an account record.

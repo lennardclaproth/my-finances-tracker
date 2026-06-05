@@ -46,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [015] Updated manual portfolio transaction date entry to use the shared custom calendar selector used by navbar date controls.
 - [024] Changed assets-page top growth/current-worth rendering to consume server snapshot points directly instead of client-side class-growth aggregation.
 - [025] Changed portfolio rebuild flow to trigger account-level assets snapshot rebuild requests and realtime `assets.rebuilt` notifications on completion.
+- [019] Consolidated the database schema into a single from-scratch initial migration for SQLite and PostgreSQL, tightening column sizes/types (`VARCHAR(n)` limits), aligning `NULL`/`NOT NULL` with the Go domain model, completing foreign keys/unique constraints/`CHECK`s, and redesigning indexes around the storage layer's real query patterns.
+- [019] Corrected schema/code drift in the initial migration: included the `processing` import status in the status `CHECK`, removed the unused `import.accounts` projection table, and changed `account.accounts.external_id` from `UUID` to a nullable string.
 
 ### Fixed
 - [001] Fixed websocket feature hygiene by adding realtime endpoint Swagger coverage and explicit client-side websocket error handling/logging.

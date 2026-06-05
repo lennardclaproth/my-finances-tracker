@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lennardclaproth/my-finances-tracker/internal/assets"
 	"github.com/lennardclaproth/my-finances-tracker/internal/logging"
-	httpx "github.com/lennardclaproth/my-finances-tracker/internal/transport/http"
+	httpx "github.com/lennardclaproth/my-finances-tracker/transport/http"
 )
 
 // GetAssetSnapshotsRequest contains query filters for account-level asset snapshots.

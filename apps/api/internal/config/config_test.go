@@ -2,8 +2,6 @@ package config
 
 import (
 	"testing"
-
-	"github.com/google/uuid"
 )
 
 func TestApplyAPMDefaults_ProductionDefault(t *testing.T) {
@@ -81,31 +79,13 @@ func validConfigForValidation() Config {
 		DiskStorage: DiskStorage{
 			BasePath: "C:\\mft",
 		},
-		Agent: AgentConfig{
-			Enabled:           true,
-			AgentBaseURL:      "http://localhost:8001/api",
-			DefaultTagAgentID: uuid.NewString(),
-		},
 	}
 }
 
-func TestValidate_AllowsDisabledAgentWithoutConnectionSettings(t *testing.T) {
+func TestValidate_AcceptsValidConfig(t *testing.T) {
 	cfg := validConfigForValidation()
-	cfg.Agent.Enabled = false
-	cfg.Agent.AgentBaseURL = ""
-	cfg.Agent.DefaultTagAgentID = ""
 
 	if err := cfg.Validate(); err != nil {
-		t.Fatalf("expected disabled agent validation to pass, got %v", err)
-	}
-}
-
-func TestValidate_RejectsEnabledAgentWithInvalidDefaultTagAgentID(t *testing.T) {
-	cfg := validConfigForValidation()
-	cfg.Agent.Enabled = true
-	cfg.Agent.DefaultTagAgentID = "not-a-uuid"
-
-	if err := cfg.Validate(); err == nil {
-		t.Fatalf("expected validation error for invalid default tag agent id")
+		t.Fatalf("expected valid config to pass validation, got %v", err)
 	}
 }
