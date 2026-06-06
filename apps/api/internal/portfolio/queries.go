@@ -11,16 +11,17 @@ import (
 
 // Queries exposes portfolio read-side use cases.
 type Queries struct {
-	qs queryStore
+	qs QueryStore
 }
 
-type queryStore interface {
+// QueryStore reads portfolio snapshots and positions.
+type QueryStore interface {
 	SnapshotsForAccount(ctx context.Context, accountID uuid.UUID, limit, offset *int, from, to *time.Time, sort *sorting.Direction) ([]*PortfolioSnapshot, error)
 	PositionsWithLatestSnapshot(ctx context.Context, accID uuid.UUID, includeClosed bool) ([]*PositionWithLatestSnapshot, error)
 }
 
 // NewQueries creates portfolio read-side use cases.
-func NewQueries(qs queryStore) *Queries {
+func NewQueries(qs QueryStore) *Queries {
 	return &Queries{
 		qs: qs,
 	}

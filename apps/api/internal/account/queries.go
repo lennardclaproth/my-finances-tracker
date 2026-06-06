@@ -7,15 +7,17 @@ import (
 )
 
 type Queries struct {
-	qs queryStore
+	qs QueryStore
 }
 
-type queryStore interface {
+// QueryStore reads account records for query use cases.
+type QueryStore interface {
 	Exists(ctx context.Context, id uuid.UUID) (bool, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*Account, error)
 }
 
-func NewExistsHandler(qs queryStore) *Queries {
+// NewQueries creates account read-side use cases.
+func NewQueries(qs QueryStore) *Queries {
 	return &Queries{
 		qs: qs,
 	}

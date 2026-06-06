@@ -49,7 +49,7 @@ func TestCreateClassPublishesSnapshotsRebuildRequested(t *testing.T) {
 	defer sub.Close()
 
 	// account.Queries is held by value on Commands; deref the constructed pointer.
-	aq := account.NewExistsHandler(fakeAccountStore{exists: true})
+	aq := account.NewQueries(fakeAccountStore{exists: true})
 	commands := assets.NewCommands(fakeAssetsStore{}, nil, *aq, nil, nil, bus)
 
 	accID := uuid.New()

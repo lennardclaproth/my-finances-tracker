@@ -13,7 +13,8 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/vendor"
 )
 
-type importCommandStore interface {
+// ImportStore persists and reads import records.
+type ImportStore interface {
 	Create(ctx context.Context, imp *Import) error
 	FetchByID(ctx context.Context, id uuid.UUID) (*Import, error)
 	UpdateState(ctx context.Context, imp *Import) error
@@ -33,7 +34,7 @@ func WithProcessors(cashflow, portfolio, eod Processor) CommandOption {
 
 // Commands exposes CSV import write-side use cases.
 type Commands struct {
-	imports    importCommandStore
+	imports    ImportStore
 	files      ImportFileWriter
 	remover    FileRemover
 	vendors    vendor.Queries
@@ -48,7 +49,7 @@ type Commands struct {
 
 // NewCommands creates CSV import write-side use cases.
 func NewCommands(
-	imports importCommandStore,
+	imports ImportStore,
 	files ImportFileWriter,
 	remover FileRemover,
 	vendors vendor.Queries,

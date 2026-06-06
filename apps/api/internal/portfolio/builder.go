@@ -26,13 +26,13 @@ type Builder struct {
 
 type PositionStore interface {
 	GetLastSnapshot(ctx context.Context, positionID uuid.UUID) (*PositionSnapshot, error)
-	CreateSnapshot(ctx context.Context, snap *PositionSnapshot) error
+	CreatePositionSnapshot(ctx context.Context, snap *PositionSnapshot) error
 	CreateMany(ctx context.Context, positions []*Position) error
 	UpdatePositions(ctx context.Context, transactions []Transaction) error
 }
 
 type PortfolioStore interface {
-	CreateSnapshot(ctx context.Context, snap *PortfolioSnapshot) error
+	CreatePortfolioSnapshot(ctx context.Context, snap *PortfolioSnapshot) error
 	Clean(ctx context.Context, accID uuid.UUID) error
 }
 
@@ -196,7 +196,7 @@ func (b *Builder) buildPositionSnapshots(
 		if err != nil {
 			return nil, fmt.Errorf("build position snapshots: new snapshot: %w", err)
 		}
-		if err := b.pss.CreateSnapshot(ctx, snap); err != nil {
+		if err := b.pss.CreatePositionSnapshot(ctx, snap); err != nil {
 			return nil, fmt.Errorf("build position snapshots: create snapshot: %w", err)
 		}
 		prevSnapshot = snap
@@ -339,7 +339,7 @@ func (b *Builder) Build(ctx context.Context, accID uuid.UUID) (err error) {
 			pss,
 			prevSnapshot,
 		)
-		if err := b.pfs.CreateSnapshot(ctx, snap); err != nil {
+		if err := b.pfs.CreatePortfolioSnapshot(ctx, snap); err != nil {
 			return fmt.Errorf("portfolio build failed to persist portfolio snapshot: %w", err)
 		}
 		prevSnapshot = snap

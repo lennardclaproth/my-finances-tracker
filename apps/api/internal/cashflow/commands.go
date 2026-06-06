@@ -11,8 +11,8 @@ import (
 )
 
 type Commands struct {
-	cs  commandStore
-	qs  queryStore
+	cs  CommandStore
+	qs  QueryStore
 	aec accountExistenceChecker
 }
 
@@ -20,7 +20,8 @@ type accountExistenceChecker interface {
 	Exists(ctx context.Context, id uuid.UUID) (bool, error)
 }
 
-type commandStore interface {
+// CommandStore persists cashflow transaction mutations.
+type CommandStore interface {
 	CreateTransactions(ctx context.Context, txs []*Transaction) (int, error)
 	UpdateTagByIDs(ctx context.Context, ids []uuid.UUID, tag string) (int, error)
 	UpdateTagByFilter(ctx context.Context, filters TransactionFilters, tag string) (int, error)
@@ -34,8 +35,8 @@ const (
 
 // NewCommands creates cashflow write-side use cases.
 func NewCommands(
-	cStore commandStore,
-	qStore queryStore,
+	cStore CommandStore,
+	qStore QueryStore,
 	aec accountExistenceChecker,
 ) *Commands {
 	return &Commands{

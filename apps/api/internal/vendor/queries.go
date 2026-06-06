@@ -14,7 +14,7 @@ type Queries struct {
 
 // QueryStore reads vendor records for query use cases.
 type QueryStore interface {
-	FetchById(ctx context.Context, vID uuid.UUID) (*Vendor, error)
+	GetByID(ctx context.Context, vID uuid.UUID) (*Vendor, error)
 	ListActive(ctx context.Context) ([]*Vendor, error)
 }
 
@@ -25,7 +25,7 @@ func NewQueries(qs QueryStore) *Queries {
 
 // GetById returns a vendor by ID.
 func (q *Queries) GetById(ctx context.Context, vID uuid.UUID) (*Vendor, error) {
-	v, err := q.qs.FetchById(ctx, vID)
+	v, err := q.qs.GetByID(ctx, vID)
 	if err != nil {
 		return nil, fmt.Errorf("get by id: failed to execute query: %w", err)
 	}

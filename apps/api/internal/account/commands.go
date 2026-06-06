@@ -8,13 +8,14 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/eventbus"
 )
 
-type Commands struct {
-	c creator
-	b eventbus.Bus
+// CommandStore persists account mutations.
+type CommandStore interface {
+	Create(ctx context.Context, acc *Account) error
 }
 
-type creator interface {
-	Create(ctx context.Context, acc *Account) error
+type Commands struct {
+	c CommandStore
+	b eventbus.Bus
 }
 
 // Create persists an account and publishes a Created event when a

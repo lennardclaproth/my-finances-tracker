@@ -195,7 +195,7 @@ type ManualPortfolioTransactionResponse struct {
 // @Router /portfolio/transactions [get]
 func GetPortfolioTransactions(
 	log logging.Logger,
-	fetcher account.Fetcher,
+	fetcher account.QueryStore,
 	lister portfolioTransactionLister,
 ) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -222,7 +222,7 @@ func GetPortfolioTransactions(
 			return
 		}
 
-		if _, err := fetcher.FetchByID(r.Context(), req.AccountID); err != nil {
+		if _, err := fetcher.GetByID(r.Context(), req.AccountID); err != nil {
 			if errors.Is(err, account.ErrAccountNotFound) {
 				_ = httpx.JSONEncode(w, http.StatusNotFound, map[string]string{"account_id": account.ErrAccountNotFound.Error()})
 				return

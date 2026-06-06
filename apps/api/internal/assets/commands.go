@@ -13,7 +13,8 @@ import (
 
 // TODO: fix interfaces
 
-type commandStore interface {
+// CommandStore persists assets, classes, accounts, and mutations.
+type CommandStore interface {
 	CreateAsset(ctx context.Context, asset *Asset) error
 	CreateAccount(ctx context.Context, account *Account) error
 	SetWorth(ctx context.Context, asset *Asset) error
@@ -23,37 +24,39 @@ type commandStore interface {
 	DeleteClass(ctx context.Context, classID uuid.UUID) error
 }
 
-type commandGetter interface {
+// CommandGetter reads a single class/asset aggregate for command validation.
+type CommandGetter interface {
 	Class(ctx context.Context, classID uuid.UUID) (*Class, error)
 	Asset(ctx context.Context, assetID uuid.UUID) (*Asset, error)
 }
 
-type classAggregator interface {
+// ClassAggregator computes the aggregated worth of a class.
+type ClassAggregator interface {
 	AggregateValue(ctx context.Context, accID, classID uuid.UUID) (money.Price, error)
-	AggregateValues(ctx context.Context, accID, classIDs []uuid.UUID) (map[uuid.UUID]money.Price, error)
 }
 
-type unitOfWork interface {
+// UnitOfWork runs a function within a single database transaction.
+type UnitOfWork interface {
 	Do(ctx context.Context, fn func(txCtx context.Context) error) error
 }
 
 type Commands struct {
-	cs  commandStore
-	cg  commandGetter
+	cs  CommandStore
+	cg  CommandGetter
 	aq  account.Queries
-	uow unitOfWork
-	ca  classAggregator
+	uow UnitOfWork
+	ca  ClassAggregator
 	bus eventbus.Bus
 }
 
 // NewCommands constructs the assets write-side use cases. The bus may be nil,
 // in which case snapshot rebuild events are not published.
 func NewCommands(
-	cs commandStore,
-	cg commandGetter,
+	cs CommandStore,
+	cg CommandGetter,
 	aq account.Queries,
-	uow unitOfWork,
-	ca classAggregator,
+	uow UnitOfWork,
+	ca ClassAggregator,
 	bus eventbus.Bus,
 ) *Commands {
 	return &Commands{

@@ -13,19 +13,20 @@ import (
 )
 
 type Commands struct {
-	cs  commandStore
+	cs  CommandStore
 	mdq marketdata.Queries
 	vq  vendor.Queries
 }
 
-type commandStore interface {
+// CommandStore persists portfolio accounts and transactions.
+type CommandStore interface {
 	CreateAccount(ctx context.Context, acc *Account) error
 	CreateTransaction(ctx context.Context, tx *Transaction) error
 	CreateTransactions(ctx context.Context, txs []*Transaction) (int, error)
 }
 
 // NewCommands constructs the portfolio write-side use cases.
-func NewCommands(cs commandStore, mdq marketdata.Queries, vq vendor.Queries) *Commands {
+func NewCommands(cs CommandStore, mdq marketdata.Queries, vq vendor.Queries) *Commands {
 	return &Commands{cs: cs, mdq: mdq, vq: vq}
 }
 

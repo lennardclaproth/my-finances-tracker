@@ -11,19 +11,20 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/sorting"
 )
 
-type builderStore interface {
+// BuilderStore reads mutations and rewrites account-level snapshots.
+type BuilderStore interface {
 	Mutations(ctx context.Context, accID uuid.UUID, sort *sorting.Direction, skip, take *uint64) ([]*Mutation, error)
 	DeleteSnapshots(ctx context.Context, accID uuid.UUID) error
 	StoreSnapshots(ctx context.Context, snapshots []*Snapshot) error
 }
 
 type Builder struct {
-	bs  builderStore
-	uow unitOfWork
+	bs  BuilderStore
+	uow UnitOfWork
 }
 
 // NewBuilder constructs the assets snapshot Builder.
-func NewBuilder(bs builderStore, uow unitOfWork) *Builder {
+func NewBuilder(bs BuilderStore, uow UnitOfWork) *Builder {
 	return &Builder{bs: bs, uow: uow}
 }
 

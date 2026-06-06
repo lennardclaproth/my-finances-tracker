@@ -10,7 +10,8 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/money"
 )
 
-type commandStore interface {
+// CommandStore persists market-data listings and EOD datapoints.
+type CommandStore interface {
 	Get(ctx context.Context, lsID uuid.UUID) (*Listing, error)
 	Create(ctx context.Context, listing *Listing) error
 	Update(ctx context.Context, listing *Listing) error
@@ -18,7 +19,7 @@ type commandStore interface {
 }
 
 type Commands struct {
-	cs commandStore
+	cs CommandStore
 	s  *Syncer
 }
 

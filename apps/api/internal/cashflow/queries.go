@@ -11,10 +11,11 @@ import (
 
 // Queries exposes read-side cashflow use cases.
 type Queries struct {
-	qs queryStore
+	qs QueryStore
 }
 
-type queryStore interface {
+// QueryStore reads cashflow transactions and analytics.
+type QueryStore interface {
 	GetMonthlyAnalytics(ctx context.Context, filter AnalyticsFilter) ([]MonthlyAnalyticsPoint, error)
 	GetTagDistribution(ctx context.Context, filter AnalyticsFilter) (*TagDistribution, error)
 	ListTransactions(ctx context.Context, query TransactionListQuery) (*TransactionListResult, error)
@@ -22,7 +23,7 @@ type queryStore interface {
 }
 
 // NewQueries creates cashflow read-side use cases.
-func NewQueries(qs queryStore) *Queries {
+func NewQueries(qs QueryStore) *Queries {
 	return &Queries{qs: qs}
 }
 

@@ -82,6 +82,17 @@ func qualifyTable(db *DB, schema, table string) string {
 	return fmt.Sprintf("%s.%s", schema, table)
 }
 
+// qualifyTableAs resolves a table name across dialects when the SQLite name is not
+// the bare Postgres table name. On Postgres it returns the schema-qualified name; on
+// SQLite (which has no schemas) it returns the flattened, prefixed name the
+// migrations use (e.g. portfolio.accounts -> portfolio_accounts).
+func qualifyTableAs(db *DB, schema, pgTable, sqliteTable string) string {
+	if db == nil || db.DriverName() == string(Sqlite) {
+		return sqliteTable
+	}
+	return fmt.Sprintf("%s.%s", schema, pgTable)
+}
+
 func (db *DB) GetExecutor(ctx context.Context) sqlx.ExtContext {
 	tx, ok := ctx.Value(transactionContextKey).(*sqlx.Tx)
 	if ok {

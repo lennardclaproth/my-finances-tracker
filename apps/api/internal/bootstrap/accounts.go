@@ -16,12 +16,12 @@ var (
 	defaultAccountName = "Lennard Claproth"
 )
 
-func Accounts(ctx context.Context, creator account.Creator, fetcher account.Fetcher, logger logging.Logger) {
-	if creator == nil || fetcher == nil {
-		panic(fmt.Errorf("bootstrap accounts: creator/fetcher is required"))
+func Accounts(ctx context.Context, commands account.CommandStore, queries account.QueryStore, logger logging.Logger) {
+	if commands == nil || queries == nil {
+		panic(fmt.Errorf("bootstrap accounts: command/query store is required"))
 	}
 
-	if _, err := fetcher.FetchByID(ctx, defaultAccountID); err == nil {
+	if _, err := queries.GetByID(ctx, defaultAccountID); err == nil {
 		logger.Info(ctx, "account already exists, skipping bootstrap", "account_id", defaultAccountID.String())
 		return
 	} else if !errors.Is(err, account.ErrAccountNotFound) {
@@ -34,7 +34,7 @@ func Accounts(ctx context.Context, creator account.Creator, fetcher account.Fetc
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
 	}
-	if err := creator.Create(ctx, acc); err != nil {
+	if err := commands.Create(ctx, acc); err != nil {
 		if errors.Is(err, account.ErrAccountAlreadyExists) {
 			logger.Info(ctx, "account already exists by unique constraint, skipping bootstrap", "account_name", defaultAccountName)
 			return

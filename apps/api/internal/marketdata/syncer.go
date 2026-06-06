@@ -15,8 +15,9 @@ type EODFetcher interface {
 	GetEOD(ctx context.Context, symbols []string, from, to *time.Time) iter.Seq2[EOD, error]
 }
 
-type syncStore interface {
-	// Get listing including provider from the store
+// SyncStore reads a listing and persists EOD sync progress.
+type SyncStore interface {
+	// Listing returns the listing (including provider) for the given id.
 	Listing(ctx context.Context, id uuid.UUID) (*Listing, error)
 	SetAccumulatedRange(ctx context.Context, id uuid.UUID, from, to *time.Time) error
 	TryAcquireSyncLock(ctx context.Context, id uuid.UUID) (bool, error)
@@ -25,7 +26,7 @@ type syncStore interface {
 }
 
 type Syncer struct {
-	ss  syncStore
+	ss  SyncStore
 	efs map[Source]EODFetcher
 }
 

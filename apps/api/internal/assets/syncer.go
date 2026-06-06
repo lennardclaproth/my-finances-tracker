@@ -16,7 +16,7 @@ type Syncer struct {
 	pq  *portfolio.Queries
 	b   *Builder
 	ss  SyncStore
-	uow uow
+	uow UnitOfWork
 }
 
 type SyncStore interface {
@@ -31,12 +31,8 @@ type SyncStore interface {
 	CreateMutation(ctx context.Context, mutation *Mutation) error
 }
 
-type uow interface {
-	Do(ctx context.Context, fn func(txCtx context.Context) error) error
-}
-
 // NewSyncer constructs the assets portfolio Syncer.
-func NewSyncer(pq *portfolio.Queries, b *Builder, ss SyncStore, u uow) *Syncer {
+func NewSyncer(pq *portfolio.Queries, b *Builder, ss SyncStore, u UnitOfWork) *Syncer {
 	return &Syncer{pq: pq, b: b, ss: ss, uow: u}
 }
 

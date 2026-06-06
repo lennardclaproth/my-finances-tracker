@@ -59,7 +59,7 @@ type SnapshotPointResponse struct {
 // @Router /portfolio/snapshots [get]
 func GetPortfolioSnapshots(
 	log logging.Logger,
-	fetcher account.Fetcher,
+	fetcher account.QueryStore,
 	queries *portfoliodomain.Queries,
 ) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +87,7 @@ func GetPortfolioSnapshots(
 			return
 		}
 
-		if _, err := fetcher.FetchByID(r.Context(), req.AccountID); err != nil {
+		if _, err := fetcher.GetByID(r.Context(), req.AccountID); err != nil {
 			if errors.Is(err, account.ErrAccountNotFound) {
 				_ = httpx.JSONEncode(w, http.StatusNotFound, map[string]string{"account_id": account.ErrAccountNotFound.Error()})
 				return

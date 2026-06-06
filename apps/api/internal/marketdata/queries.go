@@ -10,7 +10,8 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/sorting"
 )
 
-type queryStore interface {
+// QueryStore reads market-data listings, EOD datapoints, and providers.
+type QueryStore interface {
 	Get(ctx context.Context, id uuid.UUID) (*Listing, error)
 	GetBySymbol(ctx context.Context, symbol string) (*Listing, error)
 	List(ctx context.Context, limit, offset *int) ([]*Listing, error)
@@ -22,7 +23,7 @@ type queryStore interface {
 }
 
 type Queries struct {
-	qs queryStore
+	qs QueryStore
 	s  *Syncer
 }
 
@@ -166,7 +167,7 @@ func getEODResult(
 	limit, offset *int,
 	sortOrder sorting.Direction,
 	msg string,
-	qs queryStore,
+	qs QueryStore,
 ) (*EODResult, error) {
 	data, err := qs.GetEODForListing(
 		ctx,

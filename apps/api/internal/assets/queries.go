@@ -10,10 +10,11 @@ import (
 )
 
 type Queries struct {
-	qs queryStore
+	qs QueryStore
 }
 
-type queryStore interface {
+// QueryStore reads asset classes, bounds, and snapshots for the read models.
+type QueryStore interface {
 	ClassesForAccount(ctx context.Context, accID uuid.UUID, includeArchived bool) (map[uuid.UUID]*Class, error)
 	Class(ctx context.Context, classID uuid.UUID) (*Class, error)
 	ClassBounds(ctx context.Context, classIDs []uuid.UUID) (map[uuid.UUID]*ClassBounds, error)
