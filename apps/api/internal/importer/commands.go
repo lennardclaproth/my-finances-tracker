@@ -87,7 +87,7 @@ type PortfolioCSVImportCommand struct {
 	AccountID uuid.UUID
 }
 
-// EODCSVImportCommand contains the inputs needed to accept a daily market-data CSV import.
+// EODCSVImportCommand contains the inputs needed to accept an end-of-day market-data CSV import.
 type EODCSVImportCommand struct {
 	File      io.Reader
 	ListingID uuid.UUID
@@ -142,7 +142,7 @@ func (c *Commands) ImportPortfolioCSV(ctx context.Context, cmd PortfolioCSVImpor
 	)
 }
 
-// ImportEODCSV validates and persists a pending daily market-data CSV import.
+// ImportEODCSV validates and persists a pending end-of-day market-data CSV import.
 func (c *Commands) ImportEODCSV(ctx context.Context, cmd EODCSVImportCommand) (uuid.UUID, error) {
 	if cmd.File == nil {
 		return uuid.Nil, ErrImportFileRequired

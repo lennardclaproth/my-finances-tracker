@@ -22,9 +22,9 @@ type Listing struct {
 	Active      bool      `db:"active"`
 	CreatedAt   time.Time `db:"created_at"`
 	UpdatedAt   time.Time `db:"updated_at"`
-	// AccumulatedStart is the first history entry date that has been accumulated for this listing.
+	// AccumulatedStart is the first EOD entry date that has been accumulated for this listing.
 	AccumulatedStart *time.Time `db:"accumulated_start"`
-	// AccumulatedEnd is the last date for which history accumulation finished.
+	// AccumulatedEnd is the last date for which EOD accumulation finished.
 	AccumulatedEnd   *time.Time `db:"accumulated_end"`
 	ShouldAccumulate bool       `db:"should_accumulate"`
 	Syncing          bool       `db:"syncing"`

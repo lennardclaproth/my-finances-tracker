@@ -28,7 +28,7 @@ func (r importEODRequest) isValid() (bool, map[string]string) {
 // ImportEOD accepts an end-of-day market-data CSV upload and queues it for asynchronous processing.
 //
 // @Summary     Import end-of-day market-data CSV
-// @Description Uploads a daily market-data CSV file for a manually ingested listing and queues it for asynchronous processing.
+// @Description Uploads an end-of-day market-data CSV file for a manually ingested listing and queues it for asynchronous processing.
 // @Tags        imports
 // @Accept      multipart/form-data
 // @Produce     application/json

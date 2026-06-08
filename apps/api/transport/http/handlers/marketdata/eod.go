@@ -13,7 +13,7 @@ import (
 	httpx "github.com/lennardclaproth/my-finances-tracker/transport/http"
 )
 
-// GetEODRequest contains filters for listing daily market data retrieval.
+// GetEODRequest contains filters for listing end-of-day market data retrieval.
 type GetEODRequest struct {
 	ListingID *uuid.UUID `query:"listing_id"`
 	Symbol    string     `query:"symbol"`
@@ -47,13 +47,13 @@ func (r GetEODRequest) isValid() (bool, map[string]string) {
 	return len(problems) == 0, problems
 }
 
-// GetEODResponse returns daily rows and freshness metadata.
+// GetEODResponse returns EOD rows and freshness metadata.
 type GetEODResponse struct {
 	Data     []marketdata.EOD
 	Metadata GetEODMetadataResponse
 }
 
-// GetEODMetadataResponse describes daily retrieval metadata.
+// GetEODMetadataResponse describes EOD retrieval metadata.
 type GetEODMetadataResponse struct {
 	Message     string
 	ResultCount int
@@ -62,9 +62,9 @@ type GetEODMetadataResponse struct {
 
 // GetEOD fetches end of day market data for a given symbol.
 //
-// @Summary Fetch daily market data
-// @Description Get daily market data for a symbol with optional date range and pagination
-// @Tags dailies
+// @Summary Fetch end-of-day market data
+// @Description Get end-of-day market data for a symbol with optional date range and pagination
+// @Tags eods
 // @Accept json
 // @Produce json
 // @Param listing_id query string false "Listing ID (preferred when duplicate symbols exist across sources)"
@@ -78,7 +78,7 @@ type GetEODMetadataResponse struct {
 // @Failure 400 {object} map[string]string "Bad request"
 // @Failure 404 {object} map[string]string "Not found"
 // @Failure 500 {object} map[string]string "Internal server error"
-// @Router /marketdata/dailies [get]
+// @Router /marketdata/eods [get]
 func GetEOD(
 	log logging.Logger,
 	queries *marketdata.Queries,
@@ -119,9 +119,9 @@ func GetEOD(
 				return
 			}
 
-			log.Error(r.Context(), "marketdata dailies: failed to resolve listing", err)
+			log.Error(r.Context(), "marketdata eods: failed to resolve listing", err)
 			_ = httpx.JSONEncode(w, http.StatusInternalServerError, map[string]string{
-				"error": "failed to get market data dailies",
+				"error": "failed to get market data eods",
 			})
 			return
 		}
@@ -133,9 +133,9 @@ func GetEOD(
 				return
 			}
 
-			log.Error(r.Context(), "marketdata dailies: failed to get EOD data", err)
+			log.Error(r.Context(), "marketdata eods: failed to get EOD data", err)
 			_ = httpx.JSONEncode(w, http.StatusInternalServerError, map[string]string{
-				"error": "failed to get market data dailies",
+				"error": "failed to get market data eods",
 			})
 			return
 		}

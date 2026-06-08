@@ -51,7 +51,7 @@ func (p *BrandNewDayParser) ParseAll(rc io.ReadCloser) (ParseResult, error) {
 	}
 
 	result := ParseResult{
-		Rows:      make([]DailyRow, 0),
+		Rows:      make([]EODRow, 0),
 		RowErrors: make([]RowError, 0),
 		TotalRows: 0,
 	}
@@ -128,7 +128,7 @@ func (p *BrandNewDayParser) ParseAll(rc io.ReadCloser) (ParseResult, error) {
 		}
 
 		seenDates[dateKey] = struct{}{}
-		result.Rows = append(result.Rows, DailyRow{
+		result.Rows = append(result.Rows, EODRow{
 			RowNumber: rowNumber,
 			Date:      parsedDate,
 			Open:      nav,

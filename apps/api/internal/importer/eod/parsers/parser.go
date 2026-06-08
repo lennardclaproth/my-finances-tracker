@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type DailyRow struct {
+type EODRow struct {
 	RowNumber int
 	Date      time.Time
 	Open      float64
@@ -21,11 +21,11 @@ type RowError struct {
 }
 
 type ParseResult struct {
-	Rows      []DailyRow
+	Rows      []EODRow
 	RowErrors []RowError
 	TotalRows int
 }
 
-type DailyParser interface {
+type EODParser interface {
 	ParseAll(rc io.ReadCloser) (ParseResult, error)
 }

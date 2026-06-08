@@ -31,21 +31,21 @@ const (
 )
 
 const (
-	TableVendors       = "vendors"
-	TableTransactions  = "transactions"
-	TableImports       = "imports"
-	TableListings      = "listings"
-	TableHistories     = "dailies"
-	TableDailyUploads  = "daily_uploads"
-	TableProviders     = "providers"
-	TableAccounts      = "accounts"
-	TablePositions     = "positions"
-	TablePosSnapshots  = "position_snapshots"
-	TablePortSnapshots = "portfolio_snapshots"
-	TableAssetClasses  = "classes"
-	TableAssetItems    = "items"
-	TableAssetHistory  = "histories"
-	TableAssetSnapshot = "snapshots"
+	TableVendors        = "vendors"
+	TableTransactions   = "transactions"
+	TableImports        = "imports"
+	TableListings       = "listings"
+	TableEOD            = "eods"
+	TableEODUploads     = "eod_uploads"
+	TableProviders      = "providers"
+	TableAccounts       = "accounts"
+	TablePositions      = "positions"
+	TablePosSnapshots   = "position_snapshots"
+	TablePortSnapshots  = "portfolio_snapshots"
+	TableAssetClasses   = "classes"
+	TableAssetItems     = "items"
+	TableAssetMutations = "mutations"
+	TableAssetSnapshot  = "snapshots"
 )
 
 type DB struct {

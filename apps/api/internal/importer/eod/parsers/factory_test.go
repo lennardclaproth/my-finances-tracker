@@ -6,10 +6,10 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/marketdata"
 )
 
-func TestCreateDailyParser_BrandNewDay(t *testing.T) {
+func TestCreateEODParser_BrandNewDay(t *testing.T) {
 	t.Parallel()
 
-	parser, err := CreateDailyParser(marketdata.SourceBrandNewDay)
+	parser, err := CreateEODParser(marketdata.SourceBrandNewDay)
 	if err != nil {
 		t.Fatalf("expected parser, got error: %v", err)
 	}
@@ -18,10 +18,10 @@ func TestCreateDailyParser_BrandNewDay(t *testing.T) {
 	}
 }
 
-func TestCreateDailyParser_UnknownSource(t *testing.T) {
+func TestCreateEODParser_UnknownSource(t *testing.T) {
 	t.Parallel()
 
-	_, err := CreateDailyParser(marketdata.SourceAlphaVantage)
+	_, err := CreateEODParser(marketdata.SourceAlphaVantage)
 	if err == nil {
 		t.Fatalf("expected unsupported source error")
 	}

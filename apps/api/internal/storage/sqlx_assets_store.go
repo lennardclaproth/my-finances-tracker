@@ -17,10 +17,10 @@ import (
 )
 
 // SQLXAssetsStore persists the assets aggregate: account projection, classes, items,
-// mutation history, and account-level snapshots. It satisfies the assets command,
+// mutations, and account-level snapshots. It satisfies the assets command,
 // getter, aggregator, query, builder, sync, and unit-of-work contracts.
 //
-// The mutation history table column is item_id, while the domain Mutation models it
+// The mutations table column is item_id, while the domain Mutation models it
 // as AssetID (db:"asset_id"); reads alias item_id AS asset_id and writes map
 // :asset_id into item_id.
 type SQLXAssetsStore struct {
@@ -28,7 +28,7 @@ type SQLXAssetsStore struct {
 	accountsTable  string
 	classesTable   string
 	itemsTable     string
-	historyTable   string
+	mutationsTable string
 	snapshotsTable string
 }
 
@@ -42,8 +42,8 @@ var (
 	_ assets.SyncStore       = (*SQLXAssetsStore)(nil)
 )
 
-// assetHistorySelectColumns aliases item_id to the domain's asset_id db tag.
-const assetHistorySelectColumns = `
+// assetMutationSelectColumns aliases item_id to the domain's asset_id db tag.
+const assetMutationSelectColumns = `
 	id, account_id, class_id, item_id AS asset_id, change_type, direction,
 	amount, previous_worth, new_worth, class_total_worth, effective_date, note, created_at
 `
@@ -55,7 +55,7 @@ func NewSQLXAssetsStore(db *DB) *SQLXAssetsStore {
 		accountsTable:  qualifyTableAs(db, SchemaAssets, TableAccounts, "assets_accounts"),
 		classesTable:   qualifyTableAs(db, SchemaAssets, TableAssetClasses, "asset_classes"),
 		itemsTable:     qualifyTableAs(db, SchemaAssets, TableAssetItems, "asset_items"),
-		historyTable:   qualifyTableAs(db, SchemaAssets, TableAssetHistory, "asset_histories"),
+		mutationsTable: qualifyTableAs(db, SchemaAssets, TableAssetMutations, "asset_mutations"),
 		snapshotsTable: qualifyTableAs(db, SchemaAssets, TableAssetSnapshot, "asset_snapshots"),
 	}
 }
@@ -117,7 +117,7 @@ func (s *SQLXAssetsStore) UpdateClass(ctx context.Context, class *assets.Class) 
 	return nil
 }
 
-// DeleteClass removes a class by ID; items and history cascade via foreign keys.
+// DeleteClass removes a class by ID; items and mutations cascade via foreign keys.
 func (s *SQLXAssetsStore) DeleteClass(ctx context.Context, classID uuid.UUID) error {
 	query := s.db.Rebind(fmt.Sprintf(`DELETE FROM %s WHERE id = ?`, s.classesTable))
 	if _, err := s.db.GetExecutor(ctx).ExecContext(ctx, query, classID); err != nil {
@@ -145,7 +145,7 @@ func (s *SQLXAssetsStore) Class(ctx context.Context, classID uuid.UUID) (*assets
 	}
 	class.Assets = items
 
-	mutQuery := s.db.Rebind(fmt.Sprintf(`SELECT %s FROM %s WHERE class_id = ? ORDER BY effective_date DESC, created_at DESC`, assetHistorySelectColumns, s.historyTable))
+	mutQuery := s.db.Rebind(fmt.Sprintf(`SELECT %s FROM %s WHERE class_id = ? ORDER BY effective_date DESC, created_at DESC`, assetMutationSelectColumns, s.mutationsTable))
 	var muts []assets.Mutation
 	if err := sqlx.SelectContext(ctx, s.db.GetExecutor(ctx), &muts, mutQuery, classID); err != nil {
 		return nil, fmt.Errorf("assets store: get class mutations: %w", err)
@@ -200,7 +200,7 @@ func (s *SQLXAssetsStore) ClassBounds(ctx context.Context, classIDs []uuid.UUID)
 	query, args, err := sqlx.In(fmt.Sprintf(`
 		SELECT %s FROM %s WHERE class_id IN (?)
 		ORDER BY class_id, effective_date ASC, created_at ASC
-	`, assetHistorySelectColumns, s.historyTable), classIDs)
+	`, assetMutationSelectColumns, s.mutationsTable), classIDs)
 	if err != nil {
 		return nil, fmt.Errorf("assets store: class bounds expand: %w", err)
 	}
@@ -319,7 +319,7 @@ func (s *SQLXAssetsStore) UpdateAssetWorth(ctx context.Context, accountID, class
 
 // --- Mutations --------------------------------------------------------------
 
-// CreateMutation inserts one mutation history entry. AssetID maps to the item_id column.
+// CreateMutation inserts one mutation entry. AssetID maps to the item_id column.
 func (s *SQLXAssetsStore) CreateMutation(ctx context.Context, mut *assets.Mutation) error {
 	query := fmt.Sprintf(`
 		INSERT INTO %s (
@@ -329,14 +329,14 @@ func (s *SQLXAssetsStore) CreateMutation(ctx context.Context, mut *assets.Mutati
 			:id, :account_id, :class_id, :asset_id, :change_type, :direction, :amount,
 			:previous_worth, :new_worth, :class_total_worth, :effective_date, :note, :created_at
 		)
-	`, s.historyTable)
+	`, s.mutationsTable)
 	if _, err := sqlx.NamedExecContext(ctx, s.db.GetExecutor(ctx), query, mut); err != nil {
 		return fmt.Errorf("assets store: create mutation: %w", err)
 	}
 	return nil
 }
 
-// Mutations returns an account's mutation history ordered by effective date, optionally paginated.
+// Mutations returns an account's mutations ordered by effective date, optionally paginated.
 func (s *SQLXAssetsStore) Mutations(ctx context.Context, accID uuid.UUID, sort *sorting.Direction, skip, take *uint64) ([]*assets.Mutation, error) {
 	dir := "ASC"
 	if sort != nil {
@@ -345,7 +345,7 @@ func (s *SQLXAssetsStore) Mutations(ctx context.Context, accID uuid.UUID, sort *
 	query := fmt.Sprintf(`
 		SELECT %s FROM %s WHERE account_id = ?
 		ORDER BY effective_date %s, created_at %s
-	`, assetHistorySelectColumns, s.historyTable, dir, dir)
+	`, assetMutationSelectColumns, s.mutationsTable, dir, dir)
 	args := []any{accID}
 	if take != nil {
 		query += " LIMIT ?"
@@ -429,7 +429,7 @@ func (s *SQLXAssetsStore) StoreSnapshots(ctx context.Context, snapshots []*asset
 // --- Sync -------------------------------------------------------------------
 
 // CleanPortfolio removes the account's portfolio-sourced class so the sync flow can
-// rebuild it; its items and history cascade via foreign keys.
+// rebuild it; its items and mutations cascade via foreign keys.
 func (s *SQLXAssetsStore) CleanPortfolio(ctx context.Context, accountID uuid.UUID) error {
 	query := s.db.Rebind(fmt.Sprintf(`DELETE FROM %s WHERE account_id = ? AND source = ?`, s.classesTable))
 	if _, err := s.db.GetExecutor(ctx).ExecContext(ctx, query, accountID, assets.ClassSourcePortfolio); err != nil {

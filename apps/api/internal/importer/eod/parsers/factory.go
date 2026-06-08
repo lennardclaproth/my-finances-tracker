@@ -6,7 +6,7 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/marketdata"
 )
 
-func CreateDailyParser(source marketdata.Source) (DailyParser, error) {
+func CreateEODParser(source marketdata.Source) (EODParser, error) {
 	switch source {
 	case marketdata.SourceBrandNewDay:
 		return NewBrandNewDayParser(), nil

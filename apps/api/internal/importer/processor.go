@@ -17,7 +17,7 @@ type CashflowParserFactory func(id vendor.VendorID) (cashflow.CsvParser, error)
 type PortfolioParserFactory func(id vendor.VendorID) (portfolio.CsvParser, error)
 
 // EODParserFactory resolves a CSV parser for EOD imports by listing source.
-type EODParserFactory func(source marketdata.Source) (eodparsers.DailyParser, error)
+type EODParserFactory func(source marketdata.Source) (eodparsers.EODParser, error)
 
 // ProcessResult captures counters produced by one import processor.
 type ProcessResult struct {

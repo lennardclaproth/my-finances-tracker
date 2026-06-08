@@ -90,7 +90,7 @@ func (s *Syncer) SyncEOD(ctx context.Context, lsID uuid.UUID, from, to *time.Tim
 	if !ok {
 		return nil, fmt.Errorf("sync eod: failed to find fetcher for listing source %s", listing.Source)
 	}
-	// Fetch daily data from the EOD fetcher and persist it, this will return an error for each individual day that fails to
+	// Fetch EOD data from the EOD fetcher and persist it, this will return an error for each individual day that fails to
 	// fetch or persist, but will continue processing the rest of the data.
 	for eod, fetchErr := range c.GetEOD(ctx, []string{listing.Symbol}, from, to) {
 		if err != nil {

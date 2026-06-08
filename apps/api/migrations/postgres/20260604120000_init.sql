@@ -247,7 +247,7 @@ CREATE TABLE portfolio.portfolio_snapshots (
 -- Market data: end-of-day prices + upload tracking.
 -- ---------------------------------------------------------------------------
 
-CREATE TABLE marketdata.dailies (
+CREATE TABLE marketdata.eods (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     listing_id  UUID        NOT NULL REFERENCES marketdata.listings(id) ON DELETE CASCADE,
     symbol      VARCHAR(50) NOT NULL,
@@ -259,10 +259,10 @@ CREATE TABLE marketdata.dailies (
     volume      BIGINT      NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_dailies_listing_date UNIQUE (listing_id, date)
+    CONSTRAINT uq_eods_listing_date UNIQUE (listing_id, date)
 );
 
-CREATE TABLE marketdata.daily_uploads (
+CREATE TABLE marketdata.eod_uploads (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     listing_id        UUID         NOT NULL REFERENCES marketdata.listings(id) ON DELETE CASCADE,
     source            VARCHAR(20)  NOT NULL,
@@ -282,7 +282,7 @@ CREATE TABLE marketdata.daily_uploads (
 );
 
 -- ---------------------------------------------------------------------------
--- Assets: per-account projection, classes, items, mutation history, snapshots.
+-- Assets: per-account projection, classes, items, mutations, snapshots.
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE assets.accounts (
@@ -315,7 +315,7 @@ CREATE TABLE assets.items (
     CONSTRAINT uq_asset_items_class_name UNIQUE (class_id, name)
 );
 
-CREATE TABLE assets.histories (
+CREATE TABLE assets.mutations (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     account_id        UUID        NOT NULL REFERENCES assets.accounts(account_id) ON DELETE CASCADE,
     class_id          UUID        NOT NULL REFERENCES assets.classes(id) ON DELETE CASCADE,
@@ -374,9 +374,9 @@ CREATE INDEX idx_portfolio_positions_listing_id ON portfolio.positions (listing_
 CREATE INDEX idx_position_snapshots_account_day ON portfolio.position_snapshots (account_id, occurred_at);
 CREATE INDEX idx_position_snapshots_listing_id ON portfolio.position_snapshots (listing_id);
 
--- daily uploads: pending queue ordering + listing cascade.
-CREATE INDEX idx_daily_uploads_status_created ON marketdata.daily_uploads (status, created_at);
-CREATE INDEX idx_daily_uploads_listing_id ON marketdata.daily_uploads (listing_id);
+-- eod uploads: pending queue ordering + listing cascade.
+CREATE INDEX idx_eod_uploads_status_created ON marketdata.eod_uploads (status, created_at);
+CREATE INDEX idx_eod_uploads_listing_id ON marketdata.eod_uploads (listing_id);
 
 -- providers: name+mode is the lookup/ranking key for token selection.
 CREATE INDEX idx_providers_name_mode ON marketdata.providers (name, ingestion_mode);
@@ -387,10 +387,10 @@ CREATE INDEX idx_asset_classes_account_source ON assets.classes (account_id, sou
 -- asset items: per-class/account aggregations filtered by archived.
 CREATE INDEX idx_asset_items_account_class_archived ON assets.items (account_id, class_id, archived);
 
--- asset histories: per-class and per-account history (newest first) + item cascade.
-CREATE INDEX idx_asset_histories_account_class_date ON assets.histories (account_id, class_id, effective_date DESC);
-CREATE INDEX idx_asset_histories_account_date ON assets.histories (account_id, effective_date DESC);
-CREATE INDEX idx_asset_histories_item_id ON assets.histories (item_id);
+-- asset mutations: per-class and per-account mutations (newest first) + item cascade.
+CREATE INDEX idx_asset_mutations_account_class_date ON assets.mutations (account_id, class_id, effective_date DESC);
+CREATE INDEX idx_asset_mutations_account_date ON assets.mutations (account_id, effective_date DESC);
+CREATE INDEX idx_asset_mutations_item_id ON assets.mutations (item_id);
 
 -- +goose StatementEnd
 
@@ -398,12 +398,12 @@ CREATE INDEX idx_asset_histories_item_id ON assets.histories (item_id);
 -- +goose StatementBegin
 
 DROP TABLE IF EXISTS assets.snapshots;
-DROP TABLE IF EXISTS assets.histories;
+DROP TABLE IF EXISTS assets.mutations;
 DROP TABLE IF EXISTS assets.items;
 DROP TABLE IF EXISTS assets.classes;
 DROP TABLE IF EXISTS assets.accounts;
-DROP TABLE IF EXISTS marketdata.daily_uploads;
-DROP TABLE IF EXISTS marketdata.dailies;
+DROP TABLE IF EXISTS marketdata.eod_uploads;
+DROP TABLE IF EXISTS marketdata.eods;
 DROP TABLE IF EXISTS portfolio.portfolio_snapshots;
 DROP TABLE IF EXISTS portfolio.position_snapshots;
 DROP TABLE IF EXISTS portfolio.transactions;

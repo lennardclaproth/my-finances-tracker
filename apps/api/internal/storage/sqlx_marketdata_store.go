@@ -22,7 +22,7 @@ type SQLXMarketDataStore struct {
 	db             *DB
 	providersTable string
 	listingsTable  string
-	dailiesTable   string
+	eodsTable      string
 }
 
 var (
@@ -38,7 +38,7 @@ func NewSQLXMarketDataStore(db *DB) *SQLXMarketDataStore {
 		db:             db,
 		providersTable: qualifyTable(db, SchemaMarketData, TableProviders),
 		listingsTable:  qualifyTable(db, SchemaMarketData, TableListings),
-		dailiesTable:   qualifyTable(db, SchemaMarketData, TableHistories),
+		eodsTable:      qualifyTable(db, SchemaMarketData, TableEOD),
 	}
 }
 
@@ -238,13 +238,13 @@ func (s *SQLXMarketDataStore) CreateEODs(ctx context.Context, eods []*marketdata
 	}
 	for _, eod := range eods {
 		if eod.ListingID == uuid.Nil {
-			return 0, marketdata.ErrDailyListingIDEmpty
+			return 0, marketdata.ErrEODListingIDEmpty
 		}
 	}
 	query := fmt.Sprintf(`
 		INSERT INTO %s (%s) VALUES (%s)
 		ON CONFLICT (listing_id, date) DO NOTHING
-	`, s.dailiesTable, eodInsertColumns, eodInsertValues)
+	`, s.eodsTable, eodInsertColumns, eodInsertValues)
 	res, err := sqlx.NamedExecContext(ctx, s.db.GetExecutor(ctx), query, eods)
 	if err != nil {
 		return 0, err
@@ -259,19 +259,19 @@ func (s *SQLXMarketDataStore) CreateEODs(ctx context.Context, eods []*marketdata
 // InsertEOD persists one EOD datapoint, ignoring an existing (listing, date) pair.
 func (s *SQLXMarketDataStore) InsertEOD(ctx context.Context, eod *marketdata.EOD) error {
 	if eod.ListingID == uuid.Nil {
-		return marketdata.ErrDailyListingIDEmpty
+		return marketdata.ErrEODListingIDEmpty
 	}
 	query := fmt.Sprintf(`
 		INSERT INTO %s (%s) VALUES (%s)
 		ON CONFLICT (listing_id, date) DO NOTHING
-	`, s.dailiesTable, eodInsertColumns, eodInsertValues)
+	`, s.eodsTable, eodInsertColumns, eodInsertValues)
 	_, err := sqlx.NamedExecContext(ctx, s.db.GetExecutor(ctx), query, eod)
 	return err
 }
 
 // CountEODByListing counts EOD datapoints for a listing within an optional date range.
 func (s *SQLXMarketDataStore) CountEODByListing(ctx context.Context, lsID uuid.UUID, from, to *time.Time) (int, error) {
-	query := fmt.Sprintf(`SELECT COUNT(1) FROM %s WHERE listing_id = ?`, s.dailiesTable)
+	query := fmt.Sprintf(`SELECT COUNT(1) FROM %s WHERE listing_id = ?`, s.eodsTable)
 	args := []any{lsID}
 	if from != nil {
 		query += " AND date >= ?"
@@ -298,7 +298,7 @@ func (s *SQLXMarketDataStore) GetEODForListing(ctx context.Context, lsID uuid.UU
 			volume, created_at, updated_at
 		FROM %s
 		WHERE listing_id = ?
-	`, s.dailiesTable)
+	`, s.eodsTable)
 	args := []any{lsID}
 	if from != nil {
 		query += " AND date >= ?"

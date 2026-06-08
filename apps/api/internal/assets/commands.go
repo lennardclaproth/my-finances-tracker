@@ -257,7 +257,7 @@ func (c *Commands) UpdateClass(ctx context.Context, classID uuid.UUID, name *str
 	return nil
 }
 
-// DeleteClass removes a manual class and related items/history.
+// DeleteClass removes a manual class and related items/mutations.
 func (c *Commands) DeleteClass(ctx context.Context, accountID, classID uuid.UUID) error {
 	class, err := c.cg.Class(ctx, classID)
 	if err != nil {

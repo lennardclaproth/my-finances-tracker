@@ -16,7 +16,7 @@ const (
 	ImportTypeCashflow ImportType = "cashflow"
 	// ImportTypePortfolio imports brokerage CSV rows into portfolio transactions.
 	ImportTypePortfolio ImportType = "portfolio"
-	// ImportTypeEOD imports daily market data CSV rows into EOD records.
+	// ImportTypeEOD imports end-of-day market data CSV rows into EOD records.
 	ImportTypeEOD ImportType = "eod"
 )
 

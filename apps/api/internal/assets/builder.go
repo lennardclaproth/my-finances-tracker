@@ -28,12 +28,12 @@ func NewBuilder(bs BuilderStore, uow UnitOfWork) *Builder {
 	return &Builder{bs: bs, uow: uow}
 }
 
-// RebuildAll rebuilds account-level assets snapshots from account history.
+// RebuildAll rebuilds account-level assets snapshots from account mutations.
 func (b *Builder) RebuildAll(ctx context.Context, accountID uuid.UUID) error {
 	sort := sorting.ASC
 	mutations, err := b.bs.Mutations(ctx, accountID, &sort, nil, nil)
 	if err != nil {
-		return fmt.Errorf("assets service: list account history for snapshots: %w", err)
+		return fmt.Errorf("assets service: list account mutations for snapshots: %w", err)
 	}
 
 	today := date.StartOfDayUTC(time.Now().UTC())
@@ -66,8 +66,8 @@ func (b *Builder) RebuildAll(ctx context.Context, accountID uuid.UUID) error {
 	return nil
 }
 
-func buildSnapshotsFromMutations(accountID uuid.UUID, history []*Mutation, today time.Time) []*Snapshot {
-	if len(history) == 0 {
+func buildSnapshotsFromMutations(accountID uuid.UUID, mutations []*Mutation, today time.Time) []*Snapshot {
+	if len(mutations) == 0 {
 		return nil
 	}
 	type classKey = uuid.UUID
@@ -77,7 +77,7 @@ func buildSnapshotsFromMutations(accountID uuid.UUID, history []*Mutation, today
 	earliestDay := date.StartOfDayUTC(today)
 	earliestSet := false
 
-	for _, row := range history {
+	for _, row := range mutations {
 		if row == nil {
 			continue
 		}

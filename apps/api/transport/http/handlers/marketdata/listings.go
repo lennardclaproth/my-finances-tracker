@@ -140,7 +140,7 @@ type ListingsSearchResponse struct {
 // CreateListing creates a new market-data listing.
 //
 // @Summary Create listing
-// @Description Create a listing and trigger async daily data accumulation.
+// @Description Create a listing and trigger async end-of-day data accumulation.
 // @Tags listings
 // @Accept json
 // @Produce json

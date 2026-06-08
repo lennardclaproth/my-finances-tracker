@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [017] Added event-driven messaging handlers so account creation and imported transactions propagate to portfolio, cashflow, and importer projections.
 - [018] Added structured observability with request and correlation IDs, operation-level logging, and APM trace propagation across HTTP and jobs.
 - [019] Added automatic database migration execution and bootstrap seeding for vendors, default accounts, and providers at startup.
-- [020] Added a Vue web app experience with cashflow and portfolio pages, plus admin listings and admin dailies pages guarded by admin mode.
+- [020] Added a SvelteKit web app experience with cashflow and portfolio pages, plus admin listings and admin dailies pages guarded by admin mode.
 - [021] Added generated Swagger/OpenAPI documentation and Swagger UI serving for API discoverability and client integration.
 - [022] Added configurable agent auto-tag background control so `TaggerJob` can be enabled or disabled via `agent.enabled`.
 - [023] Added manual cashflow transaction creation with bulk entry support from the cashflow page, including account-scoped API validation and manual-source tagging (`source=manual[:vendor]`).

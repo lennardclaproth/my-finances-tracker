@@ -98,7 +98,7 @@ type marketstackEODResponse struct {
 //
 // 'https://api.marketstack.com/v2/eod?symbols=tdt.as,aapl&limit=1000&access_key=XXXX'
 //
-// it constructs history objects from the response and returns them as an iterator.
+// it constructs EOD objects from the response and returns them as an iterator.
 // It handles pagination by making multiple requests until all data is retrieved.
 // If any request fails, it yields an error and stops the iteration.
 func (c *MarketStackClient) GetEOD(ctx context.Context, symbols []string, from, to *time.Time) iter.Seq2[marketdata.EOD, error] {
@@ -131,8 +131,8 @@ func (c *MarketStackClient) GetEOD(ctx context.Context, symbols []string, from, 
 			if page.Pagination.Count == 0 || len(page.Data) == 0 {
 				return
 			}
-			// Yield the histories from this page. If the consumer signals to stop, we return early.
-			if !c.yieldDailies(yield, page) {
+			// Yield the EODs from this page. If the consumer signals to stop, we return early.
+			if !c.yieldEODs(yield, page) {
 				return
 			}
 			// Move the offset for the next page. If we've reached or exceeded the total, we are done.
@@ -232,10 +232,10 @@ func (c *MarketStackClient) deductEODTokens(ctx context.Context, total int, limi
 	return c.ps.DeductTokens(ctx, c.providerName, requestCount)
 }
 
-// yieldDailies takes a MarketStack API response page and yields History objects to the consumer.
-// It converts each data entry in the page to a History object and yields it. If any entry is malformed, it skips it.
+// yieldEODs takes a MarketStack API response page and yields EOD objects to the consumer.
+// It converts each data entry in the page to an EOD object and yields it. If any entry is malformed, it skips it.
 // If the consumer signals to stop (by returning false), it stops yielding and returns.
-func (c *MarketStackClient) yieldDailies(
+func (c *MarketStackClient) yieldEODs(
 	yield func(marketdata.EOD, error) bool,
 	page marketstackEODResponse,
 ) bool {

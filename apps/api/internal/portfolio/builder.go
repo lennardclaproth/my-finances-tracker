@@ -107,11 +107,11 @@ func (b *Builder) buildPositionSnapshots(
 		return nil, fmt.Errorf("build position snapshots: get transactions: %w", err)
 	}
 	// Get historical market data for the listing from the position open date to today
-	dailies, err := b.mdq.GetEODByListing(ctx, *pos.ListingID, &startDate, nil, 0, 0, sorting.ASC)
+	eods, err := b.mdq.GetEODByListing(ctx, *pos.ListingID, &startDate, nil, 0, 0, sorting.ASC)
 	if err != nil {
-		return nil, fmt.Errorf("build position snapshots: get dailies: %w", err)
+		return nil, fmt.Errorf("build position snapshots: get eods: %w", err)
 	}
-	// Initialize iterators for transactions and daily data, and an accumulator for the position state
+	// Initialize iterators for transactions and EOD data, and an accumulator for the position state
 	txIdx := 0
 	dIdx := 0
 	var prevSnapshot *PositionSnapshot
@@ -153,24 +153,24 @@ func (b *Builder) buildPositionSnapshots(
 			txIdx++
 		}
 		// find marketclose for this day (advance pointer)
-		// If daily data is available, calculate market value based on the close price for that day.
-		for dIdx < len(dailies.Data) && date.StartOfDayUTC(dailies.Data[dIdx].Date).Before(d) {
+		// If EOD data is available, calculate market value based on the close price for that day.
+		for dIdx < len(eods.Data) && date.StartOfDayUTC(eods.Data[dIdx].Date).Before(d) {
 			dIdx++
 		}
-		if dIdx < len(dailies.Data) && date.SameDayUTC(dailies.Data[dIdx].Date, d) {
+		if dIdx < len(eods.Data) && date.SameDayUTC(eods.Data[dIdx].Date, d) {
 			// We prioritize the close price for the day for market value calculation, if available. If
 			// not, we fallback to the open price. If there is no open and close price available, we keep
 			// the previous market value (if any) to avoid having a gap in the market value for this day.
-			if dailies.Data[dIdx].Close > 0 {
-				unitPrice = dailies.Data[dIdx].Close
+			if eods.Data[dIdx].Close > 0 {
+				unitPrice = eods.Data[dIdx].Close
 				unitPriceSet = true
 			}
-			if !unitPriceSet && dailies.Data[dIdx].Open > 0 {
-				unitPrice = dailies.Data[dIdx].Open
+			if !unitPriceSet && eods.Data[dIdx].Open > 0 {
+				unitPrice = eods.Data[dIdx].Open
 				unitPriceSet = true
 			}
 		}
-		// If we don't have daily data for this day, we carry forward the previous market value.
+		// If we don't have EOD data for this day, we carry forward the previous market value.
 		// If a buy or sell transaction occurred on this day we can calculate the market value based on the
 		// transaction price, this is an approximation but it's better than carrying forward the previous market
 		// value without any adjustments.

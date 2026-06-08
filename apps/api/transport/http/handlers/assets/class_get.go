@@ -114,7 +114,7 @@ type ClassGrowthPointResponse struct {
 	TotalWorth string `json:"total_worth"`
 }
 
-// GetAssetClassDetails returns class details with items, growth, and history.
+// GetAssetClassDetails returns class details with items, growth, and mutations.
 //
 // @Summary Get asset class details
 // @Description Returns class details for drawer rendering.

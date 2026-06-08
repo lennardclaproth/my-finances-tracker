@@ -142,7 +142,7 @@ func (q *Queries) GetEODByListing(
 			q.s.SyncEOD(ctx, ls.ID, from, to)
 		}
 	}
-	// Fetch daily data from the database, this will return the existing data if a sync is in progress, or the up to date data if not.
+	// Fetch EOD data from the database, this will return the existing data if a sync is in progress, or the up to date data if not.
 	res, err = getEODResult(
 		ctx,
 		ls,
@@ -179,11 +179,11 @@ func getEODResult(
 		string(sortOrder),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("GetDaily failed to fetch daily data: %w", err)
+		return nil, fmt.Errorf("GetEOD failed to fetch EOD data: %w", err)
 	}
 	totalCount, err := qs.CountEODByListing(ctx, ls.ID, from, to)
 	if err != nil {
-		return nil, fmt.Errorf("GetDaily failed to fetch total daily count: %w", err)
+		return nil, fmt.Errorf("GetEOD failed to fetch total EOD count: %w", err)
 	}
 	res := make([]EOD, 0, len(data))
 	for _, item := range data {

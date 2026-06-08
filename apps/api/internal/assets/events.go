@@ -11,7 +11,7 @@ const (
 )
 
 // SnapshotsRebuildRequested asks the assets feature to rebuild account-level
-// snapshots from mutation history. It is published through the eventbus.Bus by
+// snapshots from mutations. It is published through the eventbus.Bus by
 // the write side after a mutation and consumed by the assets snapshot handler.
 type SnapshotsRebuildRequested struct {
 	AccID uuid.UUID

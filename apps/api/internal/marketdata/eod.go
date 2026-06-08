@@ -8,7 +8,7 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/money"
 )
 
-// EOD is one OHLCV history datapoint for a listing/date.
+// EOD is one OHLCV end-of-day datapoint for a listing/date.
 type EOD struct {
 	ID        uuid.UUID   `db:"id"`
 	ListingID uuid.UUID   `db:"listing_id"`
@@ -24,32 +24,32 @@ type EOD struct {
 }
 
 var (
-	// ErrDailySymbolEmpty indicates missing symbol.
-	ErrDailySymbolEmpty = fmt.Errorf("daily symbol cannot be empty")
-	// ErrDailyListingIDEmpty indicates missing listing identifier.
-	ErrDailyListingIDEmpty = fmt.Errorf("daily listing id cannot be empty")
+	// ErrEODSymbolEmpty indicates missing symbol.
+	ErrEODSymbolEmpty = fmt.Errorf("eod symbol cannot be empty")
+	// ErrEODListingIDEmpty indicates missing listing identifier.
+	ErrEODListingIDEmpty = fmt.Errorf("eod listing id cannot be empty")
 )
 
-// NewEOD constructs a daily datapoint from decimal prices.
+// NewEOD constructs an EOD datapoint from decimal prices.
 func NewEOD(symbol string, date time.Time, open, close, high, low float64, volume int64) (EOD, error) {
 	if symbol == "" {
-		return EOD{}, ErrDailySymbolEmpty
+		return EOD{}, ErrEODSymbolEmpty
 	}
 	openCents, err := money.NewPrice(open)
 	if err != nil {
-		return EOD{}, fmt.Errorf("NewDaily failed, invalid open price: %w", err)
+		return EOD{}, fmt.Errorf("NewEOD failed, invalid open price: %w", err)
 	}
 	closeCents, err := money.NewPrice(close)
 	if err != nil {
-		return EOD{}, fmt.Errorf("NewDaily failed, invalid close price: %w", err)
+		return EOD{}, fmt.Errorf("NewEOD failed, invalid close price: %w", err)
 	}
 	highCents, err := money.NewPrice(high)
 	if err != nil {
-		return EOD{}, fmt.Errorf("NewDaily failed, invalid high price: %w", err)
+		return EOD{}, fmt.Errorf("NewEOD failed, invalid high price: %w", err)
 	}
 	lowCents, err := money.NewPrice(low)
 	if err != nil {
-		return EOD{}, fmt.Errorf("NewDaily failed, invalid low price: %w", err)
+		return EOD{}, fmt.Errorf("NewEOD failed, invalid low price: %w", err)
 	}
 	return EOD{
 		ID:        uuid.New(),

@@ -2,7 +2,7 @@
 
 ## Scope
 - This repository is a monorepo.
-- Main applications live in `apps/api` and `apps/web`.
+- Main applications live in `apps/api` (Go backend) and `web` (SvelteKit frontend — the directory is `web/`, not `apps/web`).
 - Apply these instructions for all work unless a more specific `AGENTS.md` exists deeper in the tree.
 
 ## Commands
@@ -37,7 +37,7 @@
 
 ## Backend architecture (`apps/api`)
 - Prefer package-by-feature organization.
-- Existing feature-oriented packages such as account, portfolio, cashflow, and vendors should remain coherent.
+- Existing feature-oriented packages such as account, portfolio, cashflow, and vendor should remain coherent.
 - Keep controllers thin.
 - Controllers may parse requests, validate inputs, and map transport models to application/domain inputs.
 - Controllers must not contain business rules, orchestration logic, or domain decision-making.
@@ -55,7 +55,7 @@
 - Use appropriate log levels: debug, info, warning, error.
 - Avoid logging sensitive data.
 
-## Frontend architecture (`apps/web`)
+## Frontend architecture (`web`)
 - Follow the Atomic Design pattern strictly.
 - Preserve and extend the established atom/molecule/organism/template/page structure.
 - Do not bypass the Atomic Design structure without explicit instruction.
@@ -75,21 +75,18 @@
 - Run `make swagger` for API-related work before finalizing.
 
 ## Feature documentation
-- Feature documentation lives in `/docs/features`.
-- Feature files use names like `001_FEATURE_NAME.md`, `010_FEATURE_NAME.md`, or `1001_FEATURE_NAME.md`.
-- The numeric identifier is at least three digits and comes from the changelog sequence.
-- Read the relevant feature document before editing an existing feature.
-- When a feature changes, update its feature document in the same task.
+- Feature documentation is consolidated in `apps/api/docs/features/FEATURES.md` — a single short overview of all features.
+- The legacy per-feature numbered files (`001_FEATURE_NAME.md`, …) under `/docs/features` have been removed; do not recreate them without explicit instruction.
+- Read `FEATURES.md` before editing an existing feature.
+- When a feature's behavior changes, update its entry in `FEATURES.md` in the same task.
 - Also update the root `CHANGELOG.md` in the same task.
-- Changelog entries must go under `Unreleased` and use the Keep a Changelog categories `Added`, `Changed`, and `Fixed`.
+- Changelog entries go under `Unreleased` and use the Keep a Changelog categories `Added`, `Changed`, and `Fixed`.
 
 ## Feature identification rules
-- Existing feature IDs will usually be provided.
-- For new features, infer the next feature ID from `CHANGELOG.md`.
-- If a changed feature cannot be mapped confidently to an existing feature document, stop and ask.
-- If a feature document does not exist for a feature that clearly needs one, ask whether the work is large enough to be treated as a feature before creating it.
-- A feature is generally large enough when it introduces a new user-visible capability, meaningful backend domain behavior, or a substantial UI workflow change.
-- When a new feature is confirmed, create the feature document in `/docs/features` and add the corresponding changelog entry.
+- The `CHANGELOG.md` still tracks features with `[NNN]` IDs (at least three digits).
+- Existing feature IDs will usually be provided; for new features, infer the next ID from `CHANGELOG.md`.
+- If a changed feature cannot be mapped confidently to an existing changelog feature, stop and ask.
+- A feature is generally large enough to warrant a changelog entry when it introduces a new user-visible capability, meaningful backend domain behavior, or a substantial UI workflow change.
 - Changelog entries for feature work must explicitly mention the feature ID.
 
 ## Maintaining this file

@@ -242,7 +242,7 @@ CREATE TABLE portfolio_snapshots (
 -- Market data: end-of-day prices + upload tracking.
 -- ---------------------------------------------------------------------------
 
-CREATE TABLE dailies (
+CREATE TABLE eods (
     id          TEXT PRIMARY KEY,
     listing_id  TEXT     NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
     symbol      TEXT     NOT NULL,
@@ -254,10 +254,10 @@ CREATE TABLE dailies (
     volume      INTEGER  NOT NULL,
     created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_dailies_listing_date UNIQUE (listing_id, date)
+    CONSTRAINT uq_eods_listing_date UNIQUE (listing_id, date)
 );
 
-CREATE TABLE daily_uploads (
+CREATE TABLE eod_uploads (
     id                TEXT PRIMARY KEY,
     listing_id        TEXT     NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
     source            TEXT     NOT NULL,
@@ -310,7 +310,7 @@ CREATE TABLE asset_items (
     CONSTRAINT uq_asset_items_class_name UNIQUE (class_id, name)
 );
 
-CREATE TABLE asset_histories (
+CREATE TABLE asset_mutations (
     id                TEXT PRIMARY KEY,
     account_id        TEXT     NOT NULL REFERENCES assets_accounts(account_id) ON DELETE CASCADE,
     class_id          TEXT     NOT NULL REFERENCES asset_classes(id) ON DELETE CASCADE,
@@ -359,8 +359,8 @@ CREATE INDEX idx_portfolio_positions_listing_id ON positions (listing_id);
 CREATE INDEX idx_position_snapshots_account_day ON position_snapshots (account_id, occurred_at);
 CREATE INDEX idx_position_snapshots_listing_id ON position_snapshots (listing_id);
 
-CREATE INDEX idx_daily_uploads_status_created ON daily_uploads (status, created_at);
-CREATE INDEX idx_daily_uploads_listing_id ON daily_uploads (listing_id);
+CREATE INDEX idx_eod_uploads_status_created ON eod_uploads (status, created_at);
+CREATE INDEX idx_eod_uploads_listing_id ON eod_uploads (listing_id);
 
 CREATE INDEX idx_providers_name_mode ON providers (name, ingestion_mode);
 
@@ -368,9 +368,9 @@ CREATE INDEX idx_asset_classes_account_source ON asset_classes (account_id, sour
 
 CREATE INDEX idx_asset_items_account_class_archived ON asset_items (account_id, class_id, archived);
 
-CREATE INDEX idx_asset_histories_account_class_date ON asset_histories (account_id, class_id, effective_date DESC);
-CREATE INDEX idx_asset_histories_account_date ON asset_histories (account_id, effective_date DESC);
-CREATE INDEX idx_asset_histories_item_id ON asset_histories (item_id);
+CREATE INDEX idx_asset_mutations_account_class_date ON asset_mutations (account_id, class_id, effective_date DESC);
+CREATE INDEX idx_asset_mutations_account_date ON asset_mutations (account_id, effective_date DESC);
+CREATE INDEX idx_asset_mutations_item_id ON asset_mutations (item_id);
 
 -- +goose StatementEnd
 
@@ -378,12 +378,12 @@ CREATE INDEX idx_asset_histories_item_id ON asset_histories (item_id);
 -- +goose StatementBegin
 
 DROP TABLE IF EXISTS asset_snapshots;
-DROP TABLE IF EXISTS asset_histories;
+DROP TABLE IF EXISTS asset_mutations;
 DROP TABLE IF EXISTS asset_items;
 DROP TABLE IF EXISTS asset_classes;
 DROP TABLE IF EXISTS assets_accounts;
-DROP TABLE IF EXISTS daily_uploads;
-DROP TABLE IF EXISTS dailies;
+DROP TABLE IF EXISTS eod_uploads;
+DROP TABLE IF EXISTS eods;
 DROP TABLE IF EXISTS portfolio_snapshots;
 DROP TABLE IF EXISTS position_snapshots;
 DROP TABLE IF EXISTS portfolio_transactions;
