@@ -27,6 +27,14 @@ type Queries struct {
 	s  *Syncer
 }
 
+// NewQueries creates market-data read-side use cases.
+func NewQueries(qs QueryStore, s *Syncer) *Queries {
+	return &Queries{qs: qs, s: s}
+}
+
+// NewListingHandler creates an empty query handler.
+//
+// Deprecated: use NewQueries with explicit store and syncer dependencies.
 func NewListingHandler() *Queries {
 	return &Queries{}
 }
@@ -138,7 +146,7 @@ func (q *Queries) GetEODByListing(
 		if err != nil {
 			return nil, fmt.Errorf("get eod by listing: %w: %w", ErrShouldAccumulateFailed, err)
 		}
-		if err == nil {
+		if err == nil && q.s != nil {
 			q.s.SyncEOD(ctx, ls.ID, from, to)
 		}
 	}

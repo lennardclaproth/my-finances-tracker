@@ -16,7 +16,8 @@ else
 endif
 
 BINARY_PATH := ./apps/api/bin/$(BINARY_NAME)$(EXE)
-MAIN_PATH := ./apps/api/cmd/server/main.go
+RUN_BINARY_PATH := ./bin/$(BINARY_NAME)$(EXE)
+MAIN_PATH := ./apps/api/cmd/my-finances-tracker/main.go
 API_DIR := ./apps/api
 WEB_DIR := ./apps/web
 COVERAGE_FILE := coverage.out
@@ -70,7 +71,7 @@ build:
 ## run: Build and run the application
 run: build
 	@echo "Running $(BINARY_NAME)..."
-	@$(BINARY_PATH)
+	@cd $(API_DIR) && $(RUN_BINARY_PATH)
 
 ## dev: Run with hot reload using air
 dev: env

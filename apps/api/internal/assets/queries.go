@@ -13,6 +13,11 @@ type Queries struct {
 	qs QueryStore
 }
 
+// NewQueries creates assets read-side use cases.
+func NewQueries(qs QueryStore) *Queries {
+	return &Queries{qs: qs}
+}
+
 // QueryStore reads asset classes, bounds, and snapshots for the read models.
 type QueryStore interface {
 	ClassesForAccount(ctx context.Context, accID uuid.UUID, includeArchived bool) (map[uuid.UUID]*Class, error)

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -360,6 +361,51 @@ func (s *SQLXPortfolioStore) Clean(ctx context.Context, accID uuid.UUID) error {
 
 // --- Queries ----------------------------------------------------------------
 
+// FetchForAccount returns portfolio transactions for an account with optional
+// filters, date sorting, and offset pagination.
+func (s *SQLXPortfolioStore) FetchForAccount(
+	ctx context.Context,
+	query portfolio.TransactionListQuery,
+) (*portfolio.TransactionListResult, error) {
+	limit := query.Limit
+	if limit <= 0 {
+		limit = 25
+	}
+
+	whereClause, args := buildPortfolioTransactionWhereClause(query)
+	executor := s.db.GetExecutor(ctx)
+
+	totalQuery := s.db.Rebind(fmt.Sprintf("SELECT COUNT(1) FROM %s t%s", s.transactionsTable, whereClause))
+	total := 0
+	if err := sqlx.GetContext(ctx, executor, &total, totalQuery, args...); err != nil {
+		return nil, fmt.Errorf("portfolio store: count transactions: %w", err)
+	}
+
+	sortOrder := normalizeSortOrder(string(query.SortOrder))
+	dataQuery := s.db.Rebind(fmt.Sprintf(`
+		SELECT
+			t.*,
+			p.listing_id
+		FROM %s t
+		LEFT JOIN %s p ON p.id = t.position_id
+		%s
+		ORDER BY t.occurred_at %s, t.row_number %s, t.created_at %s, t.id %s
+		LIMIT ?
+		OFFSET ?
+	`, s.transactionsTable, s.positionsTable, whereClause, sortOrder, sortOrder, sortOrder, sortOrder))
+	dataArgs := append(append([]any{}, args...), limit, query.Offset)
+
+	var rows []portfolio.TransactionWithListingID
+	if err := sqlx.SelectContext(ctx, executor, &rows, dataQuery, dataArgs...); err != nil {
+		return nil, fmt.Errorf("portfolio store: fetch transactions: %w", err)
+	}
+
+	return &portfolio.TransactionListResult{
+		Total:        total,
+		Transactions: rows,
+	}, nil
+}
+
 // SnapshotsForAccount returns portfolio snapshots for an account within an optional
 // date range, ordered by occurrence (default ascending), optionally paginated.
 func (s *SQLXPortfolioStore) SnapshotsForAccount(
@@ -443,4 +489,52 @@ func (s *SQLXPortfolioStore) PositionsWithLatestSnapshot(
 		return nil, fmt.Errorf("portfolio store: positions with latest snapshot: %w", err)
 	}
 	return rows, nil
+}
+
+func buildPortfolioTransactionWhereClause(query portfolio.TransactionListQuery) (string, []any) {
+	conditions := []string{"t.account_id = ?"}
+	args := []any{query.AccountID}
+
+	if query.From != nil {
+		conditions = append(conditions, "t.occurred_at >= ?")
+		args = append(args, *query.From)
+	}
+	if query.To != nil {
+		conditions = append(conditions, "t.occurred_at <= ?")
+		args = append(args, *query.To)
+	}
+	if query.Type != nil {
+		conditions = append(conditions, "t.type = ?")
+		args = append(args, string(*query.Type))
+	}
+	if query.Origin != nil {
+		conditions = append(conditions, "t.origin = ?")
+		args = append(args, string(*query.Origin))
+	}
+
+	appendContains := func(column string, value string) {
+		v := strings.TrimSpace(value)
+		if v == "" {
+			return
+		}
+		conditions = append(conditions, fmt.Sprintf("LOWER(%s) LIKE ?", column))
+		args = append(args, "%"+strings.ToLower(v)+"%")
+	}
+
+	appendContains("t.source", query.Source)
+	if listing := strings.TrimSpace(query.Listing); listing != "" {
+		pattern := "%" + strings.ToLower(listing) + "%"
+		conditions = append(conditions, "(LOWER(COALESCE(t.symbol, '')) LIKE ? OR LOWER(COALESCE(t.isin, '')) LIKE ?)")
+		args = append(args, pattern, pattern)
+	}
+	if q := strings.TrimSpace(query.Q); q != "" {
+		pattern := "%" + strings.ToLower(q) + "%"
+		conditions = append(
+			conditions,
+			"(LOWER(t.description) LIKE ? OR LOWER(t.source) LIKE ? OR LOWER(COALESCE(t.symbol, '')) LIKE ? OR LOWER(COALESCE(t.isin, '')) LIKE ?)",
+		)
+		args = append(args, pattern, pattern, pattern, pattern)
+	}
+
+	return " WHERE " + strings.Join(conditions, " AND "), args
 }

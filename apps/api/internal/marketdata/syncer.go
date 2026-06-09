@@ -30,6 +30,14 @@ type Syncer struct {
 	efs map[Source]EODFetcher
 }
 
+// NewSyncer creates an EOD syncer using fetchers keyed by listing source.
+func NewSyncer(ss SyncStore, fetchers map[Source]EODFetcher) *Syncer {
+	if fetchers == nil {
+		fetchers = map[Source]EODFetcher{}
+	}
+	return &Syncer{ss: ss, efs: fetchers}
+}
+
 type SyncEODResult struct {
 	ListingID     uuid.UUID
 	Symbol        string
@@ -71,6 +79,15 @@ func (s *Syncer) SyncEOD(ctx context.Context, lsID uuid.UUID, from, to *time.Tim
 	if err != nil {
 		return nil, fmt.Errorf("sync eod: failed to get listing: %w", err)
 	}
+	if listing == nil {
+		return nil, fmt.Errorf("sync eod: %w", ErrListingNotFound)
+	}
+
+	result = &SyncEODResult{
+		ListingID: listing.ID,
+		Symbol:    listing.Symbol,
+	}
+
 	// If from is nil it means there is no override on the accumulation date
 	// so we should continue accumulating from the last accumulated date, which is the accumulated end date.
 	if from == nil {
@@ -93,7 +110,7 @@ func (s *Syncer) SyncEOD(ctx context.Context, lsID uuid.UUID, from, to *time.Tim
 	// Fetch EOD data from the EOD fetcher and persist it, this will return an error for each individual day that fails to
 	// fetch or persist, but will continue processing the rest of the data.
 	for eod, fetchErr := range c.GetEOD(ctx, []string{listing.Symbol}, from, to) {
-		if err != nil {
+		if fetchErr != nil {
 			result.FetchErrors = append(result.FetchErrors, fetchErr)
 			continue
 		}
@@ -103,7 +120,9 @@ func (s *Syncer) SyncEOD(ctx context.Context, lsID uuid.UUID, from, to *time.Tim
 		// TODO: implement batch insert
 		if insertErr := s.ss.InsertEOD(ctx, &eod); insertErr != nil {
 			result.InsertErrors = append(result.InsertErrors, insertErr)
+			continue
 		}
+		result.InsertedCount++
 	}
 	if rangeErr := s.ss.SetAccumulatedRange(ctx, lsID, from, to); rangeErr != nil {
 		result.AccumError = rangeErr
