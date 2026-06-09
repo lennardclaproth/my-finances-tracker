@@ -167,16 +167,14 @@ the new structure. See [Refactor state](#refactor-state).
 | `internal/account/errors.go` | `ErrAccountNotFound` / `ErrAccountAlreadyExists` / `ErrAccountNameRequired` |
 | `transport/http/handlers/account/create.go` | `POST /accounts` handler + DTOs + error mapping |
 | `internal/storage/sqlx_account_store.go` | `SQLXAccountStore` implementing both store interfaces |
-| `internal/bootstrap/accounts.go` | Seeds a default account on startup (via the store, bypassing `Commands`) |
+| `internal/bootstrap/accounts.go` | Seeds a default account on startup through `account.Commands`/`account.Queries` |
 | `transport/messaging/handlers/{portfolio,assets}/account_created.go` | Projection subscribers |
 
 ## Refactor state
 
-- **No `account.NewCommands` constructor** exists and `Commands` has unexported fields, so
-  the write side cannot yet be composed outside the package; the only route registration is
-  in the stale `cmd/server/main.go`. No compiling entrypoint currently serves `POST /accounts`.
-- **Bootstrap seeding** inserts the default account directly through the store, so it does
-  **not** emit `account.created` — the seeded account's projections are not created via the
-  event path.
+- `account.NewCommands` now exposes the write side for composition, but no compiling entrypoint
+  currently serves `POST /accounts`.
+- **Bootstrap seeding** goes through `account.Commands` and follows its event behavior when it
+  creates the default account.
 - **Not implemented:** update/delete/list account operations; a `GET /accounts` read endpoint;
   cashflow and importer `account.created` projections.

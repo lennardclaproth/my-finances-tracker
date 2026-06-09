@@ -2,12 +2,12 @@ package vendor
 
 import "context"
 
-// CreateHandler creates supported vendors.
+// Commands creates supported vendors.
 type Commands struct {
 	creator VendorCreator
 }
 
-// NewCreateHandler returns a vendor create handler.
+// NewCommands returns vendor write-side use cases.
 func NewCommands(creator VendorCreator) *Commands {
 	return &Commands{creator: creator}
 }

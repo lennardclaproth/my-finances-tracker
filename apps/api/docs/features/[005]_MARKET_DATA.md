@@ -256,5 +256,6 @@ the importer's event flow (`import.accepted` → process → `import.completed`/
   MarketStack fetcher exists (no Alpha Vantage `EODFetcher`).
 - **No provider CRUD API** (providers are bootstrap-only) and **no admin/role middleware** —
   the "admin" framing in `FEATURES.md` is not enforced in code.
-- `marketdata.Commands`/`Queries`/`Syncer` have no real constructors yet, and routes are only
-  wired in the stale `cmd/server/main.go`.
+- `marketdata.Commands` has a startup constructor for provider bootstrap, but `Queries` and
+  `Syncer` do not yet have complete startup constructors, and routes are only wired in the
+  stale `cmd/server/main.go`.

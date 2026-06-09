@@ -206,8 +206,9 @@ re-discovered as bugs.
   `internal/http`, `internal/cashflow/service`, and reads a non-existent `cfg.Agent.*`).
   Nothing wires the new HTTP routes or bus subscriptions yet.
 - **`eventbus.Subscribe[T]` has zero call sites** — handlers exist but are not subscribed ([017]).
-- **`marketdata.Commands`/`Queries`/`Syncer` have no real constructors** — the feature is
-  currently un-composable ([005]).
+- **Market-data runtime wiring is partial** — `Commands` can now be composed for provider
+  bootstrap, but `Queries`/`Syncer`, the full EOD syncer/fetcher path, and market-data routes
+  remain unwired ([005]).
 - **`GET /portfolio/transactions` has no store implementation** — the `FetchForAccount`
   interface is unsatisfied, so the endpoint can't be served ([013]).
 - **Cashflow async bulk tagging is unimplemented** (`TagByFilter` TODO; dead 202 branch); the

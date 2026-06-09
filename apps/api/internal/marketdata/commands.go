@@ -10,17 +10,32 @@ import (
 	"github.com/lennardclaproth/my-finances-tracker/internal/money"
 )
 
-// CommandStore persists market-data listings and EOD datapoints.
+// CommandStore persists market-data listings, EOD datapoints, and providers.
 type CommandStore interface {
 	Get(ctx context.Context, lsID uuid.UUID) (*Listing, error)
 	Create(ctx context.Context, listing *Listing) error
 	Update(ctx context.Context, listing *Listing) error
 	CreateEODs(ctx context.Context, eods []*EOD) (int, error)
+	CreateProvider(ctx context.Context, provider *Provider) error
 }
 
+// Commands exposes market-data write-side use cases.
 type Commands struct {
 	cs CommandStore
 	s  *Syncer
+}
+
+// NewCommands creates market-data write-side use cases.
+func NewCommands(cs CommandStore, s *Syncer) *Commands {
+	return &Commands{cs: cs, s: s}
+}
+
+// CreateProvider persists provider metadata through the market-data feature boundary.
+func (c *Commands) CreateProvider(ctx context.Context, provider *Provider) error {
+	if err := c.cs.CreateProvider(ctx, provider); err != nil {
+		return fmt.Errorf("create provider: %w", err)
+	}
+	return nil
 }
 
 // CreateListing creates a new listing and persists it.

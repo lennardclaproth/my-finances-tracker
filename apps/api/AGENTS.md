@@ -18,6 +18,8 @@
 - Supporting packages include `storage`, `eventbus`, `notify`, `bootstrap`, `logging`, and `observability`. (The old `internal/jobs` package has been removed; asynchronous work now flows through the event bus.)
 - Use `Commands` and `Queries` as the default application/domain boundary when they fit the implementation.
 - Other feature-level collaborators such as builders, syncers, processors, or services may be appropriate when that is the existing nearby pattern.
+- Bootstrap code should save data through the owning feature package (for example, `account` for accounts, `vendor` for vendors, and `marketdata` for providers) instead of adding new storage-level startup wiring.
+- If bootstrap needs a feature-level function that does not exist yet, do not create it unless the task explicitly requires that API; keep the change minimal and document the gap.
 - Before adding a helper, utility, abstraction, validator, mapper, error type, logger wrapper, package, or reusable type, search `apps/api` for an established equivalent or nearby pattern.
 - Before adding date parsing, date range, date formatting, decimal parsing, or decimal formatting helpers, check existing packages such as `internal/date` and `internal/money` and reuse them when their behavior matches.
 - Do not add adapter interfaces, reflection bridges, or duplicate domain types just to avoid updating the real boundary. Prefer feature-owned query/command types, have storage implement those feature interfaces directly, and reuse shared packages such as `internal/sorting` for sort fields and directions.
@@ -61,6 +63,7 @@
 - Do not refactor unrelated code.
 - Do not rename, reorganize, clean up, or modernize nearby code unless it is directly necessary for the task.
 - Clean up only issues introduced by the current change unless broader cleanup is explicitly requested.
+- Clean up temporary files, caches, scratch plans, and generated build artifacts created during the task unless they are intentionally part of the requested output.
 - During the current refactor, agents are not required to fix unrelated compile-breaking or consistency issues discovered elsewhere in the refactor.
 - If unrelated refactor breakage blocks the requested change, explain the blocker and ask how to proceed.
 

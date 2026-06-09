@@ -142,7 +142,7 @@ None. The `vendor` package publishes and consumes no events.
 - **No vendor management API** — vendors are a hard-coded allow-list, seeded only; `active`
   / `import_disabled` cannot be toggled without a direct DB write.
 - A duplicate legacy `CreateHandler` (`internal/vendor/create.go`) still exists alongside the
-  newer `Commands`; bootstrap uses the legacy one. The `ActiveVendorLister` interface is
+  newer `Commands`; bootstrap uses `Commands`. The `ActiveVendorLister` interface is
   effectively dead aside from a `var _` assertion.
 - The `GET /vendors` route is only registered in the stale `cmd/server/main.go` (against an
   older `handlers.GetVendors`); the new `vendors.List` handler is not yet wired.

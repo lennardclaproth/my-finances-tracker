@@ -13,9 +13,15 @@ type CommandStore interface {
 	Create(ctx context.Context, acc *Account) error
 }
 
+// Commands exposes account write-side use cases.
 type Commands struct {
 	c CommandStore
 	b eventbus.Bus
+}
+
+// NewCommands creates account write-side use cases.
+func NewCommands(c CommandStore, b eventbus.Bus) *Commands {
+	return &Commands{c: c, b: b}
 }
 
 // Create persists an account and publishes a Created event when a
@@ -36,6 +42,8 @@ func (c *Commands) Create(ctx context.Context, id *uuid.UUID, externalID *string
 	if err := c.c.Create(ctx, acc); err != nil {
 		return nil, fmt.Errorf("create: failed to create account: %w", err)
 	}
-	c.b.Publish(ctx, TopicCreated, Created{AccID: acc.ID})
+	if c.b != nil {
+		_ = c.b.Publish(ctx, TopicCreated, Created{AccID: acc.ID})
+	}
 	return &acc.ID, nil
 }

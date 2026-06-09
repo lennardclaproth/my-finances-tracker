@@ -10,10 +10,13 @@ import (
 )
 
 // Vendors bootstraps all supported vendors and skips existing rows.
-func Vendors(ctx context.Context, vc vendor.VendorCreator, logger logging.Logger) {
-	h := vendor.NewCreateHandler(vc)
+func Vendors(ctx context.Context, commands *vendor.Commands, logger logging.Logger) {
+	if commands == nil {
+		panic(fmt.Errorf("bootstrap vendors: vendor commands are required"))
+	}
+
 	for vname, vtype := range vendor.SupportedVendors {
-		err := h.Handle(ctx, vname, vtype)
+		err := commands.Handle(ctx, vname, vtype)
 		if err == nil {
 			continue
 		}

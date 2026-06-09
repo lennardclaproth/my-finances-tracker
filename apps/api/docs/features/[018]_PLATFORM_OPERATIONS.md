@@ -63,6 +63,7 @@ classDiagram
         +Accounts(ctx)
         +Providers(ctx, cfg)
     }
+    class FeaturePackages
     class Config {
         +ReadConfig() Config
     }
@@ -74,7 +75,7 @@ classDiagram
     Logger ..> Observability : context fields + filter
     DB ..> Observability : apmsql spans (Postgres)
     Migrator ..> DB
-    Bootstrap ..> DB
+    Bootstrap ..> FeaturePackages : seed owned data
     Server ..> Config
 
     note for Observability "allowlist (deny-by-default): only safe keys like\ntrace.id, request_id, account_id... reach logs/labels"
@@ -157,11 +158,16 @@ flattened SQLite name.
 | Seeder | Seeds | Idempotency |
 | --- | --- | --- |
 | `Vendors` | the `SupportedVendors` allow-list | skips `ErrVendorAlreadyExists` |
-| `Accounts` | one default account (fixed UUID, name "Lennard Claproth") | `GetByID` first; tolerates `ErrAccountAlreadyExists` |
-| `Providers` | API providers per configured key + the manual `brandnewday` provider | relies on store dedupe; skips providers with no keys |
+| `Accounts` | one default account (fixed UUID, name "Lennard Claproth") | `account.Queries.GetByID` first; tolerates `ErrAccountAlreadyExists` |
+| `Providers` | API providers per configured key + the manual `brandnewday` provider | relies on provider dedupe; skips providers with no keys |
 
-Seeders use the store-level interfaces directly (not the feature `Commands`), so seeded rows
-do **not** emit domain events (e.g. the default account does not fire `account.created`).
+Bootstrap should respect feature ownership when seeding data: account rows go through the
+`account` package, vendors through `vendor`, and providers through `marketdata`. New startup
+wiring should not bypass the owning package by calling storage directly. Event behavior should
+come from the feature-level function used for the seed.
+
+During the refactor, if a bootstrap-specific feature function does not exist yet, leave that
+gap explicit rather than adding a new function only to wire startup.
 
 ## Configuration
 
@@ -210,6 +216,4 @@ Both go through request-identifier + request-logging middleware. The `docs/` pac
   `internal/http`, `internal/cashflow/service`) and reads a non-existent `cfg.Agent.*`, so it
   does not compile. Consequently `transport/http`, `internal/bootstrap`, `internal/eventbus`,
   and `migrations` are not exercised by any buildable `main`.
-- `bootstrap.Accounts`' old caller passes a removed `account.NewCreateService`; the seeder
-  itself expects `account.CommandStore`, which storage satisfies.
 - SQLite is not APM-instrumented (only Postgres goes through `apmsql`).
