@@ -78,5 +78,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [020] Fixed web-app integration maintainability by documenting shared API DTO contracts used by frontend service consumers.
 - [021] Fixed Makefile lint/vet/fmt execution from repository root by running Go tooling within `apps/api`.
 - [021] Fixed Swagger route observability consistency by applying request-logging middleware to `/swagger/`.
+- [024] Fixed asset worth adjustment rejecting every request by correcting the direction validation (`||` → `&&`) so only directions that are neither `INCREASE` nor `DECREASE` are rejected.
 - [024] Fixed `/assets/classes/{class_id}` growth data to read from the newest bounded history window, preventing stale oldest-window graph values.
 - [024] Fixed assets-page “correct then drop” top worth behavior by removing client recomputation drift after graph load.

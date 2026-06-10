@@ -9,7 +9,7 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceFolder}/apps/api/cmd/server",
+            "program": "${workspaceFolder}/apps/api/cmd/my-finances-tracker",
             "cwd": "${workspaceFolder}/apps/api",
             "envFile": "${workspaceFolder}/apps/api/.env",
             "args": []

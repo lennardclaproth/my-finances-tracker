@@ -15,26 +15,30 @@ else
   EXE :=
 endif
 
-BINARY_PATH := ./apps/api/bin/$(BINARY_NAME)$(EXE)
-RUN_BINARY_PATH := ./bin/$(BINARY_NAME)$(EXE)
-MAIN_PATH := ./apps/api/cmd/my-finances-tracker/main.go
+# Single entrypoint: cmd/my-finances-tracker (the old cmd/server was removed).
+# The frontend lives in web/, not apps/web.
 API_DIR := ./apps/api
-WEB_DIR := ./apps/web
+WEB_DIR := ./web
+CMD_PKG := cmd/my-finances-tracker
+MAIN_PKG := $(API_DIR)/$(CMD_PKG)
+BIN_DIR := $(API_DIR)/bin
+BINARY_PATH := $(BIN_DIR)/$(BINARY_NAME)$(EXE)
+RUN_BINARY := ./bin/$(BINARY_NAME)$(EXE)
 COVERAGE_FILE := coverage.out
-MIGRATION_DIR := ./apps/api/migrations/postgres
+MIGRATION_DIR := $(API_DIR)/migrations/postgres
 
 # --- Helpers (cross-platform commands) ---
 ifeq ($(IS_WINDOWS),1)
   # PowerShell helpers
-  MKDIR_BIN = powershell -NoProfile -ExecutionPolicy Bypass -Command "New-Item -ItemType Directory -Force 'bin' | Out-Null"
-  RM_BIN    = powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path 'bin') { Remove-Item -Recurse -Force 'bin' }"
+  MKDIR_BIN = powershell -NoProfile -ExecutionPolicy Bypass -Command "New-Item -ItemType Directory -Force '$(BIN_DIR)' | Out-Null"
+  RM_BIN    = powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '$(BIN_DIR)') { Remove-Item -Recurse -Force '$(BIN_DIR)' }"
   RM_COV    = powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '$(COVERAGE_FILE)') { Remove-Item -Force '$(COVERAGE_FILE)' }"
   ENV_COPY  = powershell -NoProfile -ExecutionPolicy Bypass -Command "if (!(Test-Path '.env')) { Write-Host 'Creating .env from config.example.env...'; Copy-Item 'config.example.env' '.env'; Write-Host '.env created. Please update with your local settings.' }"
   REQUIRE_NAME = powershell -NoProfile -ExecutionPolicy Bypass -Command "if ([string]::IsNullOrWhiteSpace('$(name)')) { Write-Error 'Error: migration name is required. Usage: make migrate-create name=migration_name'; exit 1 }"
 else
   # POSIX helpers
-  MKDIR_BIN = mkdir -p bin
-  RM_BIN    = rm -rf bin/
+  MKDIR_BIN = mkdir -p $(BIN_DIR)
+  RM_BIN    = rm -rf $(BIN_DIR)
   RM_COV    = rm -f $(COVERAGE_FILE)
   ENV_COPY  = sh -c 'if [ ! -f .env ]; then echo "Creating .env from config.example.env..."; cp config.example.env .env; echo ".env created. Please update with your local settings."; fi'
   REQUIRE_NAME = sh -c 'if [ -z "$(name)" ]; then echo "Error: migration name is required. Usage: make migrate-create name=migration_name"; exit 1; fi'
@@ -65,18 +69,18 @@ help:
 build:
 	@echo "Building $(BINARY_NAME)..."
 	@$(MKDIR_BIN)
-	@go build -o $(BINARY_PATH) $(MAIN_PATH)
+	@go build -o $(BINARY_PATH) $(MAIN_PKG)
 	@echo "Build complete: $(BINARY_PATH)"
 
 ## run: Build and run the application
 run: build
 	@echo "Running $(BINARY_NAME)..."
-	@cd $(API_DIR) && $(RUN_BINARY_PATH)
+	@cd $(API_DIR) && $(RUN_BINARY)
 
 ## dev: Run with hot reload using air
 dev: env
 	@echo "Starting development server with hot reload..."
-	@air
+	@cd $(API_DIR) && air --build.cmd "go build -o $(RUN_BINARY) ./$(CMD_PKG)" --build.bin "$(RUN_BINARY)"
 
 ## test: Run all tests
 test:
@@ -115,8 +119,8 @@ web-lint:
 ## swagger: Generate Swagger documentation
 swagger:
 	@echo "Generating Swagger documentation..."
-	@swag init -g $(MAIN_PATH) -o ./apps/api/docs
-	@echo "Swagger docs generated in ./apps/api/docs"
+	@cd $(API_DIR) && swag init -g $(CMD_PKG)/main.go -o docs
+	@echo "Swagger docs generated in $(API_DIR)/docs"
 
 ## clean: Remove binary and coverage files
 clean:
@@ -127,7 +131,7 @@ clean:
 
 ## env: Create .env from example if it doesn't exist
 env:
-	@$(ENV_COPY)
+	@cd $(API_DIR) && $(ENV_COPY)
 
 ## install-tools: Install required development tools
 install-tools:

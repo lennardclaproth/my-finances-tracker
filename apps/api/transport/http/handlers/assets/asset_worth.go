@@ -117,7 +117,7 @@ type AdjustAssetWorthRequest struct {
 
 func (r AdjustAssetWorthRequest) isValid() (bool, map[string]string) {
 	problems := make(map[string]string)
-	if r.Direction != string(assets.ChangeDirectionIncrease) || r.Direction != string(assets.ChangeDirectionDecrease) {
+	if r.Direction != string(assets.ChangeDirectionIncrease) && r.Direction != string(assets.ChangeDirectionDecrease) {
 		problems["direction"] = "direction must be either INCREASE or DECREASE"
 	}
 
