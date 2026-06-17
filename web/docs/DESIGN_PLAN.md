@@ -23,9 +23,11 @@
 The §9 open decisions have been resolved, and a stub-data requirement has been added so the portal can
 run and be tested **completely independently of the Go API**:
 
-- **Charting library → Chart.js 4** (approved). Charts are Phase 4, so the `chart.js` dependency is
-  **deferred until Phase 4**; `src/lib/charts/theme.ts` is created now as framework-agnostic palette +
-  structural-token data (consumed by the Chart.js wrappers later). No unused dependency is added early.
+- **Charting library → Chart.js 4** (approved, **added in Phase 4**). `src/lib/charts/` holds the
+  framework-agnostic palette/structure (`theme.ts`), Chart.js registration (`setup.ts`), option
+  builders (`config.ts`), the dashed-grid/zero-line plugin (`plugins.ts`), the area-gradient helper
+  (`gradient.ts`), and the shared drag range-selection plugin (`rangeSelect.ts`). All canvas code is
+  client-guarded (`browser` + `onDestroy`), so `npm run build` (SSR) stays clean.
 - **Popover → hand-rolled** (zero new deps): outside-click, controlled/uncontrolled, optional portal,
   viewport-aware positioning written by hand.
 - **Brand reconciliation → confirmed.** Re-map all reference accents onto the target brand
@@ -37,9 +39,16 @@ run and be tested **completely independently of the Go API**:
 - **Stub data → mock service layer + flag** (see §10). Default is **mocks-on** so the app renders
   standalone; set `VITE_API_URL` (and optionally `VITE_USE_MOCKS=false`) to hit the real API.
 
-**Implementation scope for the current pass: Phases 0–2 + the stub-data layer.** Charts (Phase 4),
-toasts (Phase 5), organisms/tables/navbar/modals (Phase 6), templates (Phase 7) and pages (Phase 8)
-are intentionally out of scope for this pass and remain as planned below.
+**Progress: Phases 0–4 + the stub-data layer are implemented.** Phase 3 added the calendar core
+(`calendar.utils` + `Calendar`), `date-picker`, `date-range-picker` (dual-month + presets), the
+`filter-popover` shell with `text-filter` / `direction-filter` / `select-filter` / `visibility-filter`,
+the animated `action-menu` and `account-menu`, and the async `listing-search-select`. Phase 4 added the
+charting layer (`charts/*`) and two organisms: **`TimeSeriesChart`** (line/bar/area combo with the
+shared drag range-selection, dashed grid + solid zero line, dark tooltip, area gradients, and an
+optional below-zero line flip) — which realizes the trend-line / combo / asset-growth charts as
+configurations — and **`DonutChart`** (click-to-filter + "+N more" popover + center total). Toasts
+(Phase 5), organisms/tables/navbar/modals (Phase 6), templates (Phase 7) and pages (Phase 8) remain as
+planned below.
 
 ---
 
