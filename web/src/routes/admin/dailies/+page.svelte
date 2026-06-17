@@ -38,7 +38,6 @@
 	{#snippet top()}
 		<TopNavbar
 			title="Dailies"
-			breadcrumb={[{ label: 'Admin', href: '/admin' }, { label: 'Dailies' }]}
 			accountName="Admin User"
 			adminMode={adminMode.enabled}
 			onAdminToggle={(v) => adminMode.set(v)}

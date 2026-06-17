@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import AppShellTemplate from '$lib/components/templates/app-shell/AppShellTemplate.svelte';
 	import PageContentTemplate from '$lib/components/templates/page-content/PageContentTemplate.svelte';
 	import TopNavbar from '$lib/components/organisms/top-navbar/TopNavbar.svelte';
 	import KpiRow from '$lib/components/organisms/kpi-row/KpiRow.svelte';
 	import TimeSeriesChart from '$lib/components/organisms/charts/TimeSeriesChart.svelte';
+	import AnalyticsCard from '$lib/components/molecules/analytics-card/AnalyticsCard.svelte';
 	import Tabs from '$lib/components/molecules/tabs/Tabs.svelte';
 	import DataTable from '$lib/components/organisms/data-table/DataTable.svelte';
 	import Money from '$lib/components/atoms/money/Money.svelte';
@@ -34,6 +34,9 @@
 	let error = $state<string | null>(null);
 	let includeClosed = $state(false);
 	let tab = $state('positions');
+	let from = $state('');
+	let to = $state('');
+	let searchQuery = $state('');
 
 	const tabs = [
 		{ value: 'positions', label: 'Positions' },
@@ -75,8 +78,18 @@
 		error = null;
 		try {
 			const [snaps, txs] = await Promise.all([
-				getPortfolioSnapshots({ account_id: DEMO_ACCOUNT_ID }),
-				listPortfolioTransactions({ account_id: DEMO_ACCOUNT_ID, limit: 25 })
+				getPortfolioSnapshots({
+					account_id: DEMO_ACCOUNT_ID,
+					from: from || undefined,
+					to: to || undefined
+				}),
+				listPortfolioTransactions({
+					account_id: DEMO_ACCOUNT_ID,
+					limit: 25,
+					q: searchQuery || undefined,
+					from: from || undefined,
+					to: to || undefined
+				})
 			]);
 			snapshots = snaps;
 			transactions = txs.data;
@@ -88,7 +101,13 @@
 		}
 	}
 
-	onMount(loadAll);
+	// Reload (zooming the value chart, filtering transactions) on date/search change; also initial load.
+	$effect(() => {
+		void from;
+		void to;
+		void searchQuery;
+		void loadAll();
+	});
 
 	$effect(() => {
 		// Reads `includeClosed` synchronously, so it reloads positions when the toggle changes.
@@ -122,7 +141,17 @@
 	{#snippet top()}
 		<TopNavbar
 			title="Portfolio"
-			breadcrumb={[{ label: 'Home', href: '/' }, { label: 'Portfolio' }]}
+			showSearch
+			searchValue={searchQuery}
+			searchPlaceholder="Search transactions…"
+			onSearch={(q) => (searchQuery = q)}
+			showDateRange
+			dateFrom={from || null}
+			dateTo={to || null}
+			onDateChange={(r) => {
+				from = r.from ?? '';
+				to = r.to ?? '';
+			}}
 			accountName="Lennard Claproth"
 			adminMode={adminMode.enabled}
 			onAdminToggle={(v) => adminMode.set(v)}
@@ -133,8 +162,7 @@
 		{#snippet analytics()}
 			<div class="flex flex-col gap-3">
 				<KpiRow items={kpis} columns={3} />
-				<div class="rounded-2xl border border-slate-200 bg-white p-3">
-					<p class="mb-1 text-xs font-medium text-slate-500">Value vs cost basis</p>
+				<AnalyticsCard title="Value vs cost basis">
 					<TimeSeriesChart
 						height="h-52"
 						{loading}
@@ -155,7 +183,7 @@
 							}
 						]}
 					/>
-				</div>
+				</AnalyticsCard>
 			</div>
 		{/snippet}
 

@@ -1,17 +1,15 @@
 import { apiGet } from '$lib/api/client';
 import { useMocks } from '$lib/api/config';
 import type {
+	CashflowDirection,
 	CashflowMonthlyAnalyticsResponse,
 	CashflowTransaction,
 	CashflowTransactionsQuery,
 	CashflowTransactionsResponse,
+	TagDistributionEntry,
 	TagDistributionResponse
 } from '$lib/api/types';
-import {
-	cashflowMonthly,
-	cashflowTagDistribution,
-	cashflowTransactions
-} from '$lib/data/fixtures/cashflow';
+import { cashflowMonthly, cashflowTransactions } from '$lib/data/fixtures/cashflow';
 import { clone, contains, delay } from './_mock';
 
 function compare(a: CashflowTransaction, b: CashflowTransaction, sortBy: string): number {
@@ -88,14 +86,31 @@ export async function getCashflowMonthly(
 ): Promise<CashflowMonthlyAnalyticsResponse> {
 	if (useMocks) {
 		await delay();
+		// Month keys are first-of-month, so compare on the YYYY-MM prefix to keep months that
+		// overlap an arbitrary range bound (e.g. from="2026-06-08" must still include June).
+		const fromMonth = query.from?.slice(0, 7);
+		const toMonth = query.to?.slice(0, 7);
 		const data = clone(
-			cashflowMonthly.filter(
-				(p) => (!query.from || p.month >= query.from) && (!query.to || p.month <= query.to)
-			)
+			cashflowMonthly.filter((p) => {
+				const m = p.month.slice(0, 7);
+				return (!fromMonth || m >= fromMonth) && (!toMonth || m <= toMonth);
+			})
 		);
 		return { data };
 	}
 	return apiGet<CashflowMonthlyAnalyticsResponse>('/cashflow/analytics/monthly', { ...query });
+}
+
+/** Sum the (1e6-scaled) magnitudes per tag for one direction, largest first. */
+function tagTotals(rows: CashflowTransaction[], direction: CashflowDirection): TagDistributionEntry[] {
+	const totals = new Map<string, number>();
+	for (const tx of rows) {
+		if (tx.direction !== direction) continue;
+		totals.set(tx.tag, (totals.get(tx.tag) ?? 0) + tx.amountCents);
+	}
+	return [...totals.entries()]
+		.map(([tag, totalCents]) => ({ tag, totalCents }))
+		.sort((a, b) => b.totalCents - a.totalCents);
 }
 
 /** `GET /cashflow/analytics/tags` */
@@ -104,7 +119,17 @@ export async function getCashflowTagDistribution(
 ): Promise<TagDistributionResponse> {
 	if (useMocks) {
 		await delay();
-		return clone(cashflowTagDistribution);
+		// Derive the distribution from the dated transactions so the donuts react to the range.
+		const rows = cashflowTransactions.filter((tx) => {
+			if (!query.include_ignored && tx.ignored) return false;
+			if (query.from && tx.date.slice(0, 10) < query.from) return false;
+			if (query.to && tx.date.slice(0, 10) > query.to) return false;
+			return true;
+		});
+		const incoming = tagTotals(rows, 'in');
+		const outgoing = tagTotals(rows, 'out');
+		const combined = [...incoming, ...outgoing].sort((a, b) => b.totalCents - a.totalCents);
+		return clone({ incoming, outgoing, combined });
 	}
 	return apiGet<TagDistributionResponse>('/cashflow/analytics/tags', { ...query });
 }

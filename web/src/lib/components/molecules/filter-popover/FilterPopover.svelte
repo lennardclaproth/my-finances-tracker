@@ -44,11 +44,11 @@
 
 	function triggerClasses(highlighted: boolean): string {
 		return [
-			'inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-sm transition-colors',
-			'focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:outline-none',
+			'inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-sm transition-colors',
+			'focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:outline-none',
 			highlighted
-				? 'border-amber-200 bg-slate-600 text-amber-200'
-				: 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+				? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+				: 'bg-transparent text-slate-600 hover:bg-slate-100'
 		].join(' ');
 	}
 
@@ -74,7 +74,7 @@
 		>
 			<Icon {icon} size="sm" />
 			{#if count}
-				<Badge intent="primary" variant="solid" size="sm">{count}</Badge>
+				<Badge intent="info" variant="solid" size="sm">{count}</Badge>
 			{/if}
 		</button>
 	{/snippet}

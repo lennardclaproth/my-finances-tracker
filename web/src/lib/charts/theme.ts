@@ -17,6 +17,8 @@ export const chartColors = {
 	net: '#334155',
 	/** info — sky-600 */
 	info: '#0284c7',
+	/** time-range drag-selection on charts — blue-600 (band, guides, endpoint markers) */
+	selection: '#2563eb',
 	/** hover marker border — brand amber-200 over slate (not the reference's indigo) */
 	markerBorder: '#fde68a',
 	/** grid + axis text */

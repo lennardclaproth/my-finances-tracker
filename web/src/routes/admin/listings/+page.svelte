@@ -51,7 +51,6 @@
 	{#snippet top()}
 		<TopNavbar
 			title="Listings"
-			breadcrumb={[{ label: 'Admin', href: '/admin' }, { label: 'Listings' }]}
 			accountName="Admin User"
 			adminMode={adminMode.enabled}
 			onAdminToggle={(v) => adminMode.set(v)}
@@ -96,6 +95,6 @@
 	</div>
 	{#snippet footer()}
 		<Button variant="ghost" intent="secondary" onclick={() => (createOpen = false)}>Cancel</Button>
-		<Button onclick={createListing}>Create</Button>
+		<Button intent="success" onclick={createListing}>Create</Button>
 	{/snippet}
 </Dialog>

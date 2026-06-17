@@ -133,13 +133,13 @@ export const rangeSelectPlugin: Plugin<ChartType> = {
 		const x2 = Math.max(state.startX, state.currentX);
 
 		ctx.save();
-		// Brand-tinted selection band.
-		ctx.fillStyle = hexToRgba(chartColors.net, 0.1);
+		// Blue selection band.
+		ctx.fillStyle = hexToRgba(chartColors.selection, 0.1);
 		ctx.fillRect(x1, chartArea.top, x2 - x1, chartArea.bottom - chartArea.top);
 
 		// Two dashed vertical guides.
 		ctx.setLineDash(chartStructure.gridDash);
-		ctx.strokeStyle = chartColors.net;
+		ctx.strokeStyle = chartColors.selection;
 		ctx.lineWidth = 1;
 		for (const gx of [x1, x2]) {
 			ctx.beginPath();
@@ -160,7 +160,7 @@ export const rangeSelectPlugin: Plugin<ChartType> = {
 			ctx.fillStyle = '#ffffff';
 			ctx.fill();
 			ctx.lineWidth = 2;
-			ctx.strokeStyle = chartColors.markerBorder;
+			ctx.strokeStyle = chartColors.selection;
 			ctx.stroke();
 		}
 		ctx.restore();

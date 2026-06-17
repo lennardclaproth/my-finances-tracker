@@ -139,6 +139,6 @@
 
 	{#snippet footer()}
 		<Button variant="ghost" intent="secondary" onclick={() => (open = false)}>Cancel</Button>
-		<Button onclick={submit} loading={submitting}>Save</Button>
+		<Button intent="success" onclick={submit} loading={submitting}>Save</Button>
 	{/snippet}
 </Dialog>

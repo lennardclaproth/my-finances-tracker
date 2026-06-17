@@ -1,17 +1,19 @@
 <script lang="ts">
-	import Breadcrumb from '$lib/components/molecules/breadcrumb/Breadcrumb.svelte';
+	import { page } from '$app/state';
 	import SearchInput from '$lib/components/molecules/search-input/SearchInput.svelte';
 	import DateRangePicker from '$lib/components/molecules/date-range-picker/DateRangePicker.svelte';
 	import ActionMenu from '$lib/components/molecules/action-menu/ActionMenu.svelte';
 	import AccountMenu from '$lib/components/molecules/account-menu/AccountMenu.svelte';
-	import type { BreadcrumbItem } from '$lib/components/molecules/breadcrumb/breadcrumb.types';
+	import NavMenu from '$lib/components/molecules/nav-menu/NavMenu.svelte';
+	import Panel from '$lib/components/atoms/panel/Panel.svelte';
+	import Heading from '$lib/components/atoms/typography/Heading.svelte';
 	import type { MenuItem } from '$lib/components/molecules/action-menu/menu.types';
+	import type { NavItem } from '$lib/components/molecules/nav-menu/nav-menu.types';
 
 	type DateRange = { from: string | null; to: string | null };
 
 	type Props = {
 		title?: string;
-		breadcrumb?: BreadcrumbItem[];
 		showSearch?: boolean;
 		searchValue?: string;
 		searchPlaceholder?: string;
@@ -32,7 +34,6 @@
 
 	let {
 		title,
-		breadcrumb,
 		showSearch = false,
 		searchValue = $bindable(''),
 		searchPlaceholder = 'Search…',
@@ -50,28 +51,37 @@
 		onAdminToggle,
 		class: className = ''
 	}: Props = $props();
+
+	// The single source of in-app navigation, surfaced through the left menu button.
+	const navItems: NavItem[] = [
+		{ label: 'Cashflow', href: '/cashflow', icon: 'heroicons:banknotes' },
+		{ label: 'Assets', href: '/assets', icon: 'heroicons:building-library' },
+		{ label: 'Portfolio', href: '/portfolio', icon: 'heroicons:chart-pie' },
+		{ label: 'Listings', href: '/admin/listings', icon: 'heroicons:cog-6-tooth', divider: true }
+	];
 </script>
 
 <header
-	class={[
-		'flex flex-col gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur md:flex-row md:items-center md:justify-between',
-		className
-	]
+	class={['flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center', className]
 		.filter(Boolean)
 		.join(' ')}
 >
-	<div class="flex min-w-0 flex-col gap-1">
-		{#if breadcrumb}
-			<Breadcrumb items={breadcrumb} />
-		{/if}
+	<Panel
+		variant="floating"
+		shape="xl"
+		shadow="sm"
+		padding="sm"
+		class="flex items-center gap-2 md:shrink-0"
+	>
+		<NavMenu items={navItems} currentPath={page.url.pathname} />
 		{#if title}
-			<h1 class="font-heading text-xl text-slate-900 md:text-2xl">{title}</h1>
+			<Heading level="h1" size="xl" class="leading-none">{title}</Heading>
 		{/if}
-	</div>
+	</Panel>
 
-	<div class="flex flex-wrap items-center gap-2">
+	<div class="flex justify-center md:flex-1">
 		{#if showSearch}
-			<div class="w-full sm:w-56">
+			<div class="w-full md:max-w-md">
 				<SearchInput
 					bind:value={searchValue}
 					{onSearch}
@@ -80,6 +90,9 @@
 				/>
 			</div>
 		{/if}
+	</div>
+
+	<div class="flex flex-wrap items-center gap-2 md:shrink-0">
 		{#if showDateRange}
 			<DateRangePicker bind:from={dateFrom} bind:to={dateTo} size="sm" onChange={onDateChange} />
 		{/if}

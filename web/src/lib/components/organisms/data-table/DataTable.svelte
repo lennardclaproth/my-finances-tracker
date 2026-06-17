@@ -138,7 +138,7 @@
 										<span>{column.header}</span>
 										<Icon
 											icon={sortIcon(column)}
-											size="sm"
+											size="md"
 											class={sortKey === column.sortKey
 												? 'text-slate-700'
 												: 'text-slate-300 group-hover:text-slate-500'}

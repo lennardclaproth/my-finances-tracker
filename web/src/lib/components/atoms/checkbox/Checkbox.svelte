@@ -122,7 +122,7 @@
     bind:indeterminate
     {disabled}
     aria-invalid={invalid || undefined}
-    class="peer sr-only"
+    class="peer absolute inset-0 z-10 m-0 size-full cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed"
   />
 
   <span

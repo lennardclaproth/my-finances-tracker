@@ -6,6 +6,8 @@
 	import TopNavbar from '$lib/components/organisms/top-navbar/TopNavbar.svelte';
 	import TimeSeriesChart from '$lib/components/organisms/charts/TimeSeriesChart.svelte';
 	import DonutChart from '$lib/components/organisms/charts/DonutChart.svelte';
+	import AnalyticsCard from '$lib/components/molecules/analytics-card/AnalyticsCard.svelte';
+	import Button from '$lib/components/atoms/button/Button.svelte';
 	import CashflowTransactionsTable from '$lib/components/organisms/cashflow-transactions-table/CashflowTransactionsTable.svelte';
 	import TransactionFormModal from '$lib/components/organisms/transaction-form-modal/TransactionFormModal.svelte';
 	import {
@@ -140,9 +142,10 @@
 	async function loadAnalytics() {
 		analyticsLoading = true;
 		try {
+			const range = { from: from || undefined, to: to || undefined };
 			const [monthlyRes, dist] = await Promise.all([
-				getCashflowMonthly(),
-				getCashflowTagDistribution()
+				getCashflowMonthly(range),
+				getCashflowTagDistribution(range)
 			]);
 			monthly = monthlyRes.data;
 			incoming = dist.incoming;
@@ -152,8 +155,14 @@
 		}
 	}
 
-	onMount(() => {
+	// Re-fetch the trend + donuts whenever the date range changes (also covers the initial load).
+	$effect(() => {
+		void from;
+		void to;
 		void loadAnalytics();
+	});
+
+	onMount(() => {
 		const realtime = connectRealtime({
 			accountId: DEMO_ACCOUNT_ID,
 			events: ['import.completed', 'bulk_tag.completed'],
@@ -210,13 +219,21 @@
 	{#snippet top()}
 		<TopNavbar
 			title="Cashflow"
-			breadcrumb={[{ label: 'Home', href: '/' }, { label: 'Cashflow' }]}
 			showSearch
 			searchValue={descriptionFilter}
 			searchPlaceholder="Search description…"
 			onSearch={(q) => {
 				descriptionFilter = q;
 				onFilterChange();
+			}}
+			showDateRange
+			dateFrom={from || null}
+			dateTo={to || null}
+			onDateChange={(r) => {
+				from = r.from ?? '';
+				to = r.to ?? '';
+				offset = 0;
+				syncUrl();
 			}}
 			actions={navActions}
 			accountName="Lennard Claproth"
@@ -230,8 +247,7 @@
 	<PageContentTemplate showFab fabLabel="New transaction" onFabClick={() => (createOpen = true)}>
 		{#snippet analytics()}
 			<div class="grid grid-cols-1 gap-3 lg:grid-cols-4">
-				<div class="rounded-2xl border border-slate-200 bg-white p-3 lg:col-span-2">
-					<p class="mb-1 text-xs font-medium text-slate-500">Net trend</p>
+				<AnalyticsCard title="Net trend" class="lg:col-span-2">
 					<TimeSeriesChart
 						height="h-44"
 						labels={monthly.map((m) => m.month)}
@@ -248,9 +264,8 @@
 							}
 						]}
 					/>
-				</div>
-				<div class="rounded-2xl border border-slate-200 bg-white p-3">
-					<p class="mb-1 text-xs font-medium text-slate-500">Incoming</p>
+				</AnalyticsCard>
+				<AnalyticsCard title="Incoming">
 					<DonutChart
 						data={incoming.map((e) => ({ label: e.tag, value: scaledToNumber(e.totalCents) }))}
 						ramp={donutRamps.incoming}
@@ -258,9 +273,8 @@
 						formatValue={euro}
 						centerLabel="In"
 					/>
-				</div>
-				<div class="rounded-2xl border border-slate-200 bg-white p-3">
-					<p class="mb-1 text-xs font-medium text-slate-500">Outgoing</p>
+				</AnalyticsCard>
+				<AnalyticsCard title="Outgoing">
 					<DonutChart
 						data={outgoing.map((e) => ({ label: e.tag, value: scaledToNumber(e.totalCents) }))}
 						ramp={donutRamps.outgoing}
@@ -268,7 +282,7 @@
 						formatValue={euro}
 						centerLabel="Out"
 					/>
-				</div>
+				</AnalyticsCard>
 			</div>
 		{/snippet}
 
@@ -292,16 +306,17 @@
 			{onFilterChange}
 		>
 			{#snippet bulkActions()}
-				<button
-					type="button"
-					class="rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-700 hover:bg-slate-50"
+				<Button
+					size="sm"
+					variant="ghost"
+					intent="secondary"
 					onclick={() => {
 						toast.success(`Tagged ${selectedIds.length} transactions`);
 						selectedIds = [];
 					}}
 				>
 					Tag
-				</button>
+				</Button>
 			{/snippet}
 		</CashflowTransactionsTable>
 	</PageContentTemplate>

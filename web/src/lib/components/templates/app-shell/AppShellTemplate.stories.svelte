@@ -33,7 +33,6 @@
 		{#snippet top()}
 			<TopNavbar
 				title="Cashflow"
-				breadcrumb={[{ label: 'Home', href: '/' }, { label: 'Cashflow' }]}
 				showSearch
 				showDateRange
 				{actions}

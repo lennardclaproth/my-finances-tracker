@@ -22,7 +22,6 @@
 <Story name="Full (search + date + actions)" asChild>
 	<TopNavbar
 		title="Cashflow"
-		breadcrumb={[{ label: 'Home', href: '/' }, { label: 'Cashflow' }]}
 		showSearch
 		showDateRange
 		{actions}
@@ -33,10 +32,5 @@
 </Story>
 
 <Story name="Admin (minimal)" asChild>
-	<TopNavbar
-		title="Listings"
-		breadcrumb={[{ label: 'Admin', href: '/admin' }, { label: 'Listings' }]}
-		accountName="Admin User"
-		adminMode={true}
-	/>
+	<TopNavbar title="Listings" accountName="Admin User" adminMode={true} />
 </Story>
