@@ -87,7 +87,7 @@
 	{#if row.tag}
 		<Badge intent="neutral" variant="soft" size="sm">{row.tag}</Badge>
 	{:else}
-		<span class="text-slate-400">Untagged</span>
+		<span class="text-slate-500">Untagged</span>
 	{/if}
 {/snippet}
 

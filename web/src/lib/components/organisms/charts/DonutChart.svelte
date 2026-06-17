@@ -7,6 +7,7 @@
 	import { chartColors, chartStructure } from '$lib/charts/theme';
 	import type { DonutDatum } from '$lib/charts/types';
 	import Popover from '$lib/components/molecules/popover/Popover.svelte';
+	import Skeleton from '$lib/components/atoms/skeleton/Skeleton.svelte';
 
 	type Props = {
 		data: DonutDatum[];
@@ -110,7 +111,7 @@
 <div class={['flex items-center gap-4', className].filter(Boolean).join(' ')}>
 	<div class="relative h-40 w-40 shrink-0" role="img" aria-label={ariaLabel}>
 		{#if loading}
-			<div class="h-full w-full animate-pulse rounded-full bg-slate-100"></div>
+			<Skeleton variant="circle" class="h-full w-full" />
 		{:else if error}
 			<div
 				class="flex h-full w-full items-center justify-center rounded-full border border-red-200 bg-red-50 p-3 text-center text-xs text-red-700"
@@ -119,7 +120,7 @@
 			</div>
 		{:else if isEmpty}
 			<div
-				class="flex h-full w-full items-center justify-center rounded-full border border-dashed border-slate-200 text-xs text-slate-400"
+				class="flex h-full w-full items-center justify-center rounded-full border border-dashed border-slate-200 text-xs text-slate-500"
 			>
 				No data
 			</div>

@@ -107,7 +107,7 @@
 
 	<div class="grid grid-cols-7 gap-0.5">
 		{#each weekdayLabels as label (label)}
-			<div class="flex h-7 w-9 items-center justify-center text-[11px] font-medium text-slate-400">
+			<div class="flex h-7 w-9 items-center justify-center text-[11px] font-medium text-slate-500">
 				{label}
 			</div>
 		{/each}

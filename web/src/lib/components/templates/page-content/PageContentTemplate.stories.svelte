@@ -23,7 +23,7 @@
 			{#snippet analytics()}
 				<KpiRow items={kpis} columns={3} />
 			{/snippet}
-			<div class="flex h-full items-center justify-center text-sm text-slate-400">
+			<div class="flex h-full items-center justify-center text-sm text-slate-500">
 				Primary content panel
 			</div>
 		</PageContentTemplate>
@@ -33,7 +33,7 @@
 <Story name="No analytics" asChild>
 	<div class="h-[24rem] bg-taupe-100">
 		<PageContentTemplate>
-			<div class="flex h-full items-center justify-center text-sm text-slate-400">
+			<div class="flex h-full items-center justify-center text-sm text-slate-500">
 				Full-height content
 			</div>
 		</PageContentTemplate>

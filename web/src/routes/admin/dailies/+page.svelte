@@ -58,7 +58,7 @@
 			</div>
 
 			{#if !selected}
-				<div class="flex flex-1 items-center justify-center p-8 text-sm text-slate-400">
+				<div class="flex flex-1 items-center justify-center p-8 text-sm text-slate-500">
 					Search for a listing to view its daily OHLCV data.
 				</div>
 			{:else}

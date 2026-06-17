@@ -39,7 +39,7 @@ run and be tested **completely independently of the Go API**:
 - **Stub data → mock service layer + flag** (see §10). Default is **mocks-on** so the app renders
   standalone; set `VITE_API_URL` (and optionally `VITE_USE_MOCKS=false`) to hit the real API.
 
-**Progress: Phases 0–8 + the stub-data layer are implemented.** Phase 3 added the calendar core
+**Progress: Phases 0–9 are implemented — the rebuild is complete (Chromatic is the one external gate left).** Phase 3 added the calendar core
 (`calendar.utils` + `Calendar`), `date-picker`, `date-range-picker` (dual-month + presets), the
 `filter-popover` shell with `text-filter` / `direction-filter` / `select-filter` / `visibility-filter`,
 the animated `action-menu` and `account-menu`, and the async `listing-search-select`. Phase 4 added the
@@ -72,7 +72,24 @@ transactions tables, include-closed toggle); **`/assets`** (growth line + distri
 table → `AssetClassDrawer`); and the admin-gated **`/admin/listings`** (table + create modal) and
 **`/admin/dailies`** (listing search → EOD table), behind a client-side admin guard
 (`routes/admin/+layout.svelte`). Verified at runtime against mocks (charts/donuts/tables render, no
-console errors). Phase 9 (cross-cutting verification) remains.
+console errors).
+
+Phase 9 (cross-cutting verification) results:
+- **Responsive** (verified via computed styles in the running app): at 375px the navbar stacks
+  (`flex-direction: column`) and the analytics grid collapses to 1 column; at 1280px the navbar is a
+  row and the grid is 4 columns (`lg:grid-cols-4`).
+- **z-index audit**: a single documented scale (`styles/z-index.ts`); every overlay (popover, sticky
+  table header, drawer, toast host, FAB, async dropdown) pulls from `zClasses` — no ad-hoc z-values
+  (Dialog uses the native top layer).
+- **a11y**: a live axe-core scan of `/cashflow` and `/portfolio` reports **0 violations**. Two serious
+  issues found and fixed — muted text contrast (`text-slate-400` → `text-slate-500`, matching §2.1's
+  "muted = slate-500", now ~4.8:1) and a missing `document-title` (default `<title>` in `app.html`).
+  The Storybook a11y addon is set to `test: 'error'` so CI now fails on violations.
+- **Type/build gates**: `npm run check` is green (0 errors/0 warnings) and `npm run build` is SSR-clean.
+- **Chromatic** (external): the visual-parity diff vs the Vue reference still needs to be run with a
+  Chromatic token — it cannot run in this environment. Pre-existing Prettier (2-space) and
+  `svelte/require-each-key` drift remain in the **original** atoms/molecules (documented in
+  `web/AGENTS.md`); all newly authored files are lint-clean.
 
 ---
 
@@ -251,7 +268,7 @@ Strict tiers, 4-file co-location (`Component.svelte` + `component.types.ts` + `c
 | SearchQueryInput | `icon-input` (+ debounce wrapper) | ✅ reuse/extend |
 | UnrealizedPnLBadge | `trend-indicator` (value, format percent/currency/number, up/down) | ✅ reuse |
 | ToastMessage | `alert` (info/success/warning/error, dismissible — already 4 tones) | ✅ reuse |
-| Chips / legend pills | `chip` | ✅ reuse |
+| Chips / legend pills | `badge` | ✅ reuse — standardized on `badge` (the `chip` molecule was removed in the final cleanup) |
 | ImportDataModal file drop | `dropzone` (+ `file-input`) | ✅ reuse |
 | Labelled field | `form-field` | ✅ reuse |
 | **BasePopover** | **`popover`** (floating, portal, outside-click, viewport-aware) | 🔴 **build — foundational, blocks many** |
@@ -546,7 +563,7 @@ three, do not unify them on the client — match the wire format per endpoint):
 - **Account** (`POST /accounts`): `{ id }`.
 
 `src/lib/api/money.ts` centralizes `MONEY_SCALE` and helpers (`scaledToNumber`, `decimalStringToNumber`,
-`centsToNumber`) so components consume display values uniformly regardless of the wire format.
+`numberToScaled`) so components consume display values uniformly regardless of the wire format.
 
 ### 10.2 Wiring — service layer + mock flag
 - `src/lib/api/config.ts` — reads `import.meta.env.VITE_API_URL` and `VITE_USE_MOCKS` (works in both the

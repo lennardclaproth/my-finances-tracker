@@ -2,6 +2,7 @@
 	import Drawer from '$lib/components/organisms/drawer/Drawer.svelte';
 	import Money from '$lib/components/atoms/money/Money.svelte';
 	import Badge from '$lib/components/atoms/badge/Badge.svelte';
+	import Skeleton from '$lib/components/atoms/skeleton/Skeleton.svelte';
 	import { decimalStringToNumber } from '$lib/api/money';
 	import { formatDisplayDate } from '$lib/components/molecules/calendar/calendar.utils';
 	import type { AssetClassDetails } from '$lib/api/types';
@@ -29,7 +30,7 @@
 	{#if loading}
 		<div class="space-y-3">
 			{#each [0, 1, 2, 3] as i (i)}
-				<div class="h-10 w-full animate-pulse rounded-lg bg-slate-100"></div>
+				<Skeleton variant="rect" class="h-10 w-full rounded-lg" />
 			{/each}
 		</div>
 	{:else if error}
@@ -58,7 +59,7 @@
 			<section>
 				<h3 class="mb-2 text-sm font-semibold text-slate-900">Assets</h3>
 				{#if details.assets.length === 0}
-					<p class="text-sm text-slate-400">No assets in this class</p>
+					<p class="text-sm text-slate-500">No assets in this class</p>
 				{:else}
 					<ul class="divide-y divide-slate-100 rounded-xl border border-slate-200">
 						{#each details.assets as asset (asset.id)}
@@ -78,14 +79,14 @@
 			<section>
 				<h3 class="mb-2 text-sm font-semibold text-slate-900">Recent changes</h3>
 				{#if details.mutations.length === 0}
-					<p class="text-sm text-slate-400">No recorded changes</p>
+					<p class="text-sm text-slate-500">No recorded changes</p>
 				{:else}
 					<ul class="space-y-2">
 						{#each details.mutations as mutation (mutation.id)}
 							<li class="flex items-center justify-between gap-3 text-sm">
 								<span class="min-w-0">
 									<span class="text-slate-700 capitalize">{mutation.change_type}</span>
-									<span class="ml-2 text-xs text-slate-400"
+									<span class="ml-2 text-xs text-slate-500"
 										>{formatDisplayDate(mutation.effective_date)}</span
 									>
 								</span>
@@ -101,6 +102,6 @@
 			</section>
 		</div>
 	{:else}
-		<p class="text-sm text-slate-400">Select an asset class to see details.</p>
+		<p class="text-sm text-slate-500">Select an asset class to see details.</p>
 	{/if}
 </Drawer>

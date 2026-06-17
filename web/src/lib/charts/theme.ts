@@ -49,8 +49,3 @@ export const chartStructure = {
 	/** click-or-drag range selection: travel under this many px is treated as a single point */
 	dragPointThresholdPx: 6
 } as const;
-
-/** Pick a ramp color by index (wraps around the ramp). */
-export function rampColor(ramp: readonly string[], index: number): string {
-	return ramp[index % ramp.length];
-}

@@ -35,7 +35,7 @@ tokens from a molecule is fine (that's data, not composition).
 
 Populated today: **`atoms/`** (all pure) — avatar, badge, button, checkbox, currency-input, divider,
 file-input, icon, input, label, link, money, panel, progress-bar, radio, select, skeleton, slider,
-sparkline, spinner, switch, textarea, typography; **`molecules/`** — alert, chip, dropzone, form-field,
+sparkline, spinner, switch, textarea, typography; **`molecules/`** — alert, dropzone, form-field,
 icon-button, icon-input, trend-indicator; **`organisms/`** — stat-card. Create the remaining tier
 folders (templates, pages) as you add their first component.
 

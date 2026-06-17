@@ -58,7 +58,7 @@
 </script>
 
 <label class={classes} ondragover={handleDragOver} ondragleave={handleDragLeave} ondrop={handleDrop}>
-  <span class="text-slate-400">
+  <span class="text-slate-500">
     <Icon icon="heroicons:arrow-up-tray" size="lg" />
   </span>
 

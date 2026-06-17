@@ -52,7 +52,7 @@ export const textSizeClasses = {
 export const textToneClasses = {
   default: 'text-slate-700',
   muted: 'text-slate-500',
-  subtle: 'text-slate-400',
+  subtle: 'text-slate-500',
   strong: 'text-slate-950',
   danger: 'text-red-700',
   success: 'text-emerald-700'

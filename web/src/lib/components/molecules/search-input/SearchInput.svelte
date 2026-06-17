@@ -73,7 +73,7 @@
 <div class="group relative w-full">
 	<span
 		class={[
-			'pointer-events-none absolute inset-y-0 left-0 flex items-center justify-center text-slate-400',
+			'pointer-events-none absolute inset-y-0 left-0 flex items-center justify-center text-slate-500',
 			inputIconContainerSizeClasses[size]
 		].join(' ')}
 		aria-hidden="true"
@@ -98,7 +98,7 @@
 			type="button"
 			aria-label="Clear search"
 			class={[
-				'absolute inset-y-0 right-0 flex items-center justify-center text-slate-400',
+				'absolute inset-y-0 right-0 flex items-center justify-center text-slate-500',
 				'transition-colors hover:text-slate-700',
 				'focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:outline-none',
 				inputIconContainerSizeClasses[size]

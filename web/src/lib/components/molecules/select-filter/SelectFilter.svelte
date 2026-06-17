@@ -49,7 +49,7 @@
 >
 	<div class="max-h-56 w-52 space-y-0.5 overflow-y-auto pr-1">
 		{#if options.length === 0}
-			<p class="px-1 py-2 text-sm text-slate-400">No options</p>
+			<p class="px-1 py-2 text-sm text-slate-500">No options</p>
 		{/if}
 		{#each options as option (option.value)}
 			<label

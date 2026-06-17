@@ -70,7 +70,7 @@
     .join(' '));
 
   const chevronClasses = $derived([
-    'pointer-events-none absolute inset-y-0 right-0 flex items-center justify-center text-slate-400',
+    'pointer-events-none absolute inset-y-0 right-0 flex items-center justify-center text-slate-500',
     selectChevronContainerClasses[size]
   ].join(' '));
 </script>

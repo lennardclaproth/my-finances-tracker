@@ -49,7 +49,7 @@
 				{icon}
 				size="sm"
 				class={[
-					'text-slate-400 transition-transform duration-200',
+					'text-slate-500 transition-transform duration-200',
 					api.open ? 'rotate-180' : ''
 				].join(' ')}
 			/>
@@ -76,7 +76,7 @@
 					onclick={() => choose(item)}
 				>
 					{#if item.icon}
-						<Icon icon={item.icon} size="sm" class="text-slate-400" />
+						<Icon icon={item.icon} size="sm" class="text-slate-500" />
 					{/if}
 					{item.label}
 				</button>

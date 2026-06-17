@@ -61,7 +61,7 @@ web/
           input/  label/  link/  money/  panel/  progress-bar/  radio/  select/  skeleton/
           slider/  sparkline/  spinner/  switch/  textarea/  typography/
         molecules/      # compositions of atoms
-          alert/  chip/  dropzone/  form-field/  icon-button/  icon-input/  trend-indicator/
+          alert/  dropzone/  form-field/  icon-button/  icon-input/  trend-indicator/
         organisms/      # sections composed of molecules + atoms
           stat-card/
         templates/      # (planned — not yet created)
@@ -96,7 +96,7 @@ A component may only import from its own tier or a **lower** tier (atoms never i
 Compose upward.
 
 **Current state:** `atoms/`, `molecules/`, and `organisms/` are populated. `molecules/` holds
-`alert`, `chip`, `dropzone`, `form-field`, `icon-button`, `icon-input`, and `trend-indicator`;
+`alert`, `dropzone`, `form-field`, `icon-button`, `icon-input`, and `trend-indicator`;
 `organisms/` holds `stat-card` (it composes the `trend-indicator` molecule, which is why it is an
 organism rather than a molecule). Templates/pages don't exist yet; create the folder when you add the
 first component of that tier and keep the same anatomy below.

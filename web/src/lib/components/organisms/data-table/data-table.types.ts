@@ -1,6 +1,6 @@
 import type { Snippet } from 'svelte';
-import type { SortDirection } from '$lib/components/molecules/sortable-header/sortable-header.types';
 
+export type SortDirection = 'asc' | 'desc';
 export type ColumnAlign = 'left' | 'center' | 'right';
 
 /** Column definition for the DataTable. `T` is the row type. */
@@ -19,5 +19,3 @@ export interface Column<T> {
 	/** Optional header filter control (e.g. a TextFilter / SelectFilter). */
 	filter?: Snippet;
 }
-
-export type { SortDirection };

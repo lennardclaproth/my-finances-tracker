@@ -12,6 +12,7 @@
 	import { rangeSelectPlugin } from '$lib/charts/rangeSelect';
 	import { areaGradient } from '$lib/charts/gradient';
 	import { chartColors } from '$lib/charts/theme';
+	import Skeleton from '$lib/components/atoms/skeleton/Skeleton.svelte';
 	import type { SeriesDataset } from '$lib/charts/types';
 
 	type Props = {
@@ -139,7 +140,7 @@
 	aria-label={ariaLabel}
 >
 	{#if loading}
-		<div class="h-full w-full animate-pulse rounded-xl bg-slate-100"></div>
+		<Skeleton variant="rect" class="h-full w-full rounded-xl" />
 	{:else if error}
 		<div
 			class="flex h-full w-full items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 text-center text-sm text-red-700"
@@ -147,7 +148,7 @@
 			{error}
 		</div>
 	{:else if isEmpty}
-		<div class="flex h-full w-full items-center justify-center text-sm text-slate-400">No data</div>
+		<div class="flex h-full w-full items-center justify-center text-sm text-slate-500">No data</div>
 	{:else}
 		<canvas bind:this={canvasEl}></canvas>
 	{/if}

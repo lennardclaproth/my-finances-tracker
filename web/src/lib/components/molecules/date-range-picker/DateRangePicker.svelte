@@ -152,13 +152,13 @@
 				'focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:outline-none',
 				'disabled:pointer-events-none disabled:opacity-50',
 				api.open ? 'border-slate-400' : 'border-slate-300',
-				from ? 'text-slate-800' : 'text-slate-400',
+				from ? 'text-slate-800' : 'text-slate-500',
 				sizeClasses[size],
 				className
 			].join(' ')}
 			onclick={api.toggle}
 		>
-			<Icon icon="heroicons:calendar-days" size="sm" class="text-slate-400" />
+			<Icon icon="heroicons:calendar-days" size="sm" class="text-slate-500" />
 			<span>{label}</span>
 		</button>
 	{/snippet}

@@ -13,12 +13,6 @@ export function scaledToNumber(scaled: number): number {
 	return scaled / MONEY_SCALE;
 }
 
-/**
- * Alias for {@link scaledToNumber}. The backend's `amountCents` / `*_cents` fields are 1e6-scaled
- * despite the "cents" name; this alias documents that at call sites that read those fields.
- */
-export const centsToNumber = scaledToNumber;
-
 /** Parse a decimal-string money value (e.g. assets `current_worth`, portfolio tx `amount`) to a number. */
 export function decimalStringToNumber(value: string): number {
 	const parsed = Number.parseFloat(value);

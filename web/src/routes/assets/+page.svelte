@@ -76,7 +76,7 @@
 			{row.growth_pct >= 0 ? '+' : ''}{row.growth_pct.toFixed(2)}%
 		</Badge>
 	{:else}
-		<span class="text-slate-400">—</span>
+		<span class="text-slate-500">—</span>
 	{/if}
 {/snippet}
 

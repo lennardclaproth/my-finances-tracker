@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import Checkbox from '$lib/components/atoms/checkbox/Checkbox.svelte';
 	import Icon from '$lib/components/atoms/icon/Icon.svelte';
+	import Skeleton from '$lib/components/atoms/skeleton/Skeleton.svelte';
 	import { zClasses } from '$lib/styles/z-index';
 	import type { Column, ColumnAlign, SortDirection } from './data-table.types';
 
@@ -140,7 +141,7 @@
 											size="sm"
 											class={sortKey === column.sortKey
 												? 'text-slate-700'
-												: 'text-slate-300 group-hover:text-slate-400'}
+												: 'text-slate-300 group-hover:text-slate-500'}
 										/>
 									</button>
 								{:else}
@@ -160,13 +161,11 @@
 					{#each [0, 1, 2, 3, 4, 5] as rowIndex (rowIndex)}
 						<tr class="border-b border-slate-100">
 							{#if selectable}
-								<td class="px-3 py-2"
-									><div class="h-4 w-4 animate-pulse rounded bg-slate-100"></div></td
-								>
+								<td class="px-3 py-2"><Skeleton variant="rect" class="h-4 w-4" /></td>
 							{/if}
 							{#each columns as column (column.key)}
 								<td class="px-3 py-2">
-									<div class="h-4 w-full animate-pulse rounded bg-slate-100"></div>
+									<Skeleton />
 								</td>
 							{/each}
 						</tr>
@@ -183,7 +182,7 @@
 					</tr>
 				{:else if isEmpty}
 					<tr>
-						<td colspan={colSpan} class="px-3 py-10 text-center text-sm text-slate-400">
+						<td colspan={colSpan} class="px-3 py-10 text-center text-sm text-slate-500">
 							{emptyText}
 						</td>
 					</tr>

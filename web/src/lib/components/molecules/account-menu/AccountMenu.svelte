@@ -77,7 +77,7 @@
 			<div class="my-1 border-t border-slate-200"></div>
 			<div class="flex items-center justify-between gap-3 px-3 py-1.5 text-sm text-slate-700">
 				<span class="flex items-center gap-2">
-					<Icon icon="heroicons:shield-check" size="sm" class="text-slate-400" />
+					<Icon icon="heroicons:shield-check" size="sm" class="text-slate-500" />
 					Admin mode
 				</span>
 				<Switch checked={adminMode} aria-label="Admin mode" onchange={toggleAdmin} />
@@ -103,7 +103,7 @@
 							onclick={() => choose(item)}
 						>
 							{#if item.icon}
-								<Icon icon={item.icon} size="sm" class="text-slate-400" />
+								<Icon icon={item.icon} size="sm" class="text-slate-500" />
 							{/if}
 							{item.label}
 						</button>

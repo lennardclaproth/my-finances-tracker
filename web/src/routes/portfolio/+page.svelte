@@ -100,7 +100,7 @@
 	{#if row.market_value !== null && row.market_value !== undefined}
 		<Money amount={scaledToNumber(row.market_value)} currency="EUR" size="sm" />
 	{:else}
-		<span class="text-slate-400">—</span>
+		<span class="text-slate-500">—</span>
 	{/if}
 {/snippet}
 
@@ -110,7 +110,7 @@
 			{row.unrealized_pnl_pct >= 0 ? '+' : ''}{row.unrealized_pnl_pct.toFixed(2)}%
 		</Badge>
 	{:else}
-		<span class="text-slate-400">—</span>
+		<span class="text-slate-500">—</span>
 	{/if}
 {/snippet}
 

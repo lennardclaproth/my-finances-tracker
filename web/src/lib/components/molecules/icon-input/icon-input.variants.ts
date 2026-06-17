@@ -28,13 +28,13 @@ export const inputIconSizeClasses = {
 } as const;
 
 export const inputIconIntentClasses = {
-  default: 'text-slate-400',
-  error: 'text-slate-400',
-  success: 'text-slate-400'
+  default: 'text-slate-500',
+  error: 'text-slate-500',
+  success: 'text-slate-500'
 } satisfies Record<InputIntent, string>;
 
 export const inputValidationIconIntentClasses = {
-  default: 'text-slate-400',
+  default: 'text-slate-500',
   error: 'text-red-400 group-focus-within:text-red-600',
   success: 'text-emerald-400 group-focus-within:text-emerald-600'
 } satisfies Record<InputIntent, string>;

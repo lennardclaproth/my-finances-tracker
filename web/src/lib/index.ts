@@ -18,11 +18,6 @@ export { default as Dialog } from './components/molecules/dialog/Dialog.svelte';
 export type { DialogSize } from './components/molecules/dialog/dialog.types';
 export { default as Tabs } from './components/molecules/tabs/Tabs.svelte';
 export type { TabItem, TabsSize } from './components/molecules/tabs/tabs.types';
-export { default as SortableHeader } from './components/molecules/sortable-header/SortableHeader.svelte';
-export type {
-	SortDirection,
-	SortableHeaderAlign
-} from './components/molecules/sortable-header/sortable-header.types';
 export { default as Breadcrumb } from './components/molecules/breadcrumb/Breadcrumb.svelte';
 export type { BreadcrumbItem } from './components/molecules/breadcrumb/breadcrumb.types';
 export { default as SearchInput } from './components/molecules/search-input/SearchInput.svelte';
@@ -57,7 +52,11 @@ export type { Toast, ToastOptions } from './stores/toast.svelte';
 export { default as KpiRow } from './components/organisms/kpi-row/KpiRow.svelte';
 export type { KpiItem } from './components/organisms/kpi-row/kpi-row.types';
 export { default as DataTable } from './components/organisms/data-table/DataTable.svelte';
-export type { Column, ColumnAlign } from './components/organisms/data-table/data-table.types';
+export type {
+	Column,
+	ColumnAlign,
+	SortDirection
+} from './components/organisms/data-table/data-table.types';
 export { default as FooterBar } from './components/organisms/footer-bar/FooterBar.svelte';
 export { default as Drawer } from './components/organisms/drawer/Drawer.svelte';
 export { default as TopNavbar } from './components/organisms/top-navbar/TopNavbar.svelte';

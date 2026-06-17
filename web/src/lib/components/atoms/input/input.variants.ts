@@ -8,7 +8,7 @@ export const baseInputClasses = [
   'block w-full',
   'border outline-none',
   'transition-colors duration-150 ease-out',
-  'placeholder:text-slate-400',
+  'placeholder:text-slate-500',
   'disabled:cursor-not-allowed disabled:opacity-50',
   'read-only:cursor-default',
 ].join(' ');

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from '$lib/components/atoms/icon/Icon.svelte';
+	import Spinner from '$lib/components/atoms/spinner/Spinner.svelte';
 	import { zClasses } from '$lib/styles/z-index';
 	import { searchListings } from '$lib/services/marketdata';
 	import type { Listing } from '$lib/api/types';
@@ -134,11 +135,11 @@
 
 <div class={['relative', className].filter(Boolean).join(' ')}>
 	<span
-		class="pointer-events-none absolute inset-y-0 left-0 flex w-9 items-center justify-center text-slate-400"
+		class="pointer-events-none absolute inset-y-0 left-0 flex w-9 items-center justify-center text-slate-500"
 		aria-hidden="true"
 	>
 		{#if loading}
-			<Icon icon="heroicons:arrow-path" size="sm" class="animate-spin" />
+			<Spinner size="sm" />
 		{:else}
 			<Icon icon="heroicons:magnifying-glass" size="sm" />
 		{/if}
@@ -155,7 +156,7 @@
 		aria-label={ariaLabel}
 		{placeholder}
 		{disabled}
-		class="h-10 w-full rounded-xl border border-slate-300 bg-white pr-9 pl-9 text-sm text-slate-800 transition-colors placeholder:text-slate-400 focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:outline-none disabled:opacity-50"
+		class="h-10 w-full rounded-xl border border-slate-300 bg-white pr-9 pl-9 text-sm text-slate-800 transition-colors placeholder:text-slate-500 focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:outline-none disabled:opacity-50"
 		oninput={onInput}
 		onkeydown={onKeydown}
 		onfocus={onFocus}
@@ -166,7 +167,7 @@
 		<button
 			type="button"
 			aria-label="Clear"
-			class="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 transition-colors hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:outline-none"
+			class="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-500 transition-colors hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:outline-none"
 			onclick={clear}
 		>
 			<Icon icon="heroicons:x-mark" size="sm" />
@@ -183,11 +184,11 @@
 			].join(' ')}
 		>
 			{#if loading}
-				<li class="px-3 py-2 text-sm text-slate-400">Searching…</li>
+				<li class="px-3 py-2 text-sm text-slate-500">Searching…</li>
 			{:else if error}
 				<li class="px-3 py-2 text-sm text-red-600">Could not load results. Try again.</li>
 			{:else if results.length === 0}
-				<li class="px-3 py-2 text-sm text-slate-400">No listings found</li>
+				<li class="px-3 py-2 text-sm text-slate-500">No listings found</li>
 			{:else}
 				{#each results as listing, index (listing.id)}
 					<li role="option" aria-selected={index === activeIndex}>
@@ -209,7 +210,7 @@
 								<span class="text-slate-500">{listing.name}</span>
 							</span>
 							{#if listing.exchange}
-								<span class="shrink-0 text-xs text-slate-400">{listing.exchange}</span>
+								<span class="shrink-0 text-xs text-slate-500">{listing.exchange}</span>
 							{/if}
 						</button>
 					</li>
