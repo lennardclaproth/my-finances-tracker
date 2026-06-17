@@ -79,7 +79,7 @@ type MultipartFileDecoderOptions struct {
 // JSONDecode decodes a strict single JSON object payload into T.
 //
 // It returns a DecodeError containing information about the fault
-// that occurred while decoding. This error is 
+// that occurred while decoding. This error is
 func JSONDecode[T any](r *http.Request) (T, error) {
 	var req T
 	// Check for empty body before decoding to provide a clearer error message.

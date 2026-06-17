@@ -1,4 +1,4 @@
-.PHONY: help build run test test-coverage clean fmt vet lint web-lint swagger dev install-tools env migrate-up migrate-down migrate-status migrate-create
+.PHONY: help build run test test-integration test-all test-coverage clean fmt vet lint web-lint swagger dev install-tools env migrate-up migrate-down migrate-status migrate-create
 
 # --- OS detection ---
 ifeq ($(OS),Windows_NT)
@@ -50,7 +50,9 @@ help:
 	@echo "  make build            - Build the application binary"
 	@echo "  make run              - Build and run the application"
 	@echo "  make dev              - Run application with hot reload (requires air)"
-	@echo "  make test             - Run all tests"
+	@echo "  make test             - Run unit tests (fast, no infra)"
+	@echo "  make test-integration - Run integration tests (real DB; SQLite, no extra infra)"
+	@echo "  make test-all         - Run unit and integration tests"
 	@echo "  make test-coverage    - Run tests with coverage report"
 	@echo "  make fmt              - Format code with go fmt"
 	@echo "  make vet              - Run go vet"
@@ -82,10 +84,18 @@ dev: env
 	@echo "Starting development server with hot reload..."
 	@cd $(API_DIR) && air --build.cmd "go build -o $(RUN_BINARY) ./$(CMD_PKG)" --build.bin "$(RUN_BINARY)"
 
-## test: Run all tests
+## test: Run unit tests (fast, no infra; integration tests are excluded by build tag)
 test:
-	@echo "Running tests..."
+	@echo "Running unit tests..."
 	@go test -v $(API_DIR)/...
+
+## test-integration: Run integration tests (real DB; SQLite in-process, no extra infra)
+test-integration:
+	@echo "Running integration tests..."
+	@go test -v -tags=integration $(API_DIR)/...
+
+## test-all: Run unit and integration tests
+test-all: test test-integration
 
 ## test-coverage: Run tests with coverage
 test-coverage:

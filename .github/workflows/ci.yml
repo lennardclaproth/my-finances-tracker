@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The Go module lives in apps/api; the workspace (go.work) is at the repo root.
+defaults:
+  run:
+    working-directory: apps/api
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          # Track the version declared by the workspace so CI matches local dev.
+          go-version-file: go.work
+          cache-dependency-path: apps/api/go.sum
+      - run: go build ./...
+      - run: go vet ./...
+      # No build tag: integration tests are excluded, so this needs no services.
+      - run: go test -race ./...
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache-dependency-path: apps/api/go.sum
+      # SQLite is pure Go (modernc), so no database service is required today.
+      # When Postgres coverage is added, provision it here (service container or
+      # testcontainers) and the same command picks it up.
+      - run: go test -race -tags=integration ./...

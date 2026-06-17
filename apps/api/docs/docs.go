@@ -16,39 +16,6 @@ const docTemplate = `{
     "basePath": "{{.BasePath}}",
     "paths": {
         "/accounts": {
-            "get": {
-                "description": "Lists all available accounts.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "accounts"
-                ],
-                "summary": "List accounts",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/api.AccountResponse"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            },
             "post": {
                 "description": "Creates a new account.",
                 "consumes": [
@@ -68,19 +35,89 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/api.CreateAccountRequest"
+                            "$ref": "#/definitions/account.CreateAccountRequest"
                         }
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "201": {
+                        "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/api.AccountResponse"
+                            "$ref": "#/definitions/account.CreateAccountResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/assets": {
+            "post": {
+                "description": "Adds a tracked asset and records its initial worth.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Create asset",
+                "parameters": [
+                    {
+                        "description": "Create asset payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/assets.CreateAssetRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/assets.CreateAssetResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -143,7 +180,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/api.AssetClassResponse"
+                                "$ref": "#/definitions/assets.ClassResponse"
                             }
                         }
                     },
@@ -195,7 +232,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/api.CreateAssetClassRequest"
+                            "$ref": "#/definitions/assets.CreateAssetClassRequest"
                         }
                     }
                 ],
@@ -203,7 +240,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/api.AssetClassResponse"
+                            "$ref": "#/definitions/assets.CreateAssetClassResponse"
                         }
                     },
                     "400": {
@@ -245,7 +282,7 @@ const docTemplate = `{
                 }
             },
             "patch": {
-                "description": "Updates manual asset class name and archived state.",
+                "description": "Updates manual class name and archived state.",
                 "consumes": [
                     "application/json"
                 ],
@@ -255,7 +292,7 @@ const docTemplate = `{
                 "tags": [
                     "assets"
                 ],
-                "summary": "Update asset class",
+                "summary": "Update class",
                 "parameters": [
                     {
                         "description": "Update asset class payload",
@@ -263,19 +300,13 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/api.UpdateAssetClassRequest"
+                            "$ref": "#/definitions/assets.UpdateClassRequest"
                         }
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
+                    "204": {
+                        "description": "No Content"
                     },
                     "400": {
                         "description": "Bad Request",
@@ -349,7 +380,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.AssetClassDetailsResponse"
+                            "$ref": "#/definitions/assets.ClassDetailsResponse"
                         }
                     },
                     "400": {
@@ -382,7 +413,7 @@ const docTemplate = `{
                 }
             },
             "delete": {
-                "description": "Deletes a manual class and its items/history.",
+                "description": "Deletes a manual class and its items/mutations.",
                 "consumes": [
                     "application/json"
                 ],
@@ -392,7 +423,7 @@ const docTemplate = `{
                 "tags": [
                     "assets"
                 ],
-                "summary": "Delete asset class",
+                "summary": "Delete class",
                 "parameters": [
                     {
                         "type": "string",
@@ -402,220 +433,18 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "string",
-                        "description": "Account ID",
-                        "name": "account_id",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/assets/items": {
-            "post": {
-                "description": "Adds a tracked asset item and records its initial worth.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "assets"
-                ],
-                "summary": "Create asset item",
-                "parameters": [
-                    {
-                        "description": "Create asset item payload",
+                        "description": "Delete class payload",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/api.CreateAssetItemRequest"
+                            "$ref": "#/definitions/assets.DeleteClassRequest"
                         }
                     }
                 ],
                 "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/api.AssetItemResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/assets/items/worth/adjust": {
-            "post": {
-                "description": "Applies increase/decrease delta using non-future effective date.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "assets"
-                ],
-                "summary": "Adjust asset item worth",
-                "parameters": [
-                    {
-                        "description": "Adjust worth payload",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.AdjustAssetItemWorthRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/assets/items/worth/set": {
-            "post": {
-                "description": "Replaces item worth using a non-future effective date.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "assets"
-                ],
-                "summary": "Set asset item worth",
-                "parameters": [
-                    {
-                        "description": "Set worth payload",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.SetAssetItemWorthRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
+                    "204": {
+                        "description": "No Content"
                     },
                     "400": {
                         "description": "Bad Request",
@@ -687,9 +516,132 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/api.AssetGrowthPointResponse"
+                                "$ref": "#/definitions/assets.SnapshotResponse"
                             }
                         }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/assets/{asset_id}/adjust": {
+            "put": {
+                "description": "Applies increase/decrease delta using non-future effective date.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Adjust asset worth",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Asset ID",
+                        "name": "asset_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Adjust worth payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/assets.AdjustAssetWorthRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/assets/{asset_id}/worth": {
+            "put": {
+                "description": "Replaces item worth using a non-future effective date.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Set asset item worth",
+                "parameters": [
+                    {
+                        "description": "Set worth payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/assets.SetAssetWorthRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
                     },
                     "400": {
                         "description": "Bad Request",
@@ -758,7 +710,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.CashflowMonthlyAnalyticsResponse"
+                            "$ref": "#/definitions/cashflow.CashflowMonthlyAnalyticsResponse"
                         }
                     },
                     "400": {
@@ -819,7 +771,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.CashflowTagDistributionResponse"
+                            "$ref": "#/definitions/cashflow.TagDistributionResponse"
                         }
                     },
                     "400": {
@@ -946,7 +898,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.CashflowTransactionsResponse"
+                            "$ref": "#/definitions/cashflow.TransactionsResponse"
                         }
                     },
                     "400": {
@@ -990,7 +942,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/api.IgnoreTransactionsByFilterRequest"
+                            "$ref": "#/definitions/cashflow.IgnoreTransactionsByFilterRequest"
                         }
                     }
                 ],
@@ -998,7 +950,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.TagTransactionsResponse"
+                            "$ref": "#/definitions/cashflow.IgnoreTransactionsResponse"
                         }
                     },
                     "400": {
@@ -1042,7 +994,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/api.IgnoreTransactionsBySelectionRequest"
+                            "$ref": "#/definitions/cashflow.IgnoreTransactionsBySelectionRequest"
                         }
                     }
                 ],
@@ -1050,7 +1002,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.TagTransactionsResponse"
+                            "$ref": "#/definitions/cashflow.IgnoreTransactionsResponse"
                         }
                     },
                     "400": {
@@ -1094,7 +1046,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/api.CreateManualCashflowTransactionsRequest"
+                            "$ref": "#/definitions/cashflow.CreateTransactionsRequest"
                         }
                     }
                 ],
@@ -1102,7 +1054,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/api.ManualCashflowTransactionsResponse"
+                            "$ref": "#/definitions/cashflow.TransactionsResponse"
                         }
                     },
                     "400": {
@@ -1164,7 +1116,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/api.TagTransactionRequest"
+                            "$ref": "#/definitions/cashflow.TagTransactionRequest"
                         }
                     }
                 ],
@@ -1219,7 +1171,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/api.TagTransactionsByFilterRequest"
+                            "$ref": "#/definitions/cashflow.TagTransactionsByFilterRequest"
                         }
                     }
                 ],
@@ -1227,13 +1179,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.TagTransactionsResponse"
+                            "$ref": "#/definitions/cashflow.TagTransactionsResponse"
                         }
                     },
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/api.TagTransactionsResponse"
+                            "$ref": "#/definitions/cashflow.TagTransactionsResponse"
                         }
                     },
                     "400": {
@@ -1277,7 +1229,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/api.TagTransactionsBySelectionRequest"
+                            "$ref": "#/definitions/cashflow.TagTransactionsBySelectionRequest"
                         }
                     }
                 ],
@@ -1285,7 +1237,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.TagTransactionsResponse"
+                            "$ref": "#/definitions/cashflow.TagTransactionsResponse"
                         }
                     },
                     "400": {
@@ -1335,9 +1287,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/import/csv": {
+        "/imports/cashflow": {
             "post": {
-                "description": "Upload a CSV file containing transaction data to import into a specific vendor",
+                "description": "Uploads a vendor cashflow CSV file for an account and queues it for asynchronous processing.",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -1347,39 +1299,39 @@ const docTemplate = `{
                 "tags": [
                     "imports"
                 ],
-                "summary": "Import transactions from CSV file",
+                "summary": "Import cashflow CSV",
                 "parameters": [
                     {
                         "type": "file",
-                        "description": "CSV file containing transaction data",
+                        "description": "Cashflow CSV file",
                         "name": "file",
                         "in": "formData",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "description": "UUID of the vendor to import transactions for",
+                        "description": "Vendor UUID",
                         "name": "vendor_id",
                         "in": "formData",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "description": "UUID of the account",
+                        "description": "Account UUID",
                         "name": "account_id",
                         "in": "formData",
                         "required": true
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "Import ID of the created import job",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/importer.ImportAcceptedResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid request (missing file, invalid vendor_id, etc.)",
+                        "description": "Bad request",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -1387,8 +1339,8 @@ const docTemplate = `{
                             }
                         }
                     },
-                    "413": {
-                        "description": "File too large (max 20MB)",
+                    "404": {
+                        "description": "Not found",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -1396,8 +1348,8 @@ const docTemplate = `{
                             }
                         }
                     },
-                    "415": {
-                        "description": "Unsupported media type (only text/csv allowed)",
+                    "422": {
+                        "description": "Unprocessable entity",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -1417,9 +1369,166 @@ const docTemplate = `{
                 }
             }
         },
-        "/marketdata/dailies": {
+        "/imports/eod": {
+            "post": {
+                "description": "Uploads an end-of-day market-data CSV file for a manually ingested listing and queues it for asynchronous processing.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "imports"
+                ],
+                "summary": "Import end-of-day market-data CSV",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "End-of-day market-data CSV file",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Listing UUID",
+                        "name": "listing_id",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/importer.ImportAcceptedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable entity",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/imports/portfolio": {
+            "post": {
+                "description": "Uploads a brokerage portfolio CSV file for an account and queues it for asynchronous processing.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "imports"
+                ],
+                "summary": "Import portfolio CSV",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Portfolio CSV file",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brokerage vendor UUID",
+                        "name": "vendor_id",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Account UUID",
+                        "name": "account_id",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/importer.ImportAcceptedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable entity",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/marketdata/eods": {
             "get": {
-                "description": "Get daily market data for a symbol with optional date range and pagination",
+                "description": "Get end-of-day market data for a symbol with optional date range and pagination",
                 "consumes": [
                     "application/json"
                 ],
@@ -1427,9 +1536,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "dailies"
+                    "eods"
                 ],
-                "summary": "Fetch daily market data",
+                "summary": "Fetch end-of-day market data",
                 "parameters": [
                     {
                         "type": "string",
@@ -1478,11 +1587,20 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/marketdata.DailyResponse"
+                            "$ref": "#/definitions/handlers.GetEODResponse"
                         }
                     },
                     "400": {
                         "description": "Bad request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -1502,143 +1620,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/marketdata/dailies/upload": {
-            "post": {
-                "description": "Upload a .csv/.txt file with listing daily values and process it asynchronously based on listing source parser.",
-                "consumes": [
-                    "multipart/form-data"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "dailies"
-                ],
-                "summary": "Upload listing daily data file",
-                "parameters": [
-                    {
-                        "type": "file",
-                        "description": "Daily data file",
-                        "name": "file",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Listing UUID",
-                        "name": "listing_id",
-                        "in": "formData",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "description": "Accepted",
-                        "schema": {
-                            "$ref": "#/definitions/api.DailyUploadAcceptedResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Unprocessable Entity",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/marketdata/dailies/uploads/{upload_id}": {
-            "get": {
-                "description": "Returns counters and row-level errors for a daily upload processing job.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "dailies"
-                ],
-                "summary": "Get daily upload status",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Daily upload UUID",
-                        "name": "upload_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.DailyUploadStatusResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/marketdata/listing": {
             "post": {
-                "description": "Create a listing and trigger async daily data accumulation.",
+                "description": "Create a listing and trigger async end-of-day data accumulation.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1656,7 +1640,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/api.CreateListingRequest"
+                            "$ref": "#/definitions/handlers.CreateListingRequest"
                         }
                     }
                 ],
@@ -1664,7 +1648,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.ListingResponse"
+                            "$ref": "#/definitions/handlers.ListingResponse"
                         }
                     },
                     "400": {
@@ -1715,7 +1699,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/api.UpdateListingFieldsRequest"
+                            "$ref": "#/definitions/handlers.UpdateListingFieldsRequest"
                         }
                     }
                 ],
@@ -1723,7 +1707,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.ListingResponse"
+                            "$ref": "#/definitions/handlers.ListingResponse"
                         }
                     },
                     "400": {
@@ -1775,7 +1759,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/api.ListingResponse"
+                                "$ref": "#/definitions/handlers.ListingResponse"
                             }
                         }
                     },
@@ -1829,7 +1813,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.ListingsSearchResponse"
+                            "$ref": "#/definitions/handlers.ListingsSearchResponse"
                         }
                     },
                     "400": {
@@ -1885,7 +1869,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.PortfolioPositionsResponse"
+                            "$ref": "#/definitions/portfolio.PositionsResponse"
                         }
                     },
                     "400": {
@@ -1920,7 +1904,7 @@ const docTemplate = `{
         },
         "/portfolio/rebuild": {
             "post": {
-                "description": "Triggers a portfolio rebuild by publishing an event to the internal bus.",
+                "description": "Rebuilds portfolio positions and snapshots for the selected account.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1938,16 +1922,13 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/api.RebuildPortfolioRequest"
+                            "$ref": "#/definitions/portfolio.RebuildPortfolioRequest"
                         }
                     }
                 ],
                 "responses": {
-                    "202": {
-                        "description": "Accepted",
-                        "schema": {
-                            "$ref": "#/definitions/api.AsyncEventAcceptedResponse"
-                        }
+                    "204": {
+                        "description": "No Content"
                     },
                     "400": {
                         "description": "Bad Request",
@@ -1967,8 +1948,8 @@ const docTemplate = `{
                             }
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -1976,8 +1957,17 @@ const docTemplate = `{
                             }
                         }
                     },
-                    "503": {
-                        "description": "Service Unavailable",
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -2028,7 +2018,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/api.PortfolioSnapshotPointResponse"
+                                "$ref": "#/definitions/portfolio.SnapshotPointResponse"
                             }
                         }
                     },
@@ -2154,7 +2144,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.PortfolioTransactionsResponse"
+                            "$ref": "#/definitions/portfolio.PortfolioTransactionsResponse"
                         }
                     },
                     "400": {
@@ -2207,7 +2197,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/api.CreateManualPortfolioTransactionRequest"
+                            "$ref": "#/definitions/portfolio.CreateManualPortfolioTransactionRequest"
                         }
                     }
                 ],
@@ -2215,7 +2205,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/api.ManualPortfolioTransactionResponse"
+                            "$ref": "#/definitions/portfolio.ManualPortfolioTransactionResponse"
                         }
                     },
                     "400": {
@@ -2285,7 +2275,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/api.VendorResponse"
+                                "$ref": "#/definitions/vendors.VendorResponse"
                             }
                         }
                     },
@@ -2341,13 +2331,52 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "api.AccountResponse": {
+        "account.CreateAccountRequest": {
             "type": "object",
             "properties": {
-                "created_at": {
+                "external_id": {
                     "type": "string"
                 },
-                "external_id": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "account.CreateAccountResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
+        "assets.AdjustAssetWorthRequest": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "amount": {
+                    "type": "string"
+                },
+                "direction": {
+                    "type": "string"
+                },
+                "effective_date": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                }
+            }
+        },
+        "assets.AssetResponse": {
+            "type": "object",
+            "properties": {
+                "archived": {
+                    "type": "boolean"
+                },
+                "current_worth": {
                     "type": "string"
                 },
                 "id": {
@@ -2361,59 +2390,44 @@ const docTemplate = `{
                 }
             }
         },
-        "api.AdjustAssetItemWorthRequest": {
+        "assets.ClassDetailsResponse": {
             "type": "object",
             "properties": {
-                "account_id": {
-                    "type": "string"
+                "assets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/assets.AssetResponse"
+                    }
                 },
-                "amount": {
-                    "type": "string"
-                },
-                "class_id": {
-                    "type": "string"
-                },
-                "direction": {
-                    "type": "string"
-                },
-                "effective_date": {
-                    "type": "string"
-                },
-                "item_id": {
-                    "type": "string"
-                },
-                "note": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.AssetClassDetailsResponse": {
-            "type": "object",
-            "properties": {
                 "class": {
-                    "$ref": "#/definitions/api.AssetClassResponse"
+                    "$ref": "#/definitions/assets.ClassResponse"
                 },
                 "growth": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/api.AssetGrowthPointResponse"
+                        "$ref": "#/definitions/assets.ClassGrowthPointResponse"
                     }
                 },
-                "history": {
+                "mutations": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/api.AssetHistoryResponse"
-                    }
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.AssetItemResponse"
+                        "$ref": "#/definitions/assets.MutationResponse"
                     }
                 }
             }
         },
-        "api.AssetClassResponse": {
+        "assets.ClassGrowthPointResponse": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string"
+                },
+                "total_worth": {
+                    "type": "string"
+                }
+            }
+        },
+        "assets.ClassResponse": {
             "type": "object",
             "properties": {
                 "archived": {
@@ -2442,18 +2456,68 @@ const docTemplate = `{
                 }
             }
         },
-        "api.AssetGrowthPointResponse": {
+        "assets.CreateAssetClassRequest": {
             "type": "object",
             "properties": {
-                "date": {
+                "account_id": {
                     "type": "string"
                 },
-                "total_worth": {
+                "name": {
                     "type": "string"
                 }
             }
         },
-        "api.AssetHistoryResponse": {
+        "assets.CreateAssetClassResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
+        "assets.CreateAssetRequest": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "class_id": {
+                    "type": "string"
+                },
+                "effective_date": {
+                    "type": "string"
+                },
+                "initial_worth": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                }
+            }
+        },
+        "assets.CreateAssetResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "assets.DeleteClassRequest": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "assets.MutationResponse": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -2491,210 +2555,292 @@ const docTemplate = `{
                 }
             }
         },
-        "api.AssetItemResponse": {
+        "assets.SetAssetWorthRequest": {
             "type": "object",
             "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "effective_date": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "worth": {
+                    "type": "string"
+                }
+            }
+        },
+        "assets.SnapshotResponse": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string"
+                },
+                "total_worth": {
+                    "type": "string"
+                }
+            }
+        },
+        "assets.UpdateClassRequest": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
                 "archived": {
                     "type": "boolean"
-                },
-                "current_worth": {
-                    "type": "string"
                 },
                 "id": {
                     "type": "string"
                 },
                 "name": {
                     "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
                 }
             }
         },
-        "api.AsyncEventAcceptedResponse": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "message_id": {
-                    "type": "string"
-                },
-                "topic": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.CashflowMonthlyAnalyticsPoint": {
-            "type": "object",
-            "properties": {
-                "incomingCents": {
-                    "type": "integer",
-                    "example": 250000
-                },
-                "month": {
-                    "type": "string",
-                    "example": "2025-01-01"
-                },
-                "netCents": {
-                    "type": "integer",
-                    "example": 130000
-                },
-                "outgoingCents": {
-                    "type": "integer",
-                    "example": 120000
-                }
-            }
-        },
-        "api.CashflowMonthlyAnalyticsResponse": {
+        "cashflow.CashflowMonthlyAnalyticsResponse": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/api.CashflowMonthlyAnalyticsPoint"
+                        "$ref": "#/definitions/cashflow.MonthlyAnalyticsPointResponse"
                     }
                 }
             }
         },
-        "api.CashflowTagDistributionEntry": {
+        "cashflow.CreateManualCashflowTransactionRequest": {
             "type": "object",
             "properties": {
+                "amount": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
                 "tag": {
-                    "type": "string",
-                    "example": "food"
+                    "type": "string"
                 },
-                "totalCents": {
-                    "type": "integer",
-                    "example": 4200
+                "type": {
+                    "type": "string"
+                },
+                "vendor": {
+                    "type": "string"
                 }
             }
         },
-        "api.CashflowTagDistributionResponse": {
+        "cashflow.CreateTransactionResponse": {
             "type": "object",
             "properties": {
-                "combined": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.CashflowTagDistributionEntry"
-                    }
+                "amountCents": {
+                    "type": "integer"
                 },
-                "incoming": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.CashflowTagDistributionEntry"
-                    }
+                "date": {
+                    "type": "string"
                 },
-                "outgoing": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.CashflowTagDistributionEntry"
-                    }
-                }
-            }
-        },
-        "api.CashflowTagFilters": {
-            "type": "object",
-            "properties": {
                 "description": {
                     "type": "string"
                 },
                 "direction": {
                     "type": "string"
                 },
-                "from": {
+                "id": {
                     "type": "string"
                 },
-                "hide_ignored": {
+                "ignored": {
                     "type": "boolean"
                 },
                 "note": {
-                    "type": "string"
-                },
-                "q": {
                     "type": "string"
                 },
                 "source": {
                     "type": "string"
                 },
-                "tags": {
+                "tag": {
+                    "type": "string"
+                }
+            }
+        },
+        "cashflow.CreateTransactionsRequest": {
+            "type": "object",
+            "properties": {
+                "account_id": {
                     "type": "string"
                 },
-                "to": {
-                    "type": "string"
+                "transactions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cashflow.CreateManualCashflowTransactionRequest"
+                    }
+                }
+            }
+        },
+        "cashflow.IgnoreTransactionsByFilterRequest": {
+            "type": "object",
+            "properties": {
+                "filters": {
+                    "$ref": "#/definitions/transport_http_handlers_cashflow.TransactionFilters"
                 },
-                "untagged": {
+                "ignored": {
                     "type": "boolean"
                 }
             }
         },
-        "api.CashflowTransactionsResponse": {
+        "cashflow.IgnoreTransactionsBySelectionRequest": {
             "type": "object",
             "properties": {
+                "ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ignored": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "cashflow.IgnoreTransactionsResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string"
+                },
+                "updated_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "cashflow.MonthlyAnalyticsPointResponse": {
+            "type": "object",
+            "properties": {
+                "incoming_cents": {
+                    "type": "integer"
+                },
+                "month": {
+                    "type": "string"
+                },
+                "net_cents": {
+                    "type": "integer"
+                },
+                "outgoing_cents": {
+                    "type": "integer"
+                }
+            }
+        },
+        "cashflow.TagDistributionEntryResponse": {
+            "type": "object",
+            "properties": {
+                "tag": {
+                    "type": "string"
+                },
+                "totalCents": {
+                    "type": "integer"
+                }
+            }
+        },
+        "cashflow.TagDistributionResponse": {
+            "type": "object",
+            "properties": {
+                "combined": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cashflow.TagDistributionEntryResponse"
+                    }
+                },
+                "incoming": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cashflow.TagDistributionEntryResponse"
+                    }
+                },
+                "outgoing": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cashflow.TagDistributionEntryResponse"
+                    }
+                }
+            }
+        },
+        "cashflow.TagTransactionRequest": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "tag": {
+                    "type": "string"
+                }
+            }
+        },
+        "cashflow.TagTransactionsByFilterRequest": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "filters": {
+                    "$ref": "#/definitions/transport_http_handlers_cashflow.TransactionFilters"
+                },
+                "tag": {
+                    "type": "string"
+                }
+            }
+        },
+        "cashflow.TagTransactionsBySelectionRequest": {
+            "type": "object",
+            "properties": {
+                "ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "tag": {
+                    "type": "string"
+                }
+            }
+        },
+        "cashflow.TagTransactionsResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string"
+                },
+                "updated_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "cashflow.TransactionsResponse": {
+            "type": "object",
+            "properties": {
+                "created_count": {
+                    "type": "integer"
+                },
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/api.Transaction"
+                        "$ref": "#/definitions/cashflow.CreateTransactionResponse"
                     }
-                },
-                "pagination": {
-                    "$ref": "#/definitions/api.Pagination"
                 }
             }
         },
-        "api.CreateAccountRequest": {
-            "type": "object",
-            "properties": {
-                "external_id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.CreateAssetClassRequest": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.CreateAssetItemRequest": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "class_id": {
-                    "type": "string"
-                },
-                "effective_date": {
-                    "type": "string"
-                },
-                "initial_worth": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "note": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.CreateListingRequest": {
+        "handlers.CreateListingRequest": {
             "type": "object",
             "properties": {
                 "currency": {
                     "type": "string"
                 },
                 "description": {
-                    "description": "Optional fields",
                     "type": "string"
                 },
                 "exchange": {
@@ -2723,47 +2869,189 @@ const docTemplate = `{
                 }
             }
         },
-        "api.CreateManualCashflowTransactionEntryRequest": {
+        "handlers.GetEODMetadataResponse": {
             "type": "object",
             "properties": {
-                "amount": {
+                "message": {
                     "type": "string"
                 },
-                "date": {
+                "resultCount": {
+                    "type": "integer"
+                },
+                "totalCount": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.GetEODResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/marketdata.EOD"
+                    }
+                },
+                "metadata": {
+                    "$ref": "#/definitions/handlers.GetEODMetadataResponse"
+                }
+            }
+        },
+        "handlers.ListingResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "currency": {
                     "type": "string"
                 },
                 "description": {
                     "type": "string"
                 },
-                "note": {
+                "exchange": {
                     "type": "string"
                 },
-                "tag": {
+                "id": {
+                    "type": "string"
+                },
+                "isin": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "symbol": {
+                    "type": "string"
+                },
+                "ticker": {
                     "type": "string"
                 },
                 "type": {
                     "type": "string"
                 },
-                "vendor": {
+                "updated_at": {
                     "type": "string"
                 }
             }
         },
-        "api.CreateManualCashflowTransactionsRequest": {
+        "handlers.ListingsSearchResponse": {
             "type": "object",
             "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "transactions": {
+                "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/api.CreateManualCashflowTransactionEntryRequest"
+                        "$ref": "#/definitions/handlers.ListingResponse"
                     }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/handlers.PaginationResponse"
                 }
             }
         },
-        "api.CreateManualPortfolioTransactionRequest": {
+        "handlers.PaginationResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.UpdateListingFieldsRequest": {
+            "type": "object",
+            "properties": {
+                "currency": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "exchange": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isin": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "ticker": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "importer.ImportAcceptedResponse": {
+            "type": "object",
+            "properties": {
+                "import_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "marketdata.EOD": {
+            "type": "object",
+            "properties": {
+                "close": {
+                    "type": "integer"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "high": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "listingID": {
+                    "type": "string"
+                },
+                "low": {
+                    "type": "integer"
+                },
+                "open": {
+                    "type": "integer"
+                },
+                "symbol": {
+                    "description": "Kept for response readability",
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "volume": {
+                    "type": "integer"
+                }
+            }
+        },
+        "portfolio.CreateManualPortfolioTransactionRequest": {
             "type": "object",
             "properties": {
                 "account_id": {
@@ -2792,176 +3080,7 @@ const docTemplate = `{
                 }
             }
         },
-        "api.DailyUploadAcceptedResponse": {
-            "type": "object",
-            "properties": {
-                "status": {
-                    "type": "string"
-                },
-                "upload_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.DailyUploadRowErrorResponse": {
-            "type": "object",
-            "properties": {
-                "reason": {
-                    "type": "string"
-                },
-                "row_number": {
-                    "type": "integer"
-                }
-            }
-        },
-        "api.DailyUploadStatusResponse": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "duplicate_rows": {
-                    "type": "integer"
-                },
-                "error_rows": {
-                    "type": "integer"
-                },
-                "finished_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "inserted_rows": {
-                    "type": "integer"
-                },
-                "listing_id": {
-                    "type": "string"
-                },
-                "row_errors": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.DailyUploadRowErrorResponse"
-                    }
-                },
-                "source": {
-                    "type": "string"
-                },
-                "started_at": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "status_message": {
-                    "type": "string"
-                },
-                "total_rows": {
-                    "type": "integer"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.IgnoreTransactionsByFilterRequest": {
-            "type": "object",
-            "properties": {
-                "filters": {
-                    "$ref": "#/definitions/api.CashflowTagFilters"
-                },
-                "ignored": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "api.IgnoreTransactionsBySelectionRequest": {
-            "type": "object",
-            "properties": {
-                "ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "ignored": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "api.ListingResponse": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "currency": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "exchange": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "isin": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "region": {
-                    "type": "string"
-                },
-                "source": {
-                    "type": "string"
-                },
-                "symbol": {
-                    "type": "string"
-                },
-                "ticker": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.ListingsSearchResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.ListingResponse"
-                    }
-                },
-                "pagination": {
-                    "$ref": "#/definitions/api.Pagination"
-                }
-            }
-        },
-        "api.ManualCashflowTransactionsResponse": {
-            "type": "object",
-            "properties": {
-                "created_count": {
-                    "type": "integer"
-                },
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.Transaction"
-                    }
-                }
-            }
-        },
-        "api.ManualPortfolioTransactionResponse": {
+        "portfolio.ManualPortfolioTransactionResponse": {
             "type": "object",
             "properties": {
                 "account_id": {
@@ -3011,7 +3130,7 @@ const docTemplate = `{
                 }
             }
         },
-        "api.Pagination": {
+        "portfolio.PaginationResponse": {
             "type": "object",
             "properties": {
                 "count": {
@@ -3028,7 +3147,71 @@ const docTemplate = `{
                 }
             }
         },
-        "api.PortfolioPositionResponse": {
+        "portfolio.PortfolioTransactionResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "amount": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isin": {
+                    "type": "string"
+                },
+                "listing_id": {
+                    "type": "string"
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "origin": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "symbol": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "unit_price": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "portfolio.PortfolioTransactionsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/portfolio.PortfolioTransactionResponse"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/portfolio.PaginationResponse"
+                }
+            }
+        },
+        "portfolio.PositionResponse": {
             "type": "object",
             "properties": {
                 "close_date": {
@@ -3069,13 +3252,13 @@ const docTemplate = `{
                 }
             }
         },
-        "api.PortfolioPositionsResponse": {
+        "portfolio.PositionsResponse": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/api.PortfolioPositionResponse"
+                        "$ref": "#/definitions/portfolio.PositionResponse"
                     }
                 },
                 "include_closed": {
@@ -3083,7 +3266,15 @@ const docTemplate = `{
                 }
             }
         },
-        "api.PortfolioSnapshotPointResponse": {
+        "portfolio.RebuildPortfolioRequest": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "portfolio.SnapshotPointResponse": {
             "type": "object",
             "properties": {
                 "daily_return_pct": {
@@ -3115,240 +3306,42 @@ const docTemplate = `{
                 }
             }
         },
-        "api.PortfolioTransactionResponse": {
+        "transport_http_handlers_cashflow.TransactionFilters": {
             "type": "object",
             "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "amount": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
                 "description": {
                     "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "isin": {
-                    "type": "string"
-                },
-                "listing_id": {
-                    "type": "string"
-                },
-                "occurred_at": {
-                    "type": "string"
-                },
-                "origin": {
-                    "type": "string"
-                },
-                "quantity": {
-                    "type": "string"
-                },
-                "source": {
-                    "type": "string"
-                },
-                "symbol": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                },
-                "unit_price": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.PortfolioTransactionsResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.PortfolioTransactionResponse"
-                    }
-                },
-                "pagination": {
-                    "$ref": "#/definitions/api.Pagination"
-                }
-            }
-        },
-        "api.RebuildPortfolioRequest": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.SetAssetItemWorthRequest": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "class_id": {
-                    "type": "string"
-                },
-                "effective_date": {
-                    "type": "string"
-                },
-                "item_id": {
-                    "type": "string"
-                },
-                "note": {
-                    "type": "string"
-                },
-                "worth": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.TagTransactionRequest": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "tag": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.TagTransactionsByFilterRequest": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "filters": {
-                    "$ref": "#/definitions/api.CashflowTagFilters"
-                },
-                "tag": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.TagTransactionsBySelectionRequest": {
-            "type": "object",
-            "properties": {
-                "ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "tag": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.TagTransactionsResponse": {
-            "type": "object",
-            "properties": {
-                "status": {
-                    "type": "string"
-                },
-                "updated_count": {
-                    "type": "integer"
-                }
-            }
-        },
-        "api.Transaction": {
-            "type": "object",
-            "properties": {
-                "amountCents": {
-                    "type": "integer",
-                    "example": 4250
-                },
-                "date": {
-                    "type": "string",
-                    "example": "2025-01-15T00:00:00Z"
-                },
-                "description": {
-                    "type": "string",
-                    "example": "Grocery shopping"
                 },
                 "direction": {
-                    "type": "string",
-                    "example": "out"
-                },
-                "id": {
-                    "type": "string",
-                    "example": "550e8400-e29b-41d4-a716-446655440000"
-                },
-                "ignored": {
-                    "type": "boolean",
-                    "example": false
-                },
-                "note": {
-                    "type": "string",
-                    "example": "Bought fruits and vegetables"
-                },
-                "source": {
-                    "type": "string",
-                    "example": "MyBank"
-                },
-                "tag": {
-                    "type": "string",
-                    "example": "Food"
-                }
-            }
-        },
-        "api.UpdateAssetClassRequest": {
-            "type": "object",
-            "properties": {
-                "account_id": {
                     "type": "string"
                 },
-                "archived": {
+                "from": {
+                    "type": "string"
+                },
+                "hide_ignored": {
                     "type": "boolean"
                 },
-                "id": {
+                "note": {
                     "type": "string"
                 },
-                "name": {
+                "q": {
                     "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "string"
+                },
+                "to": {
+                    "type": "string"
+                },
+                "untagged": {
+                    "type": "boolean"
                 }
             }
         },
-        "api.UpdateListingFieldsRequest": {
-            "type": "object",
-            "properties": {
-                "currency": {
-                    "type": "string"
-                },
-                "description": {
-                    "description": "Optional fields",
-                    "type": "string"
-                },
-                "exchange": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "isin": {
-                    "type": "string"
-                },
-                "region": {
-                    "type": "string"
-                },
-                "ticker": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.VendorResponse": {
+        "vendors.VendorResponse": {
             "type": "object",
             "properties": {
                 "active": {
@@ -3371,73 +3364,6 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
-                }
-            }
-        },
-        "marketdata.Daily": {
-            "type": "object",
-            "properties": {
-                "close": {
-                    "type": "integer"
-                },
-                "createdAt": {
-                    "type": "string"
-                },
-                "date": {
-                    "type": "string"
-                },
-                "high": {
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "listingID": {
-                    "type": "string"
-                },
-                "low": {
-                    "type": "integer"
-                },
-                "open": {
-                    "type": "integer"
-                },
-                "symbol": {
-                    "description": "Kept for response readability",
-                    "type": "string"
-                },
-                "updatedAt": {
-                    "type": "string"
-                },
-                "volume": {
-                    "type": "integer"
-                }
-            }
-        },
-        "marketdata.DailyResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/marketdata.Daily"
-                    }
-                },
-                "metadata": {
-                    "$ref": "#/definitions/marketdata.Metadata"
-                }
-            }
-        },
-        "marketdata.Metadata": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string"
-                },
-                "resultCount": {
-                    "type": "integer"
-                },
-                "totalCount": {
-                    "type": "integer"
                 }
             }
         }

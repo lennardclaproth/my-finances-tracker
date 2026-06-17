@@ -51,7 +51,7 @@ func Create(log logging.Logger, commands account.Commands) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		req, err := httpx.JSONDecode[CreateAccountRequest](r)
 		if err != nil {
-			if httpx.WriteDecodeError(w, err){
+			if httpx.WriteDecodeError(w, err) {
 				return
 			}
 			httpx.JSONEncode(w, http.StatusBadRequest, map[string]string{"error": "invalid request payload"})

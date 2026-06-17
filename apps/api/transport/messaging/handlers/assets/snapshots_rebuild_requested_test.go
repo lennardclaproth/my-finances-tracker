@@ -19,7 +19,7 @@ type fakeBuilderStore struct{}
 func (fakeBuilderStore) Mutations(_ context.Context, _ uuid.UUID, _ *sorting.Direction, _, _ *uint64) ([]*assets.Mutation, error) {
 	return nil, nil
 }
-func (fakeBuilderStore) DeleteSnapshots(_ context.Context, _ uuid.UUID) error               { return nil }
+func (fakeBuilderStore) DeleteSnapshots(_ context.Context, _ uuid.UUID) error         { return nil }
 func (fakeBuilderStore) StoreSnapshots(_ context.Context, _ []*assets.Snapshot) error { return nil }
 
 // immediateUOW runs the transaction body inline.
