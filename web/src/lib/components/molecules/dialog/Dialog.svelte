@@ -65,7 +65,8 @@
 
 	const dialogClasses = $derived(
 		[
-			'w-full rounded-2xl bg-white p-0 text-slate-800 shadow-2xl',
+			// `m-auto` re-applies the native modal centering that Tailwind v4 Preflight's `*{margin:0}` reset removes.
+			'm-auto w-full rounded-2xl bg-white p-0 text-slate-800 shadow-2xl',
 			'backdrop:bg-slate-900/50',
 			dialogSizeClasses[size],
 			className

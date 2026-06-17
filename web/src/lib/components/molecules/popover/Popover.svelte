@@ -28,7 +28,7 @@
 		open = $bindable(false),
 		placement = 'bottom-start',
 		offset = 8,
-		portal = false,
+		portal = true,
 		matchWidth = false,
 		closeOnOutsideClick = true,
 		closeOnEscape = true,
