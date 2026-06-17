@@ -81,12 +81,13 @@
 
 	<div class="flex justify-center md:flex-1">
 		{#if showSearch}
-			<div class="w-full md:max-w-md">
+			<div class="w-full md:max-w-lg">
 				<SearchInput
 					bind:value={searchValue}
 					{onSearch}
 					placeholder={searchPlaceholder}
-					size="sm"
+					size="lg"
+					shape="pill"
 				/>
 			</div>
 		{/if}
@@ -94,7 +95,7 @@
 
 	<div class="flex flex-wrap items-center gap-2 md:shrink-0">
 		{#if showDateRange}
-			<DateRangePicker bind:from={dateFrom} bind:to={dateTo} size="sm" onChange={onDateChange} />
+			<DateRangePicker bind:from={dateFrom} bind:to={dateTo} size="lg" onChange={onDateChange} />
 		{/if}
 		{#if actions.length > 0}
 			<ActionMenu items={actions} />

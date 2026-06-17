@@ -89,7 +89,7 @@
 
 	function sortIcon(column: Column<T>): string {
 		if (sortKey !== column.sortKey) return 'heroicons:chevron-up-down';
-		return sortDirection === 'asc' ? 'heroicons:arrow-up' : 'heroicons:arrow-down';
+		return sortDirection === 'asc' ? 'heroicons:chevron-up' : 'heroicons:chevron-down';
 	}
 </script>
 

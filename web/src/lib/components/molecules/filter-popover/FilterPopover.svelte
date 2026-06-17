@@ -3,7 +3,6 @@
 	import Popover from '$lib/components/molecules/popover/Popover.svelte';
 	import Icon from '$lib/components/atoms/icon/Icon.svelte';
 	import Button from '$lib/components/atoms/button/Button.svelte';
-	import Badge from '$lib/components/atoms/badge/Badge.svelte';
 
 	type Props = {
 		/** Bindable open state of the popover. */
@@ -44,11 +43,11 @@
 
 	function triggerClasses(highlighted: boolean): string {
 		return [
-			'inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-sm transition-colors',
-			'focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:outline-none',
+			'relative inline-flex size-9 items-center justify-center rounded-full transition-colors',
+			'focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:outline-none',
 			highlighted
-				? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-				: 'bg-transparent text-slate-600 hover:bg-slate-100'
+				? 'bg-amber-200 text-slate-800 hover:bg-amber-300'
+				: 'bg-transparent text-slate-500 hover:bg-slate-100'
 		].join(' ');
 	}
 
@@ -72,9 +71,13 @@
 			class={triggerClasses(active || api.open)}
 			onclick={api.toggle}
 		>
-			<Icon {icon} size="sm" />
+			<Icon {icon} size="md" />
 			{#if count}
-				<Badge intent="info" variant="solid" size="sm">{count}</Badge>
+				<span
+					class="absolute -top-1 -right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-slate-600 px-1 text-[10px] leading-none font-semibold text-amber-200"
+				>
+					{count}
+				</span>
 			{/if}
 		</button>
 	{/snippet}

@@ -72,7 +72,7 @@
 					class={[
 						'flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors',
 						isActive(item.href)
-							? 'bg-blue-50 font-medium text-blue-700'
+							? 'bg-amber-100 font-medium text-slate-900'
 							: 'text-slate-700 hover:bg-slate-50'
 					].join(' ')}
 					onclick={() => choose(item)}
@@ -81,7 +81,7 @@
 						<Icon
 							icon={item.icon}
 							size="sm"
-							class={isActive(item.href) ? 'text-blue-700' : 'text-slate-500'}
+							class={isActive(item.href) ? 'text-amber-700' : 'text-slate-500'}
 						/>
 					{/if}
 					{item.label}

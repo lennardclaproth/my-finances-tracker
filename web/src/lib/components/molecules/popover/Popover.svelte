@@ -152,7 +152,7 @@
 
 	const panelClasses = $derived(
 		[
-			'rounded-xl border border-slate-300 bg-white shadow-md',
+			'overflow-hidden rounded-xl border border-slate-300 bg-white shadow-md',
 			zClasses.popover,
 			ready ? '' : 'invisible',
 			className
