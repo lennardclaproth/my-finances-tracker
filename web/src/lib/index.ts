@@ -47,3 +47,27 @@ export { default as ListingSearchSelect } from './components/molecules/listing-s
 export { default as TimeSeriesChart } from './components/organisms/charts/TimeSeriesChart.svelte';
 export { default as DonutChart } from './components/organisms/charts/DonutChart.svelte';
 export type { SeriesDataset, DonutDatum } from './charts/types';
+
+// Toast system (Phase 5).
+export { default as ToastHost } from './components/organisms/toast-host/ToastHost.svelte';
+export { toast } from './stores/toast.svelte';
+export type { Toast, ToastOptions } from './stores/toast.svelte';
+
+// Organisms (Phase 6).
+export { default as KpiRow } from './components/organisms/kpi-row/KpiRow.svelte';
+export type { KpiItem } from './components/organisms/kpi-row/kpi-row.types';
+export { default as DataTable } from './components/organisms/data-table/DataTable.svelte';
+export type { Column, ColumnAlign } from './components/organisms/data-table/data-table.types';
+export { default as FooterBar } from './components/organisms/footer-bar/FooterBar.svelte';
+export { default as Drawer } from './components/organisms/drawer/Drawer.svelte';
+export { default as TopNavbar } from './components/organisms/top-navbar/TopNavbar.svelte';
+export { default as CashflowTransactionsTable } from './components/organisms/cashflow-transactions-table/CashflowTransactionsTable.svelte';
+export { default as AssetClassDrawer } from './components/organisms/asset-class-drawer/AssetClassDrawer.svelte';
+export { default as TransactionFormModal } from './components/organisms/transaction-form-modal/TransactionFormModal.svelte';
+export type { CashflowTransactionFormValue } from './components/organisms/transaction-form-modal/transaction-form-modal.types';
+
+// Templates + state plumbing (Phase 7).
+export { default as AppShellTemplate } from './components/templates/app-shell/AppShellTemplate.svelte';
+export { default as PageContentTemplate } from './components/templates/page-content/PageContentTemplate.svelte';
+export * from './url/routeQuery';
+export { adminMode } from './stores/admin.svelte';

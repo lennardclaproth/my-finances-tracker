@@ -1,2 +1,5 @@
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
+<script lang="ts">
+	// Root route redirects to /cashflow in +page.ts; this is only shown briefly during the redirect.
+</script>
+
+<p class="p-4 text-sm text-slate-500">Redirecting…</p>

@@ -39,16 +39,40 @@ run and be tested **completely independently of the Go API**:
 - **Stub data → mock service layer + flag** (see §10). Default is **mocks-on** so the app renders
   standalone; set `VITE_API_URL` (and optionally `VITE_USE_MOCKS=false`) to hit the real API.
 
-**Progress: Phases 0–4 + the stub-data layer are implemented.** Phase 3 added the calendar core
+**Progress: Phases 0–8 + the stub-data layer are implemented.** Phase 3 added the calendar core
 (`calendar.utils` + `Calendar`), `date-picker`, `date-range-picker` (dual-month + presets), the
 `filter-popover` shell with `text-filter` / `direction-filter` / `select-filter` / `visibility-filter`,
 the animated `action-menu` and `account-menu`, and the async `listing-search-select`. Phase 4 added the
 charting layer (`charts/*`) and two organisms: **`TimeSeriesChart`** (line/bar/area combo with the
 shared drag range-selection, dashed grid + solid zero line, dark tooltip, area gradients, and an
 optional below-zero line flip) — which realizes the trend-line / combo / asset-growth charts as
-configurations — and **`DonutChart`** (click-to-filter + "+N more" popover + center total). Toasts
-(Phase 5), organisms/tables/navbar/modals (Phase 6), templates (Phase 7) and pages (Phase 8) remain as
-planned below.
+configurations — and **`DonutChart`** (click-to-filter + "+N more" popover + center total). Phase 5 added the single
+toast system: a runes `toast` store (`stores/toast.svelte.ts` — `toast.success/error/...`, auto-dismiss
+~4500ms, sticky via `duration: 0`, plus a status→intent heuristic) and one **`ToastHost`** organism
+that renders the `alert` molecule top-right with `fly`/`flip` transitions. Phase 6 added the organism
+layer: **`KpiRow`** (stat-card grid), a generic **`DataTable`** engine (sticky header, multi-select with
+indeterminate header, sort, per-column filter slots, loading/empty/error, footer slot), a **`FooterBar`**
+(pagination `[10,25,50,100]` + bulk-action slot), a generic right slide-in **`Drawer`**, the
+**`TopNavbar`** (breadcrumb + search + date-range + action/account menus, responsive), and concrete
+examples that prove the composition — **`CashflowTransactionsTable`** (DataTable + FooterBar + filters +
+money/badges), **`AssetClassDrawer`** (Drawer + details), and **`TransactionFormModal`** (Dialog + form
+fields). The remaining feature tables (portfolio positions/transactions, listings, dailies, asset-classes)
+and the other form modals are thin column/field configs over these engines and are finalized during page
+assembly. Phase 7 added the templates tier and state plumbing: **`AppShellTemplate`** (the
+`flex h-screen` frame + top slot + the single app-level `ToastHost`) and **`PageContentTemplate`**
+(analytics slot + content panel + primary FAB), the pure URL-as-state helpers (`url/routeQuery.ts` —
+schema-driven `parseQuery`/`serializeQuery`/`areRouteQueriesEqual`/`hasActiveFilters`) plus a SvelteKit
+`pushQuery` (`url/queryState.ts`), a localStorage-backed **`adminMode`** store, and a mock/SSR-safe
+**`connectRealtime`** WebSocket service (debounced refresh on `import.completed` / `portfolio.rebuilt` /
+`assets.rebuilt` / `bulk_tag.completed`). Phase 8 assembled the SvelteKit routes: `/` redirects to
+`/cashflow`; **`/cashflow`** is fully wired (URL-state filters/sort/pagination via `routeQuery` +
+`pushQuery`, trend line + incoming/outgoing donuts, transactions table, create modal, toasts, realtime,
+chart-range→date-filter); **`/portfolio`** (KPI row + value/cost combo chart + tabs → positions/
+transactions tables, include-closed toggle); **`/assets`** (growth line + distribution donut + classes
+table → `AssetClassDrawer`); and the admin-gated **`/admin/listings`** (table + create modal) and
+**`/admin/dailies`** (listing search → EOD table), behind a client-side admin guard
+(`routes/admin/+layout.svelte`). Verified at runtime against mocks (charts/donuts/tables render, no
+console errors). Phase 9 (cross-cutting verification) remains.
 
 ---
 
