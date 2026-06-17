@@ -18,6 +18,31 @@
 
 ---
 
+## Build status & resolved decisions (2026-06-17)
+
+The §9 open decisions have been resolved, and a stub-data requirement has been added so the portal can
+run and be tested **completely independently of the Go API**:
+
+- **Charting library → Chart.js 4** (approved). Charts are Phase 4, so the `chart.js` dependency is
+  **deferred until Phase 4**; `src/lib/charts/theme.ts` is created now as framework-agnostic palette +
+  structural-token data (consumed by the Chart.js wrappers later). No unused dependency is added early.
+- **Popover → hand-rolled** (zero new deps): outside-click, controlled/uncontrolled, optional portal,
+  viewport-aware positioning written by hand.
+- **Brand reconciliation → confirmed.** Re-map all reference accents onto the target brand
+  (indigo→slate/amber, rose→red, cyan→sky). The existing components were audited and already conform —
+  no off-brand (`indigo`/`rose`/`cyan`/`blue`) utilities exist — so **Phase 1 is a verification pass,
+  not a recolor rewrite**.
+- **Panel radius → standardize on `rounded-2xl`** (the `panel` `xl` shape). We do **not** add a `3xl`
+  shape; the reference's `rounded-3xl` cards become `rounded-2xl` for consistency.
+- **Stub data → mock service layer + flag** (see §10). Default is **mocks-on** so the app renders
+  standalone; set `VITE_API_URL` (and optionally `VITE_USE_MOCKS=false`) to hit the real API.
+
+**Implementation scope for the current pass: Phases 0–2 + the stub-data layer.** Charts (Phase 4),
+toasts (Phase 5), organisms/tables/navbar/modals (Phase 6), templates (Phase 7) and pages (Phase 8)
+are intentionally out of scope for this pass and remain as planned below.
+
+---
+
 ## 0. What already exists vs. what we build (the headline)
 
 The target is **not** a greenfield. `web/src/lib/components/` already ships, fully storied:
@@ -417,6 +442,10 @@ organisms are storied and Chromatic-clean.
 
 ## 9. Risks, Unknowns & Areas Needing Manual Review
 
+> **Resolution note:** items 1–4, 7, and 9 below were decided on 2026-06-17 — see *Build status &
+> resolved decisions* near the top of this doc (Chart.js / hand-rolled popover / brand re-map confirmed
+> / native `<dialog>` / `rounded-2xl` / stub-data layer §10). They are kept here for the rationale.
+
 1. **Charting library decision (blocking, needs approval — `AGENTS.md`: no new deps without approval).**
    Options: **(a) Chart.js 4** = exact visual parity with the reference + reuse of all chart logic, but
    a new dep and canvas needs SSR guards; **(b) LayerChart / LayerCake** = Svelte-native, composable,
@@ -450,6 +479,58 @@ organisms are storied and Chromatic-clean.
 11. **Doc/branch location.** This plan currently lives at `apps/web/docs/` on `claude/funny-easley-217651`;
     the build target is `web/` on `1-refactor-backend`. Decide where the plan should be committed (likely
     `web/docs/` on the target branch) so it travels with the code it governs.
+
+---
+
+## 10. Stub-data layer (run & test the portal independently of the API)
+
+The portal must render and be storybook-/dev-testable **without the Go backend running**. We add a
+small, typed data layer whose fixtures mirror the API response shapes exactly, fronted by a service
+layer that returns either the fixtures (mock mode) or live data (real mode).
+
+### 10.1 Shape fidelity — mirror the Go DTOs exactly
+Types live in `src/lib/api/types/` and are a 1:1 mirror of the `transport/http` response DTOs
+(field names, JSON casing, nullability). Key shapes and their **money conventions** (the backend has
+three, do not unify them on the client — match the wire format per endpoint):
+
+- **Cashflow** (`/cashflow/transactions`, `…/analytics/monthly`, `…/analytics/tags`):
+  transaction `amountCents:int64`; monthly points `incoming_cents/outgoing_cents/net_cents:int64`;
+  tag distribution `{ combined, incoming, outgoing }` of `{ tag, totalCents:int64 }`. List responses
+  wrap `{ pagination:{limit,offset,count,total}, data:[…] }`.
+- **Portfolio** (`/portfolio/positions|snapshots|transactions`): positions/snapshots use **scaled
+  integers** (`cost_basis`, `market_value`, `total_pnl`, … : `int64` at `MONEY_SCALE = 1_000_000`,
+  6 dp); transactions use **decimal strings** (`amount`, `quantity`, `unit_price`). Positions/snapshot
+  metrics include nullable fields (`market_value`, `unrealized_pnl_pct`, `last_snapshot_at`,
+  `close_date`).
+- **Assets** (`/assets/classes`, `/assets/classes/{id}`, `/assets/snapshots`): money as **decimal
+  strings** (`current_worth`, `total_worth`, `amount`, …, `%.6f`); growth/snapshot points are
+  `{ date:"YYYY-MM-DD", total_worth:string }`.
+- **Market data** (`/marketdata/listings`, `…/listings/search`, `…/eods`): listings are flat records
+  with many nullable metadata fields; **EOD rows are serialized from the raw Go struct** so keys are
+  **PascalCase** (`ID, ListingID, Symbol, Date, Open, Close, High, Low, Volume, …`) and prices are raw
+  `int64` at `MONEY_SCALE`. The EOD endpoint returns `{ Data:[…], Metadata:{Message,ResultCount,TotalCount} }`.
+- **Vendors** (`/vendors`): `{ id, name, type, active, import_disabled, created_at, updated_at }`.
+- **Account** (`POST /accounts`): `{ id }`.
+
+`src/lib/api/money.ts` centralizes `MONEY_SCALE` and helpers (`scaledToNumber`, `decimalStringToNumber`,
+`centsToNumber`) so components consume display values uniformly regardless of the wire format.
+
+### 10.2 Wiring — service layer + mock flag
+- `src/lib/api/config.ts` — reads `import.meta.env.VITE_API_URL` and `VITE_USE_MOCKS` (works in both the
+  SvelteKit app and Storybook's Vite). **Mocks are on by default** (no API URL configured ⇒ mock mode);
+  set `VITE_USE_MOCKS=false` with a `VITE_API_URL` to hit the real backend.
+- `src/lib/api/client.ts` — a thin `fetch` wrapper (base URL + JSON + error normalization) used only in
+  real mode.
+- `src/lib/services/<feature>.ts` — one async function per endpoint. In mock mode each resolves the
+  matching fixture (with a small simulated latency so loading states are observable and filtering/paging
+  is applied in-memory); in real mode it calls `client`. These are the **only** thing pages/loaders call.
+- `src/lib/data/fixtures/<feature>.ts` — realistic, deterministic fixtures typed against §10.1. Stories
+  import these fixtures directly (no service indirection) so component stories stay pure and offline.
+
+### 10.3 Storybook & tests
+Every data-driven component receives data via props from fixtures (never fetches), so Loading/Empty/Error
+stories are just different fixture inputs. The service layer is exercised by page-level wiring (Phase 8),
+not by atom/molecule stories.
 
 ---
 

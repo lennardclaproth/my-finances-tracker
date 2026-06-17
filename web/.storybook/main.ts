@@ -12,6 +12,9 @@ const config: StorybookConfig = {
     "@storybook/addon-a11y",
     "@storybook/addon-docs"
   ],
-  "framework": "@storybook/sveltekit"
+  "framework": "@storybook/sveltekit",
+  // Serve SvelteKit's static/ at the root so /fonts/*.woff2 (referenced by @font-face in app.css)
+  // resolve in Storybook exactly as they do in the running app.
+  "staticDirs": ["../static"]
 };
 export default config;

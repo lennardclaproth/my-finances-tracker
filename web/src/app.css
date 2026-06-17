@@ -1,29 +1,45 @@
 @import 'tailwindcss';
+@plugin '@tailwindcss/typography';
 
-.noto-sans {
-  font-family: "Noto Sans", sans-serif;
+/*
+  Canonical theme stylesheet. Loaded by BOTH the running app (via routes/layout.css, which imports
+  this file) and Storybook (.storybook/preview.ts imports this file directly), so the two render
+  identically. Fonts are served from /fonts/* (SvelteKit `static/`; Storybook serves it via
+  `staticDirs` in .storybook/main.ts).
+*/
+
+@font-face {
+  font-family: 'Noto Sans';
   src: url('/fonts/noto-sans.woff2') format('woff2');
-  font-optical-sizing: auto;
-  font-weight: 300;
+  font-weight: 100 900;
   font-style: normal;
-  font-variation-settings:
-    "wdth" 100;
+  font-display: swap;
 }
 
-.garamond {
-    font-family: "EB Garamond", serif;
-    src: url('/fonts/eb-garamond.woff2') format('woff2');
-    font-optical-sizing: auto;
-    font-weight: 600;
-    font-style: normal;
-    font-variation-settings:
-        "wdth" 100;
+@font-face {
+  font-family: 'EB Garamond';
+  src: url('/fonts/eb-garamond-v32-latin-regular.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
 }
 
 @theme {
   --font-sans: 'Noto Sans', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Noto Sans', ui-sans-serif, system-ui, sans-serif;
   --font-heading: 'EB Garamond', ui-serif, serif;
+
+  /* Warm neutral background family — the app surface the user sees first. */
+  --color-taupe-50: #faf8f4;
+  --color-taupe-100: #f2ede4;
+  --color-taupe-200: #e7dfd1;
+  --color-taupe-300: #d8ccb8;
+  --color-taupe-400: #bfae93;
+  --color-taupe-500: #a48f70;
+  --color-taupe-600: #877458;
+  --color-taupe-700: #6b5b46;
+  --color-taupe-800: #4c4031;
+  --color-taupe-900: #2f271e;
 }
 
 @layer base {

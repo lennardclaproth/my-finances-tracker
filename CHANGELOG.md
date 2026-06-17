@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [024] Added backend-owned daily asset snapshot projection (`GET /assets/snapshots`) with persisted account/day total-worth points and async rebuild events.
 
 ### Changed
+- [020] Began the SvelteKit visual rebuild per `web/docs/DESIGN_PLAN.md` (Phases 0–2): fixed the theme split so the app and Storybook load the same `app.css`, defined the `taupe` token ramp and valid `@font-face` rules, added a documented z-index scale and a framework-agnostic `charts/theme.ts`, and added foundational molecule primitives (popover, dialog, tabs, sortable-header, breadcrumb, search-input).
+- [020] Added a typed, API-shaped stub-data layer (`$lib/api` types + money helpers, `$lib/data` fixtures, `$lib/services`) with a mocks-on-by-default flag so the web app runs and is testable independently of the Go API.
 - [002] Clarified `/import/csv` feature documentation to describe the raw UUID response format and aligned import enqueue-degraded logging to warning level.
 - [023] Aligned the cashflow create-transaction floating action button behavior/placement with the portfolio and assets pages.
 - [024] Refined asset-management UX with top-card growth/distribution charts, table-level class settings actions, and table styling aligned to the existing app pattern.

@@ -1,2 +1,5 @@
-@import 'tailwindcss';
-@plugin '@tailwindcss/typography';
+/*
+	The running app loads its theme from the canonical src/app.css (the same file Storybook loads),
+	so the app and Storybook render identically. Keep theme tokens in app.css, not here.
+*/
+@import '../app.css';
