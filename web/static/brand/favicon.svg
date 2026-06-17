@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Tally favicon">
+  <title>Tally — favicon</title>
+  <rect x="0" y="0" width="96" height="96" rx="22" fill="#1e293b"/>
+  <g stroke="#fde68a" stroke-width="8" stroke-linecap="round">
+    <line x1="34" y1="30" x2="34" y2="66"/>
+    <line x1="50" y1="30" x2="50" y2="66"/>
+    <line x1="66" y1="30" x2="66" y2="66"/>
+  </g>
+  <line x1="26" y1="70" x2="74" y2="26" stroke="#fcd34d" stroke-width="8" stroke-linecap="round"/>
+</svg>
