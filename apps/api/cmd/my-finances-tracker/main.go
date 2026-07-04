@@ -128,7 +128,7 @@ func run() error {
 	router := apphttp.NewRouter()
 	registerRoutes(router, app)
 
-	server := apphttp.NewServer(fmt.Sprintf(":%d", cfg.Server.Port), router, log)
+	server := apphttp.NewServer(fmt.Sprintf(":%d", cfg.Server.Port), router, log, cfg.Server.AllowedOrigins())
 	return server.Run(ctx)
 }
 
@@ -259,6 +259,7 @@ func registerRoutes(router *apphttp.Router, app *application) {
 	handle("GET /swagger/", httpSwagger.WrapHandler)
 	handle("GET /ws/accounts/{account_id}", app.hub.Handler())
 
+	handle("GET /accounts", accounthttp.List(app.log, app.accountQueries))
 	handle("POST /accounts", accounthttp.Create(app.log, *app.accountCommands))
 	handle("GET /vendors", vendorshttp.List(app.log, app.vendorQueries))
 

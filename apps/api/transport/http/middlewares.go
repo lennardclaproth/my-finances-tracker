@@ -44,6 +44,51 @@ func WithRequestLogging(logger logging.Logger) func(http.Handler) http.Handler {
 	}
 }
 
+// WithCORS returns middleware that applies CORS headers for the configured
+// browser origins and short-circuits preflight (OPTIONS) requests with 204. It
+// must wrap the router so preflight requests are answered before Go's
+// method-based route matching would reject an unregistered OPTIONS pattern.
+func WithCORS(allowedOrigins []string) func(http.Handler) http.Handler {
+	allowAll := false
+	allowed := make(map[string]struct{}, len(allowedOrigins))
+	for _, o := range allowedOrigins {
+		o = strings.TrimSpace(o)
+		if o == "*" {
+			allowAll = true
+		}
+		if o != "" {
+			allowed[o] = struct{}{}
+		}
+	}
+	defaultHeaders := "Content-Type, Accept, " + observability.HeaderRequestID + ", " + observability.HeaderCorrelationID
+	exposedHeaders := observability.HeaderRequestID + ", " + observability.HeaderCorrelationID
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			origin := r.Header.Get("Origin")
+			if origin != "" {
+				if _, ok := allowed[origin]; allowAll || ok {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					w.Header().Add("Vary", "Origin")
+					w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+					if reqHeaders := r.Header.Get("Access-Control-Request-Headers"); reqHeaders != "" {
+						w.Header().Set("Access-Control-Allow-Headers", reqHeaders)
+					} else {
+						w.Header().Set("Access-Control-Allow-Headers", defaultHeaders)
+					}
+					w.Header().Set("Access-Control-Expose-Headers", exposedHeaders)
+					w.Header().Set("Access-Control-Max-Age", "600")
+				}
+			}
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // WithRequestIdentifiers ensures request/correlation IDs exist on context and response headers.
 func WithRequestIdentifiers() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

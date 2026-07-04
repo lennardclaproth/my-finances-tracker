@@ -5,8 +5,9 @@ Guidance for Claude Code when working in the SvelteKit frontend. The detailed co
 The repo-wide rules in the root [CLAUDE.md](../CLAUDE.md) also apply (minimal focused diffs,
 changelog + feature-doc discipline, no dependency/migration/infra changes without approval).
 
-> The frontend is `web/`, not `apps/web`. Run frontend scripts from inside `web/`; `make web-lint` is
-> broken because it points at the nonexistent `apps/web`.
+> The frontend is `web/`, not `apps/web`. Run frontend scripts from inside `web/`, or use the Makefile
+> `web-*` targets (`make web-dev`, `make web-build`, `make web-install`, `make web-env`, `make web-lint`),
+> which point at `web/` correctly.
 
 ## Stack
 
@@ -59,15 +60,25 @@ vocabulary: `intent` (semantic color), `variant` (`solid/outline/ghost`), `size`
 `npm run dev` · `npm run check` (svelte-check — main type gate) · `npm run lint`
 (prettier check + eslint) · `npm run format` · `npm run storybook` · `npm run build`.
 
+## Data access & backend connection
+
+- Services live in `src/lib/services/*` (one per feature) over the `src/lib/api` fetch client
+  (`apiGet` / `apiSend` for JSON, `apiUpload` for multipart imports). Each service has a mock branch
+  (fixtures in `src/lib/data/fixtures`) and a live branch.
+- `src/lib/api/config.ts`: `useMocks` is true whenever `VITE_API_URL` is empty (so the app runs
+  standalone on fixtures). Set `web/.env` (`make web-env`) with `VITE_USE_MOCKS=false` and
+  `VITE_API_URL=http://localhost:6060` to hit the live Go API.
+- The active account id comes from `accountStore` (`src/lib/stores/account.svelte.ts`), which resolves
+  it from `GET /accounts` (falling back to `DEMO_ACCOUNT_ID` / the mock account). Read
+  `accountStore.activeId` in pages instead of hard-coding an id, and `await accountStore.ensureLoaded()`
+  before the first account-scoped request.
+
 ## Gotchas to know before you trust the build
 
-- **Theme split.** `src/routes/+layout.svelte` (the running app) loads `src/routes/layout.css`, which
-  only pulls in Tailwind. The real theme — `@theme` fonts + the `taupe` body background in
-  `src/app.css` — is imported **only by Storybook**. App and Storybook can look different; wire
-  `app.css` into the layout if you need the tokens at runtime.
-- **`taupe` color is referenced but not defined** anywhere in `@theme` (`bg-taupe-100/50`). Define it
-  before relying on it.
 - **Formatting drift.** Most component files use 2-space indent while Prettier is configured for tabs,
   so `npm run lint` is not green out of the box. Match a file's existing style when editing; don't
-  mass-reformat the tree as a drive-by.
-- `routes/+page.svelte` is still the default SvelteKit welcome page — there's no real app routing yet.
+  mass-reformat the tree as a drive-by. `npm run check` (svelte-check) is the type gate and is green.
+- The theme loads at runtime: `src/routes/+layout.svelte` → `src/routes/layout.css` → `src/app.css`
+  (`@theme` fonts + the defined `taupe` palette + `bg-taupe-100` body). App and Storybook match.
+- Real app routing exists: `routes/+page.ts` redirects `/` → `/cashflow`, and there are working
+  `cashflow`, `portfolio`, `assets`, and `admin/*` feature routes with cross-screen navigation.

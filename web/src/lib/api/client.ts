@@ -53,3 +53,16 @@ export async function apiSend<T>(method: string, path: string, body?: unknown): 
 	});
 	return parse<T>(res);
 }
+
+/**
+ * POST a `multipart/form-data` body (file uploads), returning the decoded JSON body. The
+ * `Content-Type` is intentionally left unset so the browser adds the multipart boundary.
+ */
+export async function apiUpload<T>(path: string, form: FormData): Promise<T> {
+	const res = await fetch(`${apiBaseUrl}${path}`, {
+		method: 'POST',
+		headers: { Accept: 'application/json' },
+		body: form
+	});
+	return parse<T>(res);
+}

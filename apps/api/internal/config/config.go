@@ -32,6 +32,19 @@ type Logging struct {
 type Server struct {
 	Environment string `yaml:"environment"`
 	Port        int    `yaml:"port"`
+	// CORSAllowedOrigins lists the browser origins permitted to call the API
+	// cross-origin (e.g. the SvelteKit dev server). Empty falls back to the
+	// local dev origin; a single "*" entry allows any origin.
+	CORSAllowedOrigins []string `yaml:"cors_allowed_origins"`
+}
+
+// AllowedOrigins returns the configured CORS origins, defaulting to the local
+// SvelteKit dev server when none are set.
+func (s Server) AllowedOrigins() []string {
+	if len(s.CORSAllowedOrigins) == 0 {
+		return []string{"http://localhost:5199"}
+	}
+	return s.CORSAllowedOrigins
 }
 
 type Database struct {

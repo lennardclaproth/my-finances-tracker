@@ -67,6 +67,72 @@ export interface AssetSnapshotPoint {
 /** `GET /assets/snapshots` returns a bare array of snapshot points. */
 export type AssetSnapshotsResponse = AssetSnapshotPoint[];
 
+/** `POST /assets/classes` request — mirrors `assets.CreateAssetClassRequest`. */
+export interface CreateAssetClassRequest {
+	account_id: string;
+	name: string;
+}
+
+/** `POST /assets/classes` — mirrors `assets.CreateAssetClassResponse`. */
+export interface CreateAssetClassResponse {
+	id: string;
+}
+
+/** `PATCH /assets/classes` request — mirrors `assets.UpdateClassRequest`. */
+export interface UpdateAssetClassRequest {
+	account_id: string;
+	id: string;
+	name?: string;
+	archived?: boolean;
+}
+
+/** `DELETE /assets/classes/{class_id}` body — mirrors `assets.DeleteClassRequest`. */
+export interface DeleteAssetClassRequest {
+	account_id: string;
+}
+
+/** `POST /assets` request — mirrors `assets.CreateAssetRequest`. */
+export interface CreateAssetRequest {
+	account_id: string;
+	class_id: string;
+	name: string;
+	/** Non-negative decimal string. */
+	initial_worth: string;
+	/** "YYYY-MM-DD". */
+	effective_date: string;
+	note?: string;
+}
+
+/** `POST /assets` — mirrors `assets.CreateAssetResponse`. */
+export interface CreateAssetResponse {
+	id: string;
+	name: string;
+}
+
+/** `PUT /assets/{asset_id}/worth` request — mirrors `assets.SetAssetWorthRequest`. */
+export interface SetAssetWorthRequest {
+	account_id: string;
+	/** Non-negative decimal string. */
+	worth: string;
+	/** "YYYY-MM-DD". */
+	effective_date: string;
+	note?: string;
+}
+
+/** Direction for an asset-worth adjustment. */
+export type AssetWorthDirection = 'INCREASE' | 'DECREASE';
+
+/** `PUT /assets/{asset_id}/adjust` request — mirrors `assets.AdjustAssetWorthRequest`. */
+export interface AdjustAssetWorthRequest {
+	account_id: string;
+	direction: AssetWorthDirection;
+	/** Non-negative decimal string. */
+	amount: string;
+	/** "YYYY-MM-DD". */
+	effective_date: string;
+	note?: string;
+}
+
 /** Query filters for `GET /assets/classes`. */
 export interface AssetClassesQuery {
 	account_id: string;

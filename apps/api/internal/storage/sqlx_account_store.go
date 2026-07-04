@@ -61,6 +61,16 @@ func (s *SQLXAccountStore) GetByID(ctx context.Context, id uuid.UUID) (*account.
 	return &acc, nil
 }
 
+// List returns all accounts ordered by creation time (oldest first).
+func (s *SQLXAccountStore) List(ctx context.Context) ([]*account.Account, error) {
+	var accounts []*account.Account
+	query := fmt.Sprintf(`SELECT id, external_id, name, created_at, updated_at FROM %s ORDER BY created_at ASC`, s.tableName)
+	if err := sqlx.SelectContext(ctx, s.db.GetExecutor(ctx), &accounts, query); err != nil {
+		return nil, err
+	}
+	return accounts, nil
+}
+
 // Exists reports whether an account with the given ID exists.
 func (s *SQLXAccountStore) Exists(ctx context.Context, id uuid.UUID) (bool, error) {
 	var exists bool

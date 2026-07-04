@@ -8,7 +8,7 @@
 	import FormField from '$lib/components/molecules/form-field/FormField.svelte';
 	import Input from '$lib/components/atoms/input/Input.svelte';
 	import Button from '$lib/components/atoms/button/Button.svelte';
-	import { listListings } from '$lib/services/marketdata';
+	import { listListings, createListing as createListingService } from '$lib/services/marketdata';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { adminMode } from '$lib/stores/admin.svelte';
 	import type { Listing } from '$lib/api/types';
@@ -21,6 +21,7 @@
 	let name = $state('');
 	let symbol = $state('');
 	let source = $state('');
+	let creating = $state(false);
 
 	async function load() {
 		loading = true;
@@ -36,14 +37,26 @@
 
 	onMount(load);
 
-	function createListing() {
-		if (name.trim() === '' || symbol.trim() === '') return;
-		createOpen = false;
-		toast.success(`Listing ${symbol.toUpperCase()} created`);
-		name = '';
-		symbol = '';
-		source = '';
-		void load();
+	async function createListing() {
+		if (name.trim() === '' || symbol.trim() === '' || source.trim() === '') return;
+		creating = true;
+		try {
+			await createListingService({
+				name: name.trim(),
+				symbol: symbol.trim().toUpperCase(),
+				source: source.trim()
+			});
+			createOpen = false;
+			toast.success(`Listing ${symbol.toUpperCase()} created`);
+			name = '';
+			symbol = '';
+			source = '';
+			void load();
+		} catch {
+			toast.error('Failed to create listing');
+		} finally {
+			creating = false;
+		}
 	}
 </script>
 
@@ -87,7 +100,7 @@
 				<Input id={ctx.id} bind:value={name} placeholder="e.g. Vanguard FTSE All-World" />
 			{/snippet}
 		</FormField>
-		<FormField label="Source" id="listing-source" hint="Optional">
+		<FormField label="Source" id="listing-source">
 			{#snippet children(ctx)}
 				<Input id={ctx.id} bind:value={source} placeholder="e.g. marketstack" />
 			{/snippet}
@@ -95,6 +108,6 @@
 	</div>
 	{#snippet footer()}
 		<Button variant="ghost" intent="secondary" onclick={() => (createOpen = false)}>Cancel</Button>
-		<Button intent="success" onclick={createListing}>Create</Button>
+		<Button intent="success" onclick={createListing} loading={creating}>Create</Button>
 	{/snippet}
 </Dialog>

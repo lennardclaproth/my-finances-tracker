@@ -1,4 +1,13 @@
 definitions:
+  account.AccountResponse:
+    properties:
+      external_id:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
   account.CreateAccountRequest:
     properties:
       external_id:
@@ -677,6 +686,26 @@ info:
   contact: {}
 paths:
   /accounts:
+    get:
+      description: Returns all accounts.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/account.AccountResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List accounts
+      tags:
+      - accounts
     post:
       consumes:
       - application/json

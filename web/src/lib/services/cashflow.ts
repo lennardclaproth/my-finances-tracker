@@ -1,13 +1,21 @@
-import { apiGet } from '$lib/api/client';
+import { apiGet, apiSend } from '$lib/api/client';
 import { useMocks } from '$lib/api/config';
 import type {
+	CashflowBulkMutationResponse,
 	CashflowDirection,
 	CashflowMonthlyAnalyticsResponse,
 	CashflowTransaction,
 	CashflowTransactionsQuery,
 	CashflowTransactionsResponse,
+	CreateCashflowTransactionsRequest,
+	CreateCashflowTransactionsResponse,
+	IgnoreTransactionsByFilterRequest,
+	IgnoreTransactionsBySelectionRequest,
 	TagDistributionEntry,
-	TagDistributionResponse
+	TagDistributionResponse,
+	TagTransactionRequest,
+	TagTransactionsByFilterRequest,
+	TagTransactionsBySelectionRequest
 } from '$lib/api/types';
 import { cashflowMonthly, cashflowTransactions } from '$lib/data/fixtures/cashflow';
 import { clone, contains, delay } from './_mock';
@@ -132,4 +140,84 @@ export async function getCashflowTagDistribution(
 		return clone({ incoming, outgoing, combined });
 	}
 	return apiGet<TagDistributionResponse>('/cashflow/analytics/tags', { ...query });
+}
+
+/** `POST /cashflow/transactions/manual` */
+export async function createCashflowTransactions(
+	body: CreateCashflowTransactionsRequest
+): Promise<CreateCashflowTransactionsResponse> {
+	if (useMocks) {
+		await delay();
+		return { created_count: body.transactions.length, data: [] };
+	}
+	return apiSend<CreateCashflowTransactionsResponse>(
+		'POST',
+		'/cashflow/transactions/manual',
+		body
+	);
+}
+
+/** `POST /cashflow/transactions/tag` (single transaction) */
+export async function tagCashflowTransaction(body: TagTransactionRequest): Promise<void> {
+	if (useMocks) {
+		await delay();
+		return;
+	}
+	await apiSend<unknown>('POST', '/cashflow/transactions/tag', body);
+}
+
+/** `POST /cashflow/transactions/tag/selection` */
+export async function tagCashflowTransactionsBySelection(
+	body: TagTransactionsBySelectionRequest
+): Promise<CashflowBulkMutationResponse> {
+	if (useMocks) {
+		await delay();
+		return { updated_count: body.ids.length, status: 'ok' };
+	}
+	return apiSend<CashflowBulkMutationResponse>(
+		'POST',
+		'/cashflow/transactions/tag/selection',
+		body
+	);
+}
+
+/** `POST /cashflow/transactions/tag/filter` */
+export async function tagCashflowTransactionsByFilter(
+	body: TagTransactionsByFilterRequest
+): Promise<CashflowBulkMutationResponse> {
+	if (useMocks) {
+		await delay();
+		return { updated_count: 0, status: 'ok' };
+	}
+	return apiSend<CashflowBulkMutationResponse>('POST', '/cashflow/transactions/tag/filter', body);
+}
+
+/** `POST /cashflow/transactions/ignore/selection` */
+export async function ignoreCashflowTransactionsBySelection(
+	body: IgnoreTransactionsBySelectionRequest
+): Promise<CashflowBulkMutationResponse> {
+	if (useMocks) {
+		await delay();
+		return { updated_count: body.ids.length, status: 'ok' };
+	}
+	return apiSend<CashflowBulkMutationResponse>(
+		'POST',
+		'/cashflow/transactions/ignore/selection',
+		body
+	);
+}
+
+/** `POST /cashflow/transactions/ignore/filter` */
+export async function ignoreCashflowTransactionsByFilter(
+	body: IgnoreTransactionsByFilterRequest
+): Promise<CashflowBulkMutationResponse> {
+	if (useMocks) {
+		await delay();
+		return { updated_count: 0, status: 'ok' };
+	}
+	return apiSend<CashflowBulkMutationResponse>(
+		'POST',
+		'/cashflow/transactions/ignore/filter',
+		body
+	);
 }

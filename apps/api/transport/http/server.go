@@ -13,10 +13,11 @@ import (
 )
 
 type Server struct {
-	addr   string
-	router *Router
-	log    logging.Logger
-	mux    *http.ServeMux
+	addr        string
+	router      *Router
+	log         logging.Logger
+	mux         *http.ServeMux
+	corsOrigins []string
 }
 
 const (
@@ -27,12 +28,14 @@ const (
 )
 
 // NewServer creates and returns a new Server for the given address and database.
-func NewServer(addr string, router *Router, log logging.Logger) *Server {
+// corsOrigins are the browser origins permitted to call the API cross-origin.
+func NewServer(addr string, router *Router, log logging.Logger, corsOrigins []string) *Server {
 	s := &Server{
-		addr:   addr,
-		router: router,
-		log:    log,
-		mux:    http.NewServeMux(),
+		addr:        addr,
+		router:      router,
+		log:         log,
+		mux:         http.NewServeMux(),
+		corsOrigins: corsOrigins,
 	}
 
 	s.registerRoutes()
@@ -48,6 +51,7 @@ func (s *Server) Run(ctx context.Context) error {
 		return apm.DefaultTracer().IgnoredTransactionURL(r.URL)
 	}))
 	handler = WithRequestIdentifiers()(handler)
+	handler = WithCORS(s.corsOrigins)(handler)
 
 	server := s.newHTTPServer(handler)
 

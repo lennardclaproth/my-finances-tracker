@@ -55,6 +55,33 @@ export interface EODResponse {
 	Metadata: EODMetadata;
 }
 
+/** `POST /marketdata/listing` request — mirrors `marketdata.CreateListingRequest`. */
+export interface CreateListingRequest {
+	name: string;
+	symbol: string;
+	source: string;
+	description?: string;
+	exchange?: string;
+	region?: string;
+	/** ISO currency code; validated by the backend if present. */
+	currency?: string;
+	isin?: string;
+	ticker?: string;
+	type?: string;
+}
+
+/** `PATCH /marketdata/listing` request — mirrors `marketdata.UpdateListingFieldsRequest`. */
+export interface UpdateListingFieldsRequest {
+	id: string;
+	description?: string;
+	exchange?: string;
+	region?: string;
+	currency?: string;
+	isin?: string;
+	ticker?: string;
+	type?: string;
+}
+
 /** Query filters for `GET /marketdata/listings/search`. */
 export interface ListingsSearchQuery {
 	q: string;

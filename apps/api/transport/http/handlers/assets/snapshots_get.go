@@ -42,11 +42,12 @@ func GetSnapshots(log logging.Logger, queries assets.Queries) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		req, err := httpx.DecodeQuery[GetSnapshotsRequest](r)
 		if err != nil {
-			httpx.JSONEncode(w, http.StatusBadRequest, map[string]string{"error": "invalid query parameters"})
+			_ = httpx.JSONEncode(w, http.StatusBadRequest, map[string]string{"error": "invalid query parameters"})
+			return
 		}
 		var from *time.Time
 		if req.From != nil && len(strings.TrimSpace(*req.From)) != 0 {
-			parsed, err := time.Parse("2026-01-02", *req.From)
+			parsed, err := time.Parse("2006-01-02", *req.From)
 			if err != nil {
 				_ = httpx.JSONEncode(w, http.StatusBadRequest, map[string]string{
 					"from": "from must be in YYYY-MM-DD format",
@@ -57,10 +58,10 @@ func GetSnapshots(log logging.Logger, queries assets.Queries) http.Handler {
 		}
 		var to *time.Time
 		if req.To != nil && len(strings.TrimSpace(*req.To)) != 0 {
-			parsed, err := time.Parse("2026-01-02", *req.To)
+			parsed, err := time.Parse("2006-01-02", *req.To)
 			if err != nil {
 				_ = httpx.JSONEncode(w, http.StatusBadRequest, map[string]string{
-					"from": "from must be in YYYY-MM-DD format",
+					"to": "to must be in YYYY-MM-DD format",
 				})
 				return
 			}
@@ -75,7 +76,7 @@ func GetSnapshots(log logging.Logger, queries assets.Queries) http.Handler {
 		res := make([]SnapshotResponse, 0, len(snapshots))
 		for _, snapshot := range snapshots {
 			res = append(res, SnapshotResponse{
-				Date:       snapshot.Date.Format("2026-01-02"),
+				Date:       snapshot.Date.Format("2006-01-02"),
 				TotalWorth: snapshot.TotalWorth.String(),
 			})
 		}

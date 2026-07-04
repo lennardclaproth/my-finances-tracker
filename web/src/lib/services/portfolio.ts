@@ -1,12 +1,15 @@
-import { apiGet } from '$lib/api/client';
+import { apiGet, apiSend } from '$lib/api/client';
 import { useMocks } from '$lib/api/config';
 import type {
+	CreateManualPortfolioTransactionRequest,
 	PortfolioPositionsQuery,
 	PortfolioPositionsResponse,
 	PortfolioSnapshotsQuery,
 	PortfolioSnapshotsResponse,
+	PortfolioTransaction,
 	PortfolioTransactionsQuery,
-	PortfolioTransactionsResponse
+	PortfolioTransactionsResponse,
+	RebuildPortfolioRequest
 } from '$lib/api/types';
 import {
 	portfolioPositions,
@@ -86,4 +89,41 @@ export async function listPortfolioTransactions(
 		return { pagination: { limit, offset, count: data.length, total }, data };
 	}
 	return apiGet<PortfolioTransactionsResponse>('/portfolio/transactions', { ...query });
+}
+
+/** `POST /portfolio/transactions/manual` */
+export async function createManualPortfolioTransaction(
+	body: CreateManualPortfolioTransactionRequest
+): Promise<PortfolioTransaction> {
+	if (useMocks) {
+		await delay();
+		const now = new Date().toISOString();
+		return {
+			id: crypto.randomUUID(),
+			account_id: body.account_id,
+			origin: 'MANUAL',
+			source: 'manual',
+			occurred_at: body.occurred_at,
+			type: body.type,
+			listing_id: body.listing_id ?? null,
+			isin: null,
+			symbol: null,
+			description: body.description ?? '',
+			amount: body.amount,
+			quantity: body.quantity ?? '0',
+			unit_price: '0',
+			created_at: now,
+			updated_at: now
+		};
+	}
+	return apiSend<PortfolioTransaction>('POST', '/portfolio/transactions/manual', body);
+}
+
+/** `POST /portfolio/rebuild` */
+export async function rebuildPortfolio(body: RebuildPortfolioRequest): Promise<void> {
+	if (useMocks) {
+		await delay();
+		return;
+	}
+	await apiSend<unknown>('POST', '/portfolio/rebuild', body);
 }

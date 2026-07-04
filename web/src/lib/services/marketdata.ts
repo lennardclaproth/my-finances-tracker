@@ -1,14 +1,17 @@
-import { apiGet } from '$lib/api/client';
+import { apiGet, apiSend } from '$lib/api/client';
 import { useMocks } from '$lib/api/config';
 import type {
+	CreateListingRequest,
 	EODQuery,
 	EODResponse,
+	Listing,
 	ListingsResponse,
 	ListingsSearchQuery,
-	ListingsSearchResponse
+	ListingsSearchResponse,
+	UpdateListingFieldsRequest
 } from '$lib/api/types';
 import { eodByListing, listings } from '$lib/data/fixtures/marketdata';
-import { clone, delay } from './_mock';
+import { clone, delay, mockId } from './_mock';
 
 /** `GET /marketdata/listings` */
 export async function listListings(): Promise<ListingsResponse> {
@@ -62,4 +65,38 @@ export async function getEOD(query: EODQuery): Promise<EODResponse> {
 		};
 	}
 	return apiGet<EODResponse>('/marketdata/eods', { ...query });
+}
+
+/** `POST /marketdata/listing` */
+export async function createListing(body: CreateListingRequest): Promise<Listing> {
+	if (useMocks) {
+		await delay();
+		const now = new Date().toISOString();
+		return {
+			id: mockId(),
+			symbol: body.symbol,
+			name: body.name,
+			source: body.source,
+			description: body.description ?? null,
+			exchange: body.exchange ?? null,
+			region: body.region ?? null,
+			currency: body.currency ?? null,
+			isin: body.isin ?? null,
+			ticker: body.ticker ?? null,
+			type: body.type ?? null,
+			created_at: now,
+			updated_at: now
+		};
+	}
+	return apiSend<Listing>('POST', '/marketdata/listing', body);
+}
+
+/** `PATCH /marketdata/listing` */
+export async function updateListing(body: UpdateListingFieldsRequest): Promise<Listing> {
+	if (useMocks) {
+		await delay();
+		const existing = listings.find((l) => l.id === body.id) ?? listings[0];
+		return clone({ ...existing, ...body, updated_at: new Date().toISOString() });
+	}
+	return apiSend<Listing>('PATCH', '/marketdata/listing', body);
 }

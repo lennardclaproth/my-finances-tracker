@@ -20,6 +20,7 @@ func (f fakeAccountStore) Exists(_ context.Context, _ uuid.UUID) (bool, error) {
 func (f fakeAccountStore) GetByID(_ context.Context, _ uuid.UUID) (*account.Account, error) {
 	return nil, nil
 }
+func (f fakeAccountStore) List(_ context.Context) ([]*account.Account, error) { return nil, nil }
 
 // fakeAssetsStore is a no-op assets command store; persistence is not under test.
 type fakeAssetsStore struct{}

@@ -78,6 +78,29 @@ export interface PortfolioTransaction {
 /** `GET /portfolio/transactions` — mirrors `portfolio.PortfolioTransactionsResponse`. */
 export type PortfolioTransactionsResponse = PaginatedResponse<PortfolioTransaction>;
 
+/**
+ * `POST /portfolio/transactions/manual` request — mirrors
+ * `portfolio.CreateManualPortfolioTransactionRequest`.
+ * `amount`/`quantity` are decimal strings. `listing_id` is required for non-CASH types;
+ * `quantity` is required and positive for BUY/SELL and forbidden otherwise.
+ */
+export interface CreateManualPortfolioTransactionRequest {
+	account_id: string;
+	vendor_id: string;
+	/** "YYYY-MM-DD". */
+	occurred_at: string;
+	type: PortfolioTransactionType;
+	listing_id?: string;
+	amount: string;
+	quantity?: string;
+	description?: string;
+}
+
+/** `POST /portfolio/rebuild` request. */
+export interface RebuildPortfolioRequest {
+	account_id: string;
+}
+
 /** Query filters for `GET /portfolio/positions`. */
 export interface PortfolioPositionsQuery {
 	account_id: string;

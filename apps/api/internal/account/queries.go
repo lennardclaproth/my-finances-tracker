@@ -14,6 +14,7 @@ type Queries struct {
 type QueryStore interface {
 	Exists(ctx context.Context, id uuid.UUID) (bool, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*Account, error)
+	List(ctx context.Context) ([]*Account, error)
 }
 
 // NewQueries creates account read-side use cases.
@@ -29,4 +30,9 @@ func (q *Queries) Exists(ctx context.Context, id uuid.UUID) (bool, error) {
 
 func (q *Queries) GetByID(ctx context.Context, id uuid.UUID) (*Account, error) {
 	return q.qs.GetByID(ctx, id)
+}
+
+// List returns all accounts.
+func (q *Queries) List(ctx context.Context) ([]*Account, error) {
+	return q.qs.List(ctx)
 }

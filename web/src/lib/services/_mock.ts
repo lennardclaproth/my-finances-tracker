@@ -17,3 +17,10 @@ export function contains(haystack: string | null | undefined, needle: string | u
 	if (!needle) return true;
 	return (haystack ?? '').toLowerCase().includes(needle.toLowerCase());
 }
+
+/** A synthetic UUID for mock write responses (nothing is persisted in mock mode). */
+export function mockId(): string {
+	return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+		? crypto.randomUUID()
+		: '00000000-0000-4000-8000-000000000000';
+}

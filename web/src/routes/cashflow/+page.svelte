@@ -13,11 +13,15 @@
 	import {
 		listCashflowTransactions,
 		getCashflowMonthly,
-		getCashflowTagDistribution
+		getCashflowTagDistribution,
+		createCashflowTransactions,
+		tagCashflowTransactionsBySelection
 	} from '$lib/services/cashflow';
 	import { connectRealtime } from '$lib/services/realtime';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { adminMode } from '$lib/stores/admin.svelte';
+	import { accountStore } from '$lib/stores/account.svelte';
+	import type { CashflowTransactionFormValue } from '$lib/components/organisms/transaction-form-modal/transaction-form-modal.types';
 	import {
 		parseQuery,
 		serializeQuery,
@@ -27,7 +31,6 @@
 	import { pushQuery } from '$lib/url/queryState';
 	import { scaledToNumber } from '$lib/api/money';
 	import { chartColors, donutRamps } from '$lib/charts/theme';
-	import { DEMO_ACCOUNT_ID } from '$lib/api/config';
 	import type {
 		CashflowDirection,
 		CashflowTransaction,
@@ -74,6 +77,8 @@
 	let analyticsLoading = $state(true);
 
 	let createOpen = $state(false);
+	let creating = $state(false);
+	let createError = $state<string | null>(null);
 
 	const tagOptions = $derived(
 		incoming
@@ -163,15 +168,18 @@
 	});
 
 	onMount(() => {
-		const realtime = connectRealtime({
-			accountId: DEMO_ACCOUNT_ID,
-			events: ['import.completed', 'bulk_tag.completed'],
-			onRefresh: () => {
-				void load(currentQuery());
-				void loadAnalytics();
-			}
+		let realtime: { disconnect: () => void } | null = null;
+		void accountStore.ensureLoaded().then(() => {
+			realtime = connectRealtime({
+				accountId: accountStore.activeId,
+				events: ['import.completed', 'bulk_tag.completed'],
+				onRefresh: () => {
+					void load(currentQuery());
+					void loadAnalytics();
+				}
+			});
 		});
-		return () => realtime.disconnect();
+		return () => realtime?.disconnect();
 	});
 
 	function onSort(key: string, direction: SortDirection) {
@@ -198,11 +206,50 @@
 		toast.info(`Filtered to ${rangeFrom} – ${rangeTo}`);
 	}
 
-	function handleCreate() {
-		createOpen = false;
-		toast.success('Transaction created');
-		void load(currentQuery());
-		void loadAnalytics();
+	async function handleCreate(value: CashflowTransactionFormValue) {
+		creating = true;
+		createError = null;
+		try {
+			await accountStore.ensureLoaded();
+			await createCashflowTransactions({
+				account_id: accountStore.activeId,
+				transactions: [
+					{
+						date: value.date,
+						amount: value.amount,
+						type: value.type,
+						description: value.description,
+						// The backend requires a non-blank note and tag per row.
+						note: value.note || value.description,
+						tag: value.tag || 'Uncategorized'
+					}
+				]
+			});
+			createOpen = false;
+			toast.success('Transaction created');
+			void load(currentQuery());
+			void loadAnalytics();
+		} catch {
+			createError = 'Failed to create transaction';
+			toast.error('Failed to create transaction');
+		} finally {
+			creating = false;
+		}
+	}
+
+	async function handleBulkTag() {
+		const tag = window.prompt('Tag for the selected transactions')?.trim();
+		if (!tag) return;
+		const ids = selectedIds;
+		try {
+			await tagCashflowTransactionsBySelection({ tag, ids });
+			toast.success(`Tagged ${ids.length} transactions`);
+			selectedIds = [];
+			void load(currentQuery());
+			void loadAnalytics();
+		} catch {
+			toast.error('Failed to tag transactions');
+		}
 	}
 
 	const navActions: MenuItem[] = [
@@ -306,20 +353,15 @@
 			{onFilterChange}
 		>
 			{#snippet bulkActions()}
-				<Button
-					size="sm"
-					variant="ghost"
-					intent="secondary"
-					onclick={() => {
-						toast.success(`Tagged ${selectedIds.length} transactions`);
-						selectedIds = [];
-					}}
-				>
-					Tag
-				</Button>
+				<Button size="sm" variant="ghost" intent="secondary" onclick={handleBulkTag}>Tag</Button>
 			{/snippet}
 		</CashflowTransactionsTable>
 	</PageContentTemplate>
 </AppShellTemplate>
 
-<TransactionFormModal bind:open={createOpen} onSubmit={handleCreate} />
+<TransactionFormModal
+	bind:open={createOpen}
+	onSubmit={handleCreate}
+	submitting={creating}
+	error={createError}
+/>

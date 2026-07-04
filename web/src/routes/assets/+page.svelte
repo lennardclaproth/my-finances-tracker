@@ -7,13 +7,23 @@
 	import AnalyticsCard from '$lib/components/molecules/analytics-card/AnalyticsCard.svelte';
 	import DataTable from '$lib/components/organisms/data-table/DataTable.svelte';
 	import AssetClassDrawer from '$lib/components/organisms/asset-class-drawer/AssetClassDrawer.svelte';
+	import Dialog from '$lib/components/molecules/dialog/Dialog.svelte';
+	import FormField from '$lib/components/molecules/form-field/FormField.svelte';
+	import Input from '$lib/components/atoms/input/Input.svelte';
+	import Button from '$lib/components/atoms/button/Button.svelte';
 	import Money from '$lib/components/atoms/money/Money.svelte';
 	import Badge from '$lib/components/atoms/badge/Badge.svelte';
-	import { listAssetClasses, getAssetSnapshots, getAssetClassDetails } from '$lib/services/assets';
+	import {
+		listAssetClasses,
+		getAssetSnapshots,
+		getAssetClassDetails,
+		createAssetClass
+	} from '$lib/services/assets';
 	import { adminMode } from '$lib/stores/admin.svelte';
+	import { accountStore } from '$lib/stores/account.svelte';
+	import { toast } from '$lib/stores/toast.svelte';
 	import { decimalStringToNumber } from '$lib/api/money';
 	import { donutRamps } from '$lib/charts/theme';
-	import { DEMO_ACCOUNT_ID } from '$lib/api/config';
 	import type { AssetClass, AssetClassDetails, AssetSnapshotPoint } from '$lib/api/types';
 
 	let classes = $state<AssetClass[]>([]);
@@ -27,6 +37,10 @@
 
 	let from = $state('');
 	let to = $state('');
+
+	let createOpen = $state(false);
+	let className = $state('');
+	let creatingClass = $state(false);
 
 	const euro = (n: number) => `€${n.toLocaleString('en', { maximumFractionDigits: 0 })}`;
 	const monthShort = (iso: string) =>
@@ -42,10 +56,12 @@
 		loading = true;
 		error = null;
 		try {
+			await accountStore.ensureLoaded();
+			const accountId = accountStore.activeId;
 			const [cls, snaps] = await Promise.all([
-				listAssetClasses({ account_id: DEMO_ACCOUNT_ID }),
+				listAssetClasses({ account_id: accountId }),
 				getAssetSnapshots({
-					account_id: DEMO_ACCOUNT_ID,
+					account_id: accountId,
 					from: from || undefined,
 					to: to || undefined
 				})
@@ -66,12 +82,30 @@
 		void loadAll();
 	});
 
+	async function createClass() {
+		if (className.trim() === '') return;
+		creatingClass = true;
+		try {
+			await accountStore.ensureLoaded();
+			await createAssetClass({ account_id: accountStore.activeId, name: className.trim() });
+			createOpen = false;
+			className = '';
+			toast.success('Asset class created');
+			void loadAll();
+		} catch {
+			toast.error('Failed to create asset class');
+		} finally {
+			creatingClass = false;
+		}
+	}
+
 	async function openClass(row: AssetClass) {
 		drawerOpen = true;
 		detailsLoading = true;
 		details = null;
 		try {
-			details = await getAssetClassDetails(row.id, DEMO_ACCOUNT_ID);
+			await accountStore.ensureLoaded();
+			details = await getAssetClassDetails(row.id, accountStore.activeId);
 		} finally {
 			detailsLoading = false;
 		}
@@ -109,7 +143,7 @@
 		/>
 	{/snippet}
 
-	<PageContentTemplate showFab fabLabel="New asset class">
+	<PageContentTemplate showFab fabLabel="New asset class" onFabClick={() => (createOpen = true)}>
 		{#snippet analytics()}
 			<div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
 				<AnalyticsCard title="Total worth" class="lg:col-span-2">
@@ -157,3 +191,15 @@
 </AppShellTemplate>
 
 <AssetClassDrawer bind:open={drawerOpen} {details} loading={detailsLoading} />
+
+<Dialog bind:open={createOpen} title="New asset class" size="sm">
+	<FormField label="Name" id="class-name">
+		{#snippet children(ctx)}
+			<Input id={ctx.id} bind:value={className} placeholder="e.g. Real estate" />
+		{/snippet}
+	</FormField>
+	{#snippet footer()}
+		<Button variant="ghost" intent="secondary" onclick={() => (createOpen = false)}>Cancel</Button>
+		<Button intent="success" onclick={createClass} loading={creatingClass}>Create</Button>
+	{/snippet}
+</Dialog>
